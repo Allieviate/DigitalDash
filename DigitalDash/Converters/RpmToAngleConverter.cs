@@ -6,14 +6,14 @@ namespace DigitalDash.Converters
 {
     /// <summary>
     /// Converts RPM values into the rotation angle used to render the gauge needle.
+    /// Supports both single-value and multi-value bindings so callers can optionally
+    /// supply custom minimum and maximum ranges.
     /// </summary>
-    public class RpmToAngleConverter : IValueConverter
+    public class RpmToAngleConverter : IValueConverter, IMultiValueConverter
     {
-        private const double MinRpm = 0.0;
-        private const double MaxRpm = 8000.0;
-
         private const double MinAngle = -135.0;
         private const double MaxAngle = 135.0;
+        private static readonly double[] DefaultRange = { 0.0, 8000.0 };
 
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {

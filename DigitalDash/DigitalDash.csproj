@@ -35,14 +35,6 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="ActiproSoftware.Gauge.Wpf, Version=25.1.1.0, Culture=neutral, PublicKeyToken=36ff2196ab5654b9, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\..\..\WpfLibs\Actipro\ActiproSoftware.Gauge.Wpf.dll</HintPath>
-    </Reference>
-    <Reference Include="ActiproSoftware.Shared.Wpf, Version=25.1.1.0, Culture=neutral, PublicKeyToken=36ff2196ab5654b9, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\..\..\WpfLibs\Actipro\ActiproSoftware.Shared.Wpf.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
@@ -68,11 +60,12 @@
       <SubType>Designer</SubType>
     </Page>
     <Compile Include="Converters\RpmToAngleConverter.cs" />
+	  <Compile Include="MainViewModel.cs" />
+	  <Compile Include="MicroGauge\Wpf\WpfGaugeRadial.cs" />
     <Compile Include="App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="Converters\RpmToBrushConverter.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
@@ -104,5 +97,16 @@
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
+	<ItemGroup>
+		<Resource Include="Assets\Honda Frankenstein Logo.png" />
+		<Resource Include="Assets\Rpm Gauge.png" />
+		<Resource Include="Assets\Rpm Large Tacs.png" />
+		<Resource Include="Assets\Rpm Medium Tacs.png" />
+		<Resource Include="Assets\Rpm Needle Center.png" />
+		<Resource Include="Assets\Rpm Needle.png" />
+		<Resource Include="Assets\Rpm Numbers.png" />
+		<Resource Include="Assets\Rpm Small Tacs.png" />
+		<Resource Include="Assets\x1000 Rpm.png" />
+	</ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
