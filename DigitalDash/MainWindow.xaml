@@ -4,7 +4,8 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:converters="clr-namespace:DigitalDash.Converters"
-        mc:Ignorable="d"
+		xmlns:microGauge="clr-namespace:MicroGauge.Wpf"
+		mc:Ignorable="d"
         Title="MainWindow" Height="600" Width="800">
 	<Window.Resources>
 		<converters:RpmToAngleConverter x:Key="RpmToAngleConverter"/>
@@ -42,8 +43,8 @@
 		  SnapsToDevicePixels="True">
 			<Grid Width="500" Height="500">
 				<Image Source="pack://application:,,,/DigitalDash;component/Assets/Rpm%20Gauge.png"
-                   Stretch="Fill"
-                   Width="500" Height="500"/>
+                       Stretch="Fill"
+                       Width="500" Height="500"/>
 				<Image Source="pack://application:,,,/DigitalDash;component/Assets/Rpm%20Small%20Tacs.png"
                        Stretch="Fill" Width="500" Height="500"/>
 				<Image Source="pack://application:,,,/DigitalDash;component/Assets/Rpm%20Medium%20Tacs.png"
@@ -54,7 +55,7 @@
                        Stretch="Fill" Width="500" Height="500"/>
 				<Image Source="pack://application:,,,/DigitalDash;component/Assets/x1000%20Rpm.png"
                        Stretch="None"
-				   HorizontalAlignment="Center"
+                       HorizontalAlignment="Center"
                        VerticalAlignment="Bottom"
                        Margin="0,0,0,30"/>
 
@@ -72,14 +73,14 @@
                                            ValueBrush="Transparent"/>
 
 				<Image Source="pack://application:,,,/DigitalDash;component/Assets/Rpm%20Needle.png"
-                   Height="200"
-                   Stretch="Uniform"
-                   RenderTransformOrigin="0.5,0.85"
-                   VerticalAlignment="Top"
+                       Height="200"
+                       Stretch="Uniform"
+                       RenderTransformOrigin="0.5,0.85"
+                       VerticalAlignment="Top"
                        HorizontalAlignment="Center"
                        Margin="0,142,0,0"
                        IsHitTestVisible="False">
-				<Image.RenderTransform>
+					<Image.RenderTransform>
 						<RotateTransform>
 							<RotateTransform.Angle>
 								<MultiBinding Converter="{StaticResource RpmToAngleConverter}">
@@ -89,14 +90,14 @@
 								</MultiBinding>
 							</RotateTransform.Angle>
 						</RotateTransform>
-				</Image.RenderTransform>
-			</Image>
+					</Image.RenderTransform>
+				</Image>
 
 				<Image Source="pack://application:,,,/DigitalDash;component/Assets/Rpm%20Needle%20Center.png"
                        Width="30" Height="30"
-				   HorizontalAlignment="Center"
-				   VerticalAlignment="Center"/>
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"/>
+			</Grid>
 		</Grid>
-	</Grid>
 	</Grid>
 </Window>
