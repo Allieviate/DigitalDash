@@ -29,36 +29,36 @@
                VerticalAlignment="Center"
                HorizontalAlignment="Center"
 		  Opacity="0"
-		   Panel.ZIndex="10"
-		   RenderTransformOrigin="0.507,0.733"/>
+               Panel.ZIndex="10"
+               RenderTransformOrigin="0.507,0.733"/>
 
-		<!-- Main Gauge Container -->
-		<Grid x:Name="GaugeRoot"
+        <!-- Main Gauge Container -->
+        <Grid x:Name="GaugeRoot"
               Opacity="0"
               Width="500" Height="500"
               HorizontalAlignment="Center"
-		 VerticalAlignment="Center"
-		  RenderOptions.BitmapScalingMode="HighQuality"
-		  SnapsToDevicePixels="True">
-			<Grid Width="500" Height="500">
-				<Image Source="pack://application:,,,/DigitalDash;component/Assets/Rpm%20Gauge.png"
+		     VerticalAlignment="Center"
+              RenderOptions.BitmapScalingMode="HighQuality"
+              SnapsToDevicePixels="True">
+            <Grid Width="500" Height="500">
+                <Image Source="pack://application:,,,/DigitalDash;component/Assets/Rpm%20Gauge.png"
                        Stretch="Fill"
                        Width="500" Height="500"/>
-				<Image Source="pack://application:,,,/DigitalDash;component/Assets/Rpm%20Small%20Tacs.png"
+                <Image Source="pack://application:,,,/DigitalDash;component/Assets/Rpm%20Small%20Tacs.png"
                        Stretch="Fill" Width="500" Height="500"/>
-				<Image Source="pack://application:,,,/DigitalDash;component/Assets/Rpm%20Medium%20Tacs.png"
+                <Image Source="pack://application:,,,/DigitalDash;component/Assets/Rpm%20Medium%20Tacs.png"
                        Stretch="Fill" Width="500" Height="500"/>
-				<Image Source="pack://application:,,,/DigitalDash;component/Assets/Rpm%20Large%20Tacs.png"
+                <Image Source="pack://application:,,,/DigitalDash;component/Assets/Rpm%20Large%20Tacs.png"
                        Stretch="Fill" Width="500" Height="500"/>
-				<Image Source="pack://application:,,,/DigitalDash;component/Assets/Rpm%20Numbers.png"
+                <Image Source="pack://application:,,,/DigitalDash;component/Assets/Rpm%20Numbers.png"
                        Stretch="Fill" Width="500" Height="500"/>
-				<Image Source="pack://application:,,,/DigitalDash;component/Assets/x1000%20Rpm.png"
+                <Image Source="pack://application:,,,/DigitalDash;component/Assets/x1000%20Rpm.png"
                        Stretch="None"
                        HorizontalAlignment="Center"
                        VerticalAlignment="Bottom"
                        Margin="0,0,0,30"/>
 
-				<microGauge:WpfGaugeRadial x:Name="RpmGauge"
+                <microGauge:WpfGaugeRadial x:Name="RpmGauge"
                                            Width="500"
                                            Height="500"
                                            Minimum="{Binding MinimumRpm, Mode=OneWay}"
@@ -71,7 +71,7 @@
                                            LabelBrush="Transparent"
                                            ValueBrush="Transparent"/>
 
-				<Image Source="pack://application:,,,/DigitalDash;component/Assets/Rpm%20Needle.png"
+                <Image Source="pack://application:,,,/DigitalDash;component/Assets/Rpm%20Needle.png"
                        Height="200"
                        Stretch="Uniform"
                        RenderTransformOrigin="0.5,0.85"
@@ -79,24 +79,24 @@
                        HorizontalAlignment="Center"
                        Margin="0,142,0,0"
                        IsHitTestVisible="False">
-					<Image.RenderTransform>
-						<RotateTransform>
-							<RotateTransform.Angle>
-								<MultiBinding Converter="{StaticResource RpmToAngleConverter}">
+                    <Image.RenderTransform>
+                        <RotateTransform>
+                            <RotateTransform.Angle>
+                                <MultiBinding Converter="{StaticResource RpmToAngleConverter}">
                                     <Binding Path="CurrentRpm" />
                                     <Binding Path="MinimumRpm" />
                                     <Binding Path="MaximumRpm" />
-								</MultiBinding>
-							</RotateTransform.Angle>
-						</RotateTransform>
-					</Image.RenderTransform>
-				</Image>
+                                </MultiBinding>
+                            </RotateTransform.Angle>
+                        </RotateTransform>
+                    </Image.RenderTransform>
+                </Image>
 
-				<Image Source="pack://application:,,,/DigitalDash;component/Assets/Rpm%20Needle%20Center.png"
+                <Image Source="pack://application:,,,/DigitalDash;component/Assets/Rpm%20Needle%20Center.png"
                        Width="30" Height="30"
                        HorizontalAlignment="Center"
                        VerticalAlignment="Center"/>
-			</Grid>
-		</Grid>
+            </Grid>
+        </Grid>
 	</Grid>
 </Window>
