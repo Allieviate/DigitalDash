@@ -4,31 +4,31 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:converters="clr-namespace:DigitalDash.Converters"
-		xmlns:microGauge="clr-namespace:MicroGauge.Wpf"
-		mc:Ignorable="d"
+        mc:Ignorable="d"
         Title="MainWindow" Height="600" Width="800">
-	    <Window.Resources>
-		    <converters:RpmToAngleConverter x:Key="RpmToAngleConverter" />
-		    <Storyboard x:Key="StartupStoryboard">
-			    <DoubleAnimation Storyboard.TargetName="StartupLogo"
+    <Window.Resources>
+        <!-- Converter left in case you want to use it elsewhere -->
+        <converters:RpmToAngleMultiConverter x:Key="RpmToAngleConverter"/>
+        <Storyboard x:Key="StartupStoryboard">
+            <DoubleAnimation Storyboard.TargetName="StartupLogo"
                              Storyboard.TargetProperty="Opacity"
                              From="0" To="1" Duration="0:0:1" BeginTime="0:0:0"/>
-			    <DoubleAnimation Storyboard.TargetName="StartupLogo"
+            <DoubleAnimation Storyboard.TargetName="StartupLogo"
                              Storyboard.TargetProperty="Opacity"
                              From="1" To="0" Duration="0:0:1" BeginTime="0:0:3"/>
-			    <DoubleAnimation Storyboard.TargetName="GaugeRoot"
+            <DoubleAnimation Storyboard.TargetName="GaugeRoot"
                              Storyboard.TargetProperty="Opacity"
                              From="0" To="1" Duration="0:0:1" BeginTime="0:0:4"/>
-		    </Storyboard>
-	</Window.Resources>
-	<Grid Background="Black">
-		<!-- Startup Logo -->
-		<Image x:Name="StartupLogo"
+        </Storyboard>
+    </Window.Resources>
+    <Grid Background="Black">
+        <!-- Startup Logo -->
+        <Image x:Name="StartupLogo"
                Source="pack://application:,,,/DigitalDash;component/Assets/Honda%20Frankenstein%20Logo.png"
                Width="300" Height="300"
                VerticalAlignment="Center"
                HorizontalAlignment="Center"
-		  Opacity="0"
+               Opacity="0"
                Panel.ZIndex="10"
                RenderTransformOrigin="0.507,0.733"/>
 
@@ -37,7 +37,7 @@
               Opacity="0"
               Width="500" Height="500"
               HorizontalAlignment="Center"
-		     VerticalAlignment="Center"
+              VerticalAlignment="Center"
               RenderOptions.BitmapScalingMode="HighQuality"
               SnapsToDevicePixels="True">
             <Grid Width="500" Height="500">
@@ -58,19 +58,7 @@
                        VerticalAlignment="Bottom"
                        Margin="0,0,0,30"/>
 
-                <microGauge:WpfGaugeRadial x:Name="RpmGauge"
-                                           Width="500"
-                                           Height="500"
-                                           Minimum="{Binding MinimumRpm, Mode=OneWay}"
-                                           Maximum="{Binding MaximumRpm, Mode=OneWay}"
-                                           Value="{Binding CurrentRpm, Mode=OneWay}"
-                                           NeedleBrush="Transparent"
-                                           BackingBrush="Transparent"
-                                           MajorTickBrush="Transparent"
-                                           MinorTickBrush="Transparent"
-                                           LabelBrush="Transparent"
-                                           ValueBrush="Transparent"/>
-
+                <!-- Needle image; rotation is driven from code-behind via NeedleRotate -->
                 <Image Source="pack://application:,,,/DigitalDash;component/Assets/Rpm%20Needle.png"
                        Height="200"
                        Stretch="Uniform"
@@ -80,15 +68,7 @@
                        Margin="0,142,0,0"
                        IsHitTestVisible="False">
                     <Image.RenderTransform>
-                        <RotateTransform>
-                            <RotateTransform.Angle>
-                                <MultiBinding Converter="{StaticResource RpmToAngleConverter}">
-                                    <Binding Path="CurrentRpm" />
-                                    <Binding Path="MinimumRpm" />
-                                    <Binding Path="MaximumRpm" />
-                                </MultiBinding>
-                            </RotateTransform.Angle>
-                        </RotateTransform>
+                        <RotateTransform x:Name="NeedleRotate" Angle="0" />
                     </Image.RenderTransform>
                 </Image>
 
@@ -98,5 +78,5 @@
                        VerticalAlignment="Center"/>
             </Grid>
         </Grid>
-	</Grid>
+    </Grid>
 </Window>
