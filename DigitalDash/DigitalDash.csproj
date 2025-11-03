@@ -61,7 +61,9 @@
     </Page>
     <Compile Include="Converters\RpmToAngleConverter.cs" />
 	  <Compile Include="MainViewModel.cs" />
-	  <Compile Include="MicroGauge\Wpf\WpfGaugeRadial.cs" />
+	  <Compile Include="MicroGauge\*.cs" />
+	  <Compile Include="MicroGauge\Constant\*.cs" />
+	  <Compile Include="MicroGauge\MicroGauge.Wpf\*.cs" />
     <Compile Include="App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
