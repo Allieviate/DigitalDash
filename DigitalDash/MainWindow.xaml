@@ -7,19 +7,19 @@
 		xmlns:microGauge="clr-namespace:MicroGauge.Wpf"
 		mc:Ignorable="d"
         Title="MainWindow" Height="600" Width="800">
-	<Window.Resources>
+	    <Window.Resources>
 		    <converters:RpmToAngleConverter x:Key="RpmToAngleConverter" />
-		<Storyboard x:Key="StartupStoryboard">
-			<DoubleAnimation Storyboard.TargetName="StartupLogo"
+		    <Storyboard x:Key="StartupStoryboard">
+			    <DoubleAnimation Storyboard.TargetName="StartupLogo"
                              Storyboard.TargetProperty="Opacity"
                              From="0" To="1" Duration="0:0:1" BeginTime="0:0:0"/>
-			<DoubleAnimation Storyboard.TargetName="StartupLogo"
+			    <DoubleAnimation Storyboard.TargetName="StartupLogo"
                              Storyboard.TargetProperty="Opacity"
                              From="1" To="0" Duration="0:0:1" BeginTime="0:0:3"/>
-			<DoubleAnimation Storyboard.TargetName="GaugeRoot"
+			    <DoubleAnimation Storyboard.TargetName="GaugeRoot"
                              Storyboard.TargetProperty="Opacity"
                              From="0" To="1" Duration="0:0:1" BeginTime="0:0:4"/>
-		</Storyboard>
+		    </Storyboard>
 	</Window.Resources>
 	<Grid Background="Black">
 		<!-- Startup Logo -->
