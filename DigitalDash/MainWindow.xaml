@@ -8,7 +8,6 @@
 		mc:Ignorable="d"
         Title="MainWindow" Height="600" Width="800">
 	<Window.Resources>
-		<converters:RpmToAngleConverter x:Key="RpmToAngleConverter"/>
 
 		<Storyboard x:Key="StartupStoryboard">
 			<DoubleAnimation Storyboard.TargetName="StartupLogo"
@@ -84,9 +83,9 @@
 						<RotateTransform>
 							<RotateTransform.Angle>
 								<MultiBinding Converter="{StaticResource RpmToAngleConverter}">
-									<Binding Path="AnimatedValue" ElementName="RpmGauge" />
-									<Binding Path="Minimum" ElementName="RpmGauge" />
-									<Binding Path="Maximum" ElementName="RpmGauge" />
+                                    <Binding Path="CurrentRpm" />
+                                    <Binding Path="MinimumRpm" />
+                                    <Binding Path="MaximumRpm" />
 								</MultiBinding>
 							</RotateTransform.Angle>
 						</RotateTransform>
