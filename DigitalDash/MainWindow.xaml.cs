@@ -7,7 +7,7 @@ namespace DigitalDash
     {
         public MainWindow()
         {
-            InitializeComponent();      // generated from XAML
+            InitializeComponent();
             DataContext = new MainViewModel();
         }
     }

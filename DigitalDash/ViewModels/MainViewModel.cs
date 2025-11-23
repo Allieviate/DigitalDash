@@ -40,8 +40,8 @@ namespace DigitalDash.ViewModels
         {
             _demoAngle += 0.05;
 
-            Rpm = 800 + Math.Abs(Math.Sin(_demoAngle) * 6000);
-            Speed = Math.Abs(Math.Sin(_demoAngle * 0.7) * 140);
+            Rpm = 800 + Math.Abs(Math.Sin(_demoAngle) * 6000);     // 0–6800-ish
+            Speed = Math.Abs(Math.Sin(_demoAngle * 0.7) * 140);    // 0–140
         }
     }
 }

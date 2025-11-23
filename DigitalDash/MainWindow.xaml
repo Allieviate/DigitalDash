@@ -8,46 +8,32 @@
         WindowStartupLocation="CenterScreen"
         Background="#111111">
 
-	<Grid>
-		<Grid.ColumnDefinitions>
-			<ColumnDefinition Width="*" />
-			<ColumnDefinition Width="*" />
-		</Grid.ColumnDefinitions>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
-		<!-- LEFT: RPM gauge -->
-		<Grid Grid.Column="0">
-			<!-- optional: background image -->
-			<!--
-            <Image Source="Assets/Images/RpmGauge.png"
-                   Stretch="Uniform"
-                   Opacity="0.95" />
-            -->
-
-			<microGauge:WpfGaugeRadial
+        <!-- LEFT: RPM gauge -->
+        <Grid Grid.Column="0">
+            <microGauge:WpfGaugeRadial
                 Value="{Binding Rpm}"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 Width="350"
                 Height="350"
                 NeedleBrush="#FFDD3333" />
-		</Grid>
+        </Grid>
 
-		<!-- RIGHT: Speed gauge -->
-		<Grid Grid.Column="1">
-			<!-- optional: background image -->
-			<!--
-            <Image Source="Assets/Images/SpeedGauge.png"
-                   Stretch="Uniform"
-                   Opacity="0.95" />
-            -->
-
-			<microGauge:WpfGaugeRadial
+        <!-- RIGHT: Speed gauge -->
+        <Grid Grid.Column="1">
+            <microGauge:WpfGaugeRadial
                 Value="{Binding Speed}"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 Width="350"
                 Height="350"
                 NeedleBrush="#FF33DD33" />
-		</Grid>
-	</Grid>
+        </Grid>
+    </Grid>
 </Window>
