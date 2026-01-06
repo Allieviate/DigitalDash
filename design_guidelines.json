@@ -1,0 +1,150 @@
+{
+  "identity": {
+    "name": "E1",
+    "role": "Creative Designer (Automotive HMI Specialist)",
+    "mission": "Create a vehicle interface that feels like a piece of high-performance hardware, not a website.",
+    "principles": [
+      "Fusion: 1989 Retro-Futurism x 2025 Type R Precision",
+      "Latency is Death: 60fps animations or nothing",
+      "Data Hierarchy: RPM is King, everything else is secondary",
+      "Night Vision: Total darkness mastery (OLED blacks)"
+    ]
+  },
+  "theme_strategy": {
+    "mode": "dark",
+    "name": "Neo-Analog Cockpit",
+    "emotional_tone": "Precision, Adrenaline, Mechanical",
+    "visual_style": "Bento-Grid Dashboard with High-Contrast Data"
+  },
+  "typography": {
+    "primary_font": "Chivo",
+    "secondary_font": "JetBrains Mono",
+    "usage": {
+      "headings": "Chivo (Bold/Black) - For static labels (RPM, SPEED, OIL)",
+      "data_display": "JetBrains Mono (Medium/Bold) - For changing numbers (7000, 120, 98)",
+      "ui_elements": "Chivo (Regular) - For menus and settings"
+    },
+    "scale": {
+      "hero_data": "text-8xl tracking-tighter font-mono",
+      "primary_label": "text-sm tracking-[0.2em] uppercase text-muted-foreground",
+      "warning_text": "text-lg font-bold uppercase tracking-widest"
+    }
+  },
+  "colors": {
+    "palette": {
+      "background": "#050505",
+      "surface": "#09090b",
+      "surface_highlight": "#18181b",
+      "border": "#27272a",
+      "primary_red": "#DC2626",
+      "retro_amber": "#F59E0B",
+      "cyan_cool": "#06B6D4",
+      "success_green": "#10B981",
+      "warning_yellow": "#EAB308",
+      "danger_red": "#EF4444"
+    },
+    "themes": {
+      "type_r": {
+        "accent": "#DC2626",
+        "glow": "0 0 20px rgba(220, 38, 38, 0.5)",
+        "bg_texture": "carbon_fiber"
+      },
+      "retro_89": {
+        "accent": "#F59E0B",
+        "glow": "0 0 15px rgba(245, 158, 11, 0.4)",
+        "bg_texture": "grid_scanlines"
+      },
+      "clean_oem": {
+        "accent": "#ffffff",
+        "glow": "none",
+        "bg_texture": "matte_black"
+      }
+    }
+  },
+  "layout_system": {
+    "grid_type": "Bento Grid (Automotive Edition)",
+    "spacing": {
+      "container_padding": "p-4 md:p-8",
+      "gap": "gap-4 md:gap-6",
+      "internal_padding": "p-6"
+    },
+    "structure": {
+      "hero_section": "col-span-full lg:col-span-8 row-span-2 (Central Tachometer)",
+      "side_panel_left": "col-span-2 row-span-2 (Temps & Pressures)",
+      "side_panel_right": "col-span-2 row-span-2 (Fuel & Economy)",
+      "warning_strip": "col-span-full h-16 (Top or Bottom fixed bar)"
+    }
+  },
+  "components": {
+    "tachometer": {
+      "type": "custom_svg",
+      "specs": "Must be responsive. Use SVG arcs. Smooth transition on value change.",
+      "animation": "Spring physics (stiff: 120, damping: 14) for needle movement"
+    },
+    "data_card": {
+      "style": "Neumorphic Dark",
+      "classes": "bg-card/50 border border-white/10 backdrop-blur-md rounded-xl shadow-inner"
+    },
+    "warning_light": {
+      "style": "Skeuomorphic LED",
+      "active_class": "animate-pulse drop-shadow-[0_0_8px_rgba(239,68,68,0.8)] text-red-500",
+      "inactive_class": "text-zinc-800 opacity-20"
+    },
+    "buttons": {
+      "style": "Tactile",
+      "classes": "h-12 px-8 uppercase tracking-widest font-bold border border-white/10 hover:bg-white/5 active:scale-95 transition-all"
+    }
+  },
+  "assets": {
+    "icons": {
+      "library": "lucide-react",
+      "mapping": {
+        "engine": "Engine",
+        "oil": "Droplet",
+        "battery": "Zap",
+        "fuel": "Fuel",
+        "temp": "Thermometer",
+        "settings": "Settings",
+        "dashboard": "Gauge",
+        "warning": "AlertTriangle"
+      }
+    },
+    "images": [
+      {
+        "category": "texture",
+        "name": "carbon_fiber_dark",
+        "url": "https://images.unsplash.com/photo-1574505371939-de03b2e174f4?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzh8MHwxfHNlYXJjaHwyfHxjYXJib24lMjBmaWJlciUyMHRleHR1cmUlMjBkYXJrfGVufDB8fHx8MTc2NzY5MjIxOHww&ixlib=rb-4.1.0&q=85",
+        "usage": "Background overlay for Sport Mode with low opacity (10-20%)"
+      },
+      {
+        "category": "logo",
+        "name": "honda_logo_white",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Honda_Logo.svg/2560px-Honda_Logo.svg.png",
+        "usage": "Boot sequence and steering wheel center (Use this URL as fallback or search for SVG)"
+      }
+    ]
+  },
+  "motion_guidelines": {
+    "boot_sequence": {
+      "steps": [
+        "1. Blank screen (0.5s)",
+        "2. Logo fade in + glow (1s)",
+        "3. System check text scrolling (fast)",
+        "4. Gauges sweep (0 to max to 0)",
+        "5. UI fade in"
+      ]
+    },
+    "transitions": {
+      "page_switch": "Slide left/right with 0.3s ease-out",
+      "value_update": "Number counter effect for digital readouts"
+    }
+  },
+  "universal_guidelines": [
+    "NEVER use white backgrounds. This is a car dashboard.",
+    "Contrast is safety. Text must be readable at 70mph.",
+    "Touch targets must be large (min 48px) for clumsy fingers.",
+    "Avoid complex gradients. Use flat colors or subtle radial glows.",
+    "Use 'data-testid' for all interactive elements."
+  ],
+  "instructions_to_main_agent": "1. Install 'lucide-react' and 'recharts'. 2. Create a 'Gauge' component using SVG. 3. Implement the 'ThemeContext' to handle switching between Type R (Red) and Retro (Amber). 4. Build the 'BootSequence' component as the entry point. 5. Use the provided carbon fiber image as a subtle background texture in CSS."
+}
