@@ -1,15 +1,18 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import asyncio
+import math
+import time
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List
+from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone
-
+import json
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -19,52 +22,272 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# Create the main app without a prefix
+# Create the main app
 app = FastAPI()
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# ============ MODELS ============
 
-# Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
-    
+class VehicleSignals(BaseModel):
+    rpm: float = 900.0
+    speed_mph: float = 0.0
+    gear: int = 0  # -1=R, 0=N, 1..6 forward
+    fuel_pct: float = 1.0
+    coolant_temp_c: float = 25.0
+    oil_pressure_psi: float = 40.0
+    battery_voltage: float = 12.6
+    turn_left: bool = False
+    turn_right: bool = False
+    check_engine: bool = False
+    maintenance: bool = False
+    oil_pressure_warning: bool = False
+    low_fuel: bool = False
+    high_coolant: bool = False
+    abs_warning: bool = False
+    airbag_warning: bool = False
+    brake_warning: bool = False
+    headlights: bool = False
+    high_beams: bool = False
+
+class ThemeConfig(BaseModel):
+    id: str
+    name: str
+    accent: str
+    glow: str
+    bg_texture: str
+
+class UserSettings(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    theme_id: str = "type_r"
+    data_source: str = "simulated"  # simulated or obd
+    units: str = "imperial"  # imperial or metric
+    gauge_style: str = "modern"  # modern, classic, minimal
+    warning_sounds: bool = True
+    brightness: int = 100
+    show_diagnostics: bool = False
+    custom_gauges: Dict[str, Any] = Field(default_factory=dict)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
+class UserSettingsUpdate(BaseModel):
+    theme_id: Optional[str] = None
+    data_source: Optional[str] = None
+    units: Optional[str] = None
+    gauge_style: Optional[str] = None
+    warning_sounds: Optional[bool] = None
+    brightness: Optional[int] = None
+    show_diagnostics: Optional[bool] = None
+    custom_gauges: Optional[Dict[str, Any]] = None
 
-# Add your routes to the router instead of directly to app
+# ============ THEMES ============
+
+THEMES = {
+    "type_r": ThemeConfig(
+        id="type_r",
+        name="Type R",
+        accent="#DC2626",
+        glow="0 0 20px rgba(220, 38, 38, 0.5)",
+        bg_texture="carbon_fiber"
+    ),
+    "retro_89": ThemeConfig(
+        id="retro_89",
+        name="Retro '89",
+        accent="#F59E0B",
+        glow="0 0 15px rgba(245, 158, 11, 0.4)",
+        bg_texture="grid_scanlines"
+    ),
+    "clean_oem": ThemeConfig(
+        id="clean_oem",
+        name="Clean OEM",
+        accent="#ffffff",
+        glow="none",
+        bg_texture="matte_black"
+    )
+}
+
+# ============ VEHICLE DATA SIMULATION ============
+
+class VehicleSimulator:
+    def __init__(self):
+        self.t0 = time.time()
+        self.last_blink = 0.0
+        self.blink_state = False
+        self.signals = VehicleSignals()
+    
+    def update(self) -> VehicleSignals:
+        t = time.time() - self.t0
+        dt = 0.033  # ~30fps
+        
+        # Simulate driving pattern
+        load = (math.sin(t * 0.15 - math.pi / 2) * 0.5) + 0.5
+        
+        # Speed and RPM
+        self.signals.speed_mph = max(0.0, load * 120.0)
+        self.signals.rpm = max(900.0, min(8000.0, 1200.0 + self.signals.speed_mph * 55 + load * 1200))
+        
+        # Gear selection based on speed
+        sp = self.signals.speed_mph
+        if sp < 3:
+            self.signals.gear = 0
+        elif sp < 30:
+            self.signals.gear = 1
+        elif sp < 50:
+            self.signals.gear = 2
+        elif sp < 70:
+            self.signals.gear = 3
+        elif sp < 95:
+            self.signals.gear = 4
+        elif sp < 120:
+            self.signals.gear = 5
+        else:
+            self.signals.gear = 6
+        
+        # Fuel consumption
+        self.signals.fuel_pct = max(0.0, 1.0 - (t * 0.001))
+        
+        # Coolant temperature based on load
+        coolant_target = 35.0 + load * 55.0 + (self.signals.speed_mph / 170.0) * 10.0
+        coolant_target = max(20.0, min(110.0, coolant_target))
+        self.signals.coolant_temp_c += (coolant_target - self.signals.coolant_temp_c) * 0.35 * dt
+        
+        # Oil pressure based on RPM
+        self.signals.oil_pressure_psi = 20 + (self.signals.rpm / 8000) * 60
+        
+        # Battery voltage (simulate charging)
+        self.signals.battery_voltage = 12.6 + (self.signals.rpm / 8000) * 1.8
+        
+        # Warning flags
+        self.signals.low_fuel = self.signals.fuel_pct <= 0.12
+        self.signals.high_coolant = self.signals.coolant_temp_c >= 105.0
+        self.signals.oil_pressure_warning = self.signals.oil_pressure_psi < 15
+        self.signals.check_engine = self.signals.high_coolant
+        self.signals.maintenance = t >= 60.0
+        
+        # Turn signal simulation
+        phase = t % 20.0
+        left_req = 5.0 <= phase < 10.0
+        right_req = 10.0 <= phase < 15.0
+        hazard_req = phase >= 18.0
+        
+        if (time.time() - self.last_blink) > 0.5:
+            self.blink_state = not self.blink_state
+            self.last_blink = time.time()
+        
+        self.signals.turn_left = (left_req or hazard_req) and self.blink_state
+        self.signals.turn_right = (right_req or hazard_req) and self.blink_state
+        
+        # Lights
+        self.signals.headlights = True
+        self.signals.high_beams = sp > 60
+        
+        return self.signals
+
+simulator = VehicleSimulator()
+
+# ============ API ROUTES ============
+
 @api_router.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "Accord HMI API v1.0"}
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
-    
-    # Convert to dict and serialize datetime to ISO string for MongoDB
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
+@api_router.get("/vehicle-data", response_model=VehicleSignals)
+async def get_vehicle_data():
+    """Get current vehicle signals (simulated)"""
+    return simulator.update()
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    # Exclude MongoDB's _id field from the query results
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
+@api_router.get("/themes", response_model=List[ThemeConfig])
+async def get_themes():
+    """Get available themes"""
+    return list(THEMES.values())
+
+@api_router.get("/themes/{theme_id}", response_model=ThemeConfig)
+async def get_theme(theme_id: str):
+    """Get specific theme by ID"""
+    if theme_id in THEMES:
+        return THEMES[theme_id]
+    return THEMES["type_r"]
+
+@api_router.get("/settings", response_model=UserSettings)
+async def get_settings():
+    """Get user settings"""
+    settings = await db.settings.find_one({}, {"_id": 0})
+    if settings:
+        if isinstance(settings.get('updated_at'), str):
+            settings['updated_at'] = datetime.fromisoformat(settings['updated_at'])
+        return UserSettings(**settings)
+    # Return default settings
+    default = UserSettings()
+    return default
+
+@api_router.post("/settings", response_model=UserSettings)
+async def save_settings(settings_update: UserSettingsUpdate):
+    """Update user settings"""
+    existing = await db.settings.find_one({}, {"_id": 0})
     
-    # Convert ISO string timestamps back to datetime objects
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
-    
-    return status_checks
+    if existing:
+        update_data = settings_update.model_dump(exclude_unset=True)
+        update_data['updated_at'] = datetime.now(timezone.utc).isoformat()
+        await db.settings.update_one({}, {"$set": update_data})
+        updated = await db.settings.find_one({}, {"_id": 0})
+        if isinstance(updated.get('updated_at'), str):
+            updated['updated_at'] = datetime.fromisoformat(updated['updated_at'])
+        return UserSettings(**updated)
+    else:
+        new_settings = UserSettings(**settings_update.model_dump(exclude_unset=True))
+        doc = new_settings.model_dump()
+        doc['updated_at'] = doc['updated_at'].isoformat()
+        await db.settings.insert_one(doc)
+        return new_settings
+
+@api_router.get("/diagnostics")
+async def get_diagnostics():
+    """Get detailed diagnostics data (OBD scanner style)"""
+    signals = simulator.update()
+    return {
+        "engine": {
+            "rpm": round(signals.rpm, 0),
+            "load": round((signals.rpm / 8000) * 100, 1),
+            "coolant_temp_c": round(signals.coolant_temp_c, 1),
+            "coolant_temp_f": round(signals.coolant_temp_c * 9/5 + 32, 1),
+            "intake_air_temp_c": round(25 + (signals.rpm / 8000) * 20, 1),
+            "throttle_position": round((signals.speed_mph / 120) * 100, 1),
+        },
+        "fuel": {
+            "fuel_level_pct": round(signals.fuel_pct * 100, 1),
+            "fuel_pressure_kpa": round(350 + (signals.rpm / 8000) * 50, 1),
+            "fuel_trim_short": round(-2 + (math.sin(time.time()) * 5), 1),
+            "fuel_trim_long": round(1.5, 1),
+        },
+        "electrical": {
+            "battery_voltage": round(signals.battery_voltage, 2),
+            "alternator_output": round(signals.battery_voltage + 0.5 if signals.rpm > 1000 else 0, 2),
+        },
+        "transmission": {
+            "gear": signals.gear,
+            "vehicle_speed_mph": round(signals.speed_mph, 0),
+            "vehicle_speed_kmh": round(signals.speed_mph * 1.60934, 0),
+        },
+        "oil": {
+            "oil_pressure_psi": round(signals.oil_pressure_psi, 1),
+            "oil_temp_c": round(80 + (signals.rpm / 8000) * 30, 1),
+        },
+        "dtc_codes": [] if not signals.check_engine else ["P0118 - Coolant Temp High"],
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+# WebSocket for real-time data
+@api_router.websocket("/ws/vehicle-data")
+async def websocket_vehicle_data(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            data = simulator.update()
+            await websocket.send_json(data.model_dump())
+            await asyncio.sleep(0.033)  # ~30fps
+    except WebSocketDisconnect:
+        pass
 
 # Include the router in the main app
 app.include_router(api_router)
