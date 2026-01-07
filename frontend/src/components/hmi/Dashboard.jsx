@@ -70,15 +70,16 @@ export const Dashboard = ({ onOpenSettings }) => {
               maxRpm={8000}
               className="drop-shadow-[0_0_40px_rgba(0,0,0,0.55)]"
             />
-            
-            {/* Coolant Gauge - Inside right edge of RPM gauge */}
-            <div className="absolute right-[-30px] bottom-[140px]">
-              <CoolantQuarterGauge />
-            </div>
           </div>
 
-          {/* CENTER GAP - Warning Panel */}
-          <div className="flex flex-col items-center justify-end pb-8 mx-4">
+          {/* CENTER GAP - Warning Panel + Mini Gauges */}
+          <div className="flex flex-col items-center justify-end pb-8 mx-2">
+            {/* Coolant on left (next to RPM), Fuel on right (next to Speed) */}
+            <div className="flex items-end gap-6 mb-4">
+              <CoolantQuarterGauge />
+              <FuelQuarterGauge />
+            </div>
+            
             {/* Warning lights in center */}
             <WarningPanel className="scale-90" />
           </div>
@@ -90,11 +91,6 @@ export const Dashboard = ({ onOpenSettings }) => {
               maxSpeed={170}
               className="drop-shadow-[0_0_40px_rgba(0,0,0,0.55)]"
             />
-            
-            {/* Fuel Gauge - Inside left edge of Speed gauge */}
-            <div className="absolute left-[-30px] bottom-[140px]">
-              <FuelQuarterGauge />
-            </div>
           </div>
         </div>
       </div>
