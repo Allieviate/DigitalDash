@@ -1,0 +1,48 @@
+﻿<UserControl x:Class="DigitalDash.Controls.SpeedGauge"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Root"
+             Width="400"
+             Height="400"
+             Background="Transparent">
+
+    <Grid>
+
+        <!-- BACKGROUND / ARC -->
+        <Image Source="/Assets/Images/Spd Gauge.png"
+               Stretch="Uniform" />
+
+        <!-- TICKS -->
+        <Image Source="/Assets/Images/Spd Medium Tacs.png"
+               Stretch="Uniform" />
+        <Image Source="/Assets/Images/Spd Large Tacs.png"
+               Stretch="Uniform" />
+
+        <!-- NUMBERS -->
+        <Image Source="/Assets/Images/Spd Numbers.png"
+               Stretch="Uniform" />
+
+        <!-- NEEDLE -->
+        <Image Source="/Assets/Images/Rpm Needle.png"
+               Stretch="Uniform"
+               Width="260"
+               HorizontalAlignment="Center"
+               RenderTransformOrigin="0.501,0.764"
+               Margin="0,-2,0,138"> 
+            <Image.RenderTransform>
+                <RotateTransform Angle="{Binding NeedleAngle, ElementName=Root}" />
+            </Image.RenderTransform>
+        </Image>
+
+
+        <!-- NEEDLE CENTER -->
+        <Image Source="/Assets/Images/Rpm Needle Center.png"
+               Stretch="Uniform"
+               HorizontalAlignment="Center"
+               VerticalAlignment="Center" />
+
+        <!-- DIGITAL MPH + GEAR (these *are* showing in your screenshot) -->
+        <!-- ... (rest of your SpeedGauge XAML) ... -->
+
+    </Grid>
+</UserControl>

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
@@ -28,25 +28,62 @@
 	  <EmbeddedResource Remove="Assets\Images\Rpm Needle.png" />
 	  <EmbeddedResource Remove="Assets\Images\Rpm Numbers.png" />
 	  <EmbeddedResource Remove="Assets\Images\Rpm Small Tacs.png" />
+	  <EmbeddedResource Remove="Assets\Images\Spd Gauge.png" />
+	  <EmbeddedResource Remove="Assets\Images\Spd Large Tacs.png" />
+	  <EmbeddedResource Remove="Assets\Images\Spd Medium Tacs.png" />
+	  <EmbeddedResource Remove="Assets\Images\Spd Numbers.png" />
 	  <EmbeddedResource Remove="Assets\Images\x1000 Rpm.png" />
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Folder Include="Models\" />
-	</ItemGroup>
-
-	<ItemGroup>
+	  <Resource Include="Assets\Fonts\EurostarBlack.ttf">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </Resource>
+	  <Resource Include="Assets\Fonts\EurostarRegular.ttf">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </Resource>
+	  <Resource Include="Assets\Fonts\Orbitron-Medium.ttf">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </Resource>
 	  <Resource Include="Assets\Images\Honda Frankenstein Logo.png">
 	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
 	  </Resource>
-	  <Resource Include="Assets\Images\Rpm Gauge.png" />
-	  <Resource Include="Assets\Images\Rpm Large Tacs.png" />
-	  <Resource Include="Assets\Images\Rpm Medium Tacs.png" />
-	  <Resource Include="Assets\Images\Rpm Needle Center.png" />
-	  <Resource Include="Assets\Images\Rpm Needle.png" />
-	  <Resource Include="Assets\Images\Rpm Numbers.png" />
-	  <Resource Include="Assets\Images\Rpm Small Tacs.png" />
-	  <Resource Include="Assets\Images\x1000 Rpm.png" />
+	  <Resource Include="Assets\Images\Rpm Gauge.png">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </Resource>
+	  <Resource Include="Assets\Images\Rpm Large Tacs.png">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </Resource>
+	  <Resource Include="Assets\Images\Rpm Medium Tacs.png">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </Resource>
+	  <Resource Include="Assets\Images\Rpm Needle Center.png">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </Resource>
+	  <Resource Include="Assets\Images\Rpm Needle.png">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </Resource>
+	  <Resource Include="Assets\Images\Rpm Numbers.png">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </Resource>
+	  <Resource Include="Assets\Images\Rpm Small Tacs.png">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </Resource>
+	  <Resource Include="Assets\Images\Spd Gauge.png">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </Resource>
+	  <Resource Include="Assets\Images\Spd Large Tacs.png">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </Resource>
+	  <Resource Include="Assets\Images\Spd Medium Tacs.png">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </Resource>
+	  <Resource Include="Assets\Images\Spd Numbers.png">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </Resource>
+	  <Resource Include="Assets\Images\x1000 Rpm.png">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </Resource>
 	</ItemGroup>
 
 </Project>

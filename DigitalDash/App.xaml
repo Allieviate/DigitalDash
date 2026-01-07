@@ -1,9 +1,19 @@
 ﻿<Application x:Class="DigitalDash.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:DigitalDash"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-         
+
+        <!-- Global Orbitron font -->
+        <FontFamily x:Key="DashFont">
+            /Assets/Fonts/Orbitron-Medium.ttf#Orbitron
+        </FontFamily>
+
+        <!-- Default TextBlock style -->
+        <Style x:Key="GlobalTextStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource DashFont}" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+
     </Application.Resources>
 </Application>

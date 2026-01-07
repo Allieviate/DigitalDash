@@ -1,0 +1,161 @@
+﻿<UserControl x:Class="DigitalDash.Controls.RpmGauge"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Root"
+             Width="400"
+             Height="400"
+             Background="Transparent">
+
+    <Grid>
+        
+        <!-- BACKGROUND / ARC / SHADOW -->
+        <Image Source="/Assets/Images/Rpm Gauge.png"
+               Stretch="Uniform" />
+
+        <!-- TICKS -->
+        <Image Source="/Assets/Images/Rpm Small Tacs.png"
+               Stretch="Uniform" />
+        <Image Source="/Assets/Images/Rpm Medium Tacs.png"
+               Stretch="Uniform" />
+        <Image Source="/Assets/Images/Rpm Large Tacs.png"
+               Stretch="Uniform" />
+
+        <!-- NUMBERS + LABEL -->
+        <Image Source="/Assets/Images/Rpm Numbers.png"
+               Stretch="Uniform" />
+        <Image Source="/Assets/Images/x1000 Rpm.png"
+               Stretch="Uniform" Margin="78,130,78,27" />
+
+        <!-- SHIFT LIGHT (top of arc) -->
+        <Ellipse x:Name="ShiftLight"
+     Width="36"
+     Height="36"
+     HorizontalAlignment="Center"
+     VerticalAlignment="Top"
+     Margin="0,34,0,0"
+     Fill="Red"
+     Opacity="0">
+            <Ellipse.Effect>
+                <DropShadowEffect Color="Red"
+                      BlurRadius="40"
+                      ShadowDepth="0"
+                      Opacity="1" />
+            </Ellipse.Effect>
+
+            <Ellipse.Style>
+                <Style TargetType="Ellipse">
+                    <Setter Property="Opacity" Value="0" />
+
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding InShift, ElementName=Root}" Value="True">
+                            <DataTrigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <!-- Fast, aggressive pulse at redline -->
+                                        <DoubleAnimation
+                                Storyboard.TargetProperty="Opacity"
+                                From="0.2"
+                                To="1.0"
+                                Duration="0:0:0.18"
+                                AutoReverse="True"
+                                RepeatBehavior="Forever" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.EnterActions>
+
+                            <DataTrigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                Storyboard.TargetProperty="Opacity"
+                                To="0"
+                                Duration="0:0:0.15" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.ExitActions>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Ellipse.Style>
+        </Ellipse>
+
+        <!-- NEEDLE -->
+        <Image Source="/Assets/Images/Rpm Needle.png"
+       Stretch="Uniform"
+       Width="260"
+       HorizontalAlignment="Center"
+       RenderTransformOrigin="0.501,0.763"
+       Margin="0,-2,0,138">
+            <Image.RenderTransform>
+                <RotateTransform Angle="{Binding NeedleAngle, ElementName=Root}" />
+            </Image.RenderTransform>
+        </Image>
+
+        <!-- VTEC GLOW CENTER (behind the cap) -->
+        <Image Source="/Assets/Images/Rpm Needle Center.png"
+       Stretch="Uniform"
+       HorizontalAlignment="Center"
+       VerticalAlignment="Center">
+            <Image.Effect>
+                <DropShadowEffect 
+            Color="Red"
+            BlurRadius="28"      
+            ShadowDepth="0"
+            Opacity="1" />
+            </Image.Effect>
+
+            <Image.Style>
+                <Style TargetType="Image">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Setter Property="Opacity" Value="0" />
+
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding InVtec, ElementName=Root}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+
+                            <DataTrigger.EnterActions>
+                                <BeginStoryboard x:Name="GlowPulseStoryboard">
+                                    <Storyboard>
+                                        <!-- more obvious but still chill heartbeat -->
+                                        <DoubleAnimation
+                                    Storyboard.TargetProperty="Opacity"
+                                    From="0.4"
+                                    To="1.0"
+                                    Duration="0:0:1.1"
+                                    AutoReverse="True"
+                                    RepeatBehavior="Forever" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.EnterActions>
+
+                            <DataTrigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                    Storyboard.TargetProperty="Opacity"
+                                    To="0"
+                                    Duration="0:0:0.18" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.ExitActions>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Image.Style>
+        </Image>
+
+        <!-- BASE NEEDLE CENTER (on top of the glow) -->
+        <Image Source="/Assets/Images/Rpm Needle Center.png"
+       Stretch="Uniform"
+       HorizontalAlignment="Center"
+       VerticalAlignment="Center" />
+
+        <TextBlock Text="{Binding Rpm, RelativeSource={RelativeSource AncestorType=UserControl}, StringFormat={}{0:0}}"
+                   Foreground="White"
+                   FontSize="18"
+                   FontWeight="Bold"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Top"
+                   Margin="0,420,0,0" />
+    </Grid>
+</UserControl>
