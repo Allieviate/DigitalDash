@@ -90,7 +90,7 @@ export const WarningLight = ({ type, active, className = '' }) => {
         }}
       />
       <span 
-        className="text-[10px] uppercase tracking-wider mt-1 font-medium"
+        className="text-[10px] uppercase tracking-wider mt-1 font-medium font-eurostar"
         style={{ color: active ? config.color : '#3f3f46' }}
       >
         {config.label}
@@ -99,6 +99,7 @@ export const WarningLight = ({ type, active, className = '' }) => {
   );
 };
 
+// ORIGINAL WARNING PANEL LAYOUT - RESTORED
 export const WarningPanel = ({ className = '' }) => {
   const { signals } = useVehicleData();
   
@@ -121,6 +122,50 @@ export const WarningPanel = ({ className = '' }) => {
   );
 };
 
+// Indicator Light Component (for turn signals)
+export const IndicatorLight = ({ active, color, icon, className = '' }) => {
+  return (
+    <div 
+      className={`
+        flex items-center justify-center transition-all duration-100
+        ${active ? 'opacity-100' : 'opacity-20'}
+        ${className}
+      `}
+    >
+      <span 
+        className="text-2xl"
+        style={{ 
+          color: active ? color : '#3f3f46',
+          filter: active ? `drop-shadow(0 0 10px ${color})` : 'none',
+          textShadow: active ? `0 0 15px ${color}` : 'none'
+        }}
+      >
+        {icon}
+      </span>
+    </div>
+  );
+};
+
+// Turn Signals Row
+export const TurnSignalsRow = ({ className = '' }) => {
+  const { signals } = useVehicleData();
+  
+  return (
+    <div className={`flex items-center justify-center gap-8 ${className}`} data-testid="turn-signals">
+      <IndicatorLight 
+        active={signals.turn_left} 
+        color="#28D86A" 
+        icon="◀◀"
+      />
+      <IndicatorLight 
+        active={signals.turn_right} 
+        color="#28D86A" 
+        icon="▶▶"
+      />
+    </div>
+  );
+};
+
 export const CriticalWarningBanner = ({ className = '' }) => {
   const { criticalWarnings } = useVehicleData();
   
@@ -131,8 +176,9 @@ export const CriticalWarningBanner = ({ className = '' }) => {
   return (
     <div 
       className={`
-        w-full py-3 px-6 flex items-center justify-center gap-3
-        bg-red-950/90 border-y border-red-500/50
+        absolute top-0 left-0 right-0 z-50
+        py-3 px-6 flex items-center justify-center gap-3
+        bg-red-950/90 border-b border-red-500/50
         animate-pulse-glow
         ${className}
       `}
@@ -140,7 +186,7 @@ export const CriticalWarningBanner = ({ className = '' }) => {
       data-testid="critical-warning-banner"
     >
       <AlertTriangle className="text-red-500" size={24} />
-      <span className="text-red-500 font-bold text-lg uppercase tracking-widest">
+      <span className="text-red-500 font-bold text-lg uppercase tracking-widest font-eurostar">
         {primaryWarning}
       </span>
       <AlertTriangle className="text-red-500" size={24} />

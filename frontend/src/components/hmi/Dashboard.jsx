@@ -2,8 +2,8 @@ import React from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useVehicleData } from '../../contexts/VehicleDataContext';
 import { RpmGauge, SpeedGauge } from './CustomGauges';
-import { ShiftLightsBar, DigitalSpeedGear, IndicatorsRow, FuelCoolantBars } from './DashWidgets';
-import { CriticalWarningBanner } from './WarningPanel';
+import { ShiftLightsBar, DigitalSpeedGear, FuelQuarterGauge, CoolantQuarterGauge } from './DashWidgets';
+import { WarningPanel, TurnSignalsRow, CriticalWarningBanner } from './WarningPanel';
 import { Settings, Activity } from 'lucide-react';
 
 export const Dashboard = ({ onOpenSettings }) => {
@@ -37,48 +37,65 @@ export const Dashboard = ({ onOpenSettings }) => {
           size={14} 
           className={isConnected ? 'text-green-500' : 'text-red-500'}
         />
-        <span className="text-xs uppercase tracking-wider text-zinc-500">
+        <span className="text-xs uppercase tracking-wider text-zinc-500 font-eurostar">
           {isConnected ? 'LIVE' : 'OFFLINE'}
         </span>
       </div>
 
-      {/* Main Layout - Two Column Grid */}
-      <div className="absolute inset-0 grid grid-cols-2 px-8 py-3">
+      {/* Main Layout */}
+      <div className="absolute inset-0">
         
-        {/* TOP CENTER OVERLAY (spans both columns) */}
-        <div className="col-span-2 absolute top-0 left-0 right-0 z-10 flex flex-col items-center pt-3">
+        {/* TOP CENTER SECTION */}
+        <div className="absolute top-0 left-0 right-0 z-10 flex flex-col items-center pt-2">
           
           {/* Shift Lights Bar */}
-          <ShiftLightsBar className="mb-3" />
+          <ShiftLightsBar className="mb-2" />
           
-          {/* Digital Speed + Gear */}
-          <DigitalSpeedGear className="mb-3" />
+          {/* Digital Speed + Gear (URUS style) */}
+          <DigitalSpeedGear className="mb-2" />
           
-          {/* Indicators Row */}
-          <IndicatorsRow className="mb-3" />
-          
-          {/* Fuel + Coolant Bars */}
-          <FuelCoolantBars />
+          {/* Turn Signals */}
+          <TurnSignalsRow className="mb-2" />
         </div>
 
-        {/* LEFT: RPM Gauge */}
-        <div className="flex items-end justify-center pb-4">
-          <RpmGauge 
-            size={550}
-            vtecStartRpm={3000}
-            shiftRpm={7800}
-            maxRpm={8000}
-            className="drop-shadow-[0_0_40px_rgba(0,0,0,0.55)]"
-          />
-        </div>
+        {/* GAUGES ROW */}
+        <div className="absolute inset-0 flex items-end justify-center pb-4 px-4">
+          
+          {/* LEFT: RPM Gauge */}
+          <div className="relative flex items-end justify-center">
+            <RpmGauge 
+              size={520}
+              vtecStartRpm={3000}
+              shiftRpm={7800}
+              maxRpm={8000}
+              className="drop-shadow-[0_0_40px_rgba(0,0,0,0.55)]"
+            />
+            
+            {/* Coolant Gauge - Inside right edge of RPM gauge */}
+            <div className="absolute right-[-30px] bottom-[140px]">
+              <CoolantQuarterGauge />
+            </div>
+          </div>
 
-        {/* RIGHT: Speed Gauge */}
-        <div className="flex items-end justify-center pb-4">
-          <SpeedGauge 
-            size={550}
-            maxSpeed={170}
-            className="drop-shadow-[0_0_40px_rgba(0,0,0,0.55)]"
-          />
+          {/* CENTER GAP - Warning Panel */}
+          <div className="flex flex-col items-center justify-end pb-8 mx-4">
+            {/* Warning lights in center */}
+            <WarningPanel className="scale-90" />
+          </div>
+
+          {/* RIGHT: Speed Gauge */}
+          <div className="relative flex items-end justify-center">
+            <SpeedGauge 
+              size={520}
+              maxSpeed={170}
+              className="drop-shadow-[0_0_40px_rgba(0,0,0,0.55)]"
+            />
+            
+            {/* Fuel Gauge - Inside left edge of Speed gauge */}
+            <div className="absolute left-[-30px] bottom-[140px]">
+              <FuelQuarterGauge />
+            </div>
+          </div>
         </div>
       </div>
     </div>

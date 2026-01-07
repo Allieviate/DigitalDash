@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useTheme } from '../../contexts/ThemeContext';
+import React, { useState, useEffect } from 'react';
 import { useVehicleData } from '../../contexts/VehicleDataContext';
+import { Fuel, Thermometer } from 'lucide-react';
 
 // Shift lights bar - 7 LEDs that light up progressively with RPM
 export const ShiftLightsBar = ({ className = '' }) => {
@@ -54,7 +54,7 @@ export const ShiftLightsBar = ({ className = '' }) => {
   );
 };
 
-// Digital Speed + Gear display (top center)
+// Digital Speed + Gear display - URUS LAMBORGHINI STYLE
 export const DigitalSpeedGear = ({ className = '' }) => {
   const { signals } = useVehicleData();
   const [lastGear, setLastGear] = useState(signals.gear);
@@ -84,7 +84,7 @@ export const DigitalSpeedGear = ({ className = '' }) => {
     return String(g + 1);
   };
   
-  // Detect gear changes and trigger flash
+  // Detect gear changes and trigger flash - URUS STYLE
   useEffect(() => {
     if (gear !== lastGear) {
       if (gear > lastGear) {
@@ -102,155 +102,229 @@ export const DigitalSpeedGear = ({ className = '' }) => {
 
   return (
     <div className={`flex flex-col items-center ${className}`} data-testid="digital-speed-gear">
-      {/* Speed */}
-      <div className="text-white font-bold text-5xl font-mono tracking-tight" data-testid="digital-speed">
+      {/* Speed - using Eurostar font */}
+      <div 
+        className="font-eurostar font-black text-white tracking-tight leading-none"
+        style={{ fontSize: '56px' }}
+        data-testid="digital-speed"
+      >
         {speed}
       </div>
-      <div className="text-white/70 text-lg tracking-wider -mt-1 mb-2">
+      <div className="font-eurostar text-white/70 text-lg tracking-widest -mt-1 mb-3">
         MPH
       </div>
       
-      {/* Gear Row: prev / current / next */}
-      <div className="flex items-center justify-center gap-0">
-        {/* Previous gear (faded) */}
-        <span className="w-7 text-center text-lg text-white/20 font-mono">
+      {/* Gear Row: prev / current / next - URUS LAMBORGHINI STYLE */}
+      <div className="flex items-center justify-center" style={{ gap: '4px' }}>
+        {/* Previous gear - 32px, 45% opacity */}
+        <span 
+          className="font-orbitron font-medium text-center"
+          style={{ 
+            width: '32px',
+            fontSize: '22px',
+            color: 'white',
+            opacity: 0.45
+          }}
+        >
           {getPrevGearText(gear)}
         </span>
         
-        {/* Current gear */}
+        {/* Current gear - 38-50px, with flash animation */}
         <span 
           className={`
-            w-10 text-center text-3xl font-bold font-mono transition-all duration-100
-            ${flashType === 'up' ? 'opacity-40' : ''}
-            ${flashType === 'down' ? 'text-red-400' : 'text-white'}
+            font-orbitron font-bold text-center transition-all duration-100
+            ${flashType === 'up' ? 'animate-upshift' : ''}
+            ${flashType === 'down' ? 'animate-downshift' : ''}
           `}
+          style={{ 
+            width: '48px',
+            fontSize: '42px',
+            color: flashType === 'down' ? '#DD4444' : 'white',
+          }}
           data-testid="current-gear"
         >
           {getGearText(gear)}
         </span>
         
-        {/* Next gear (faded) */}
-        <span className="w-7 text-center text-lg text-white/20 font-mono">
+        {/* Next gear - 32px, 45% opacity */}
+        <span 
+          className="font-orbitron font-medium text-center"
+          style={{ 
+            width: '32px',
+            fontSize: '22px',
+            color: 'white',
+            opacity: 0.45
+          }}
+        >
           {getNextGearText(gear)}
         </span>
       </div>
       
-      <div className="text-white/70 text-sm tracking-wider">
+      <div className="font-eurostar text-white/70 text-sm tracking-widest mt-1">
         GEAR
       </div>
     </div>
   );
 };
 
-// Indicator dots with labels
-export const IndicatorLight = ({ 
-  active, 
-  color, 
-  label, 
-  icon = null,
-  className = '' 
-}) => {
+// Quarter-circle Fuel Gauge - for inside speedometer gap
+export const FuelQuarterGauge = ({ className = '' }) => {
+  const { signals } = useVehicleData();
+  const fuelPct = signals.fuel_pct * 100;
+  const lowFuel = fuelPct <= 12;
+  const veryLow = fuelPct <= 5;
+  
+  const percentage = Math.min(Math.max(fuelPct, 0), 100);
+  
+  // Arc parameters - quarter circle from bottom-left curving up
+  const radius = 55;
+  const strokeWidth = 8;
+  const size = 120;
+  const center = 60;
+  
+  // Arc from 180° (left) to 90° (top) - quarter circle
+  const startAngle = 180;
+  const endAngle = 90;
+  
+  const polarToCartesian = (angle) => {
+    const rad = (angle - 90) * Math.PI / 180;
+    return {
+      x: center + radius * Math.cos(rad),
+      y: center + radius * Math.sin(rad)
+    };
+  };
+  
+  const describeArc = (start, end) => {
+    const startPt = polarToCartesian(start);
+    const endPt = polarToCartesian(end);
+    return `M ${startPt.x} ${startPt.y} A ${radius} ${radius} 0 0 1 ${endPt.x} ${endPt.y}`;
+  };
+  
+  const bgArc = describeArc(startAngle, endAngle);
+  const currentAngle = startAngle - (90 * percentage / 100);
+  const valueArc = percentage > 0 ? describeArc(startAngle, currentAngle) : '';
+  
+  let fillColor = '#10B981';
+  if (veryLow) fillColor = '#EF4444';
+  else if (lowFuel) fillColor = '#F59E0B';
+  
   return (
-    <div className={`flex items-center gap-1.5 ${className}`}>
-      <div 
-        className="w-4 h-4 rounded-full transition-opacity duration-150"
-        style={{
-          backgroundColor: color,
-          opacity: active ? 1 : 0.15,
-          boxShadow: active ? `0 0 10px 2px ${color}` : 'none'
-        }}
-      />
+    <div className={`flex flex-col items-center ${className}`} data-testid="fuel-gauge">
+      <svg width={size} height={size/2 + 20} viewBox={`0 0 ${size} ${size/2 + 20}`}>
+        {/* Background arc */}
+        <path
+          d={bgArc}
+          fill="none"
+          stroke="#27272a"
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+        />
+        {/* Value arc */}
+        {valueArc && (
+          <path
+            d={valueArc}
+            fill="none"
+            stroke={fillColor}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            style={{ filter: `drop-shadow(0 0 8px ${fillColor}60)` }}
+          />
+        )}
+        
+        {/* Fuel icon */}
+        <g transform={`translate(${center - 10}, ${center - 30})`}>
+          <Fuel size={20} color={lowFuel ? fillColor : '#71717a'} />
+        </g>
+      </svg>
+      
+      {/* Value */}
       <span 
-        className="text-xs font-semibold text-white/90 transition-opacity duration-150"
-        style={{ opacity: active ? 1 : 0.20 }}
+        className="font-orbitron text-sm font-medium -mt-1"
+        style={{ color: veryLow ? '#EF4444' : lowFuel ? '#F59E0B' : '#a1a1aa' }}
       >
-        {icon || label}
+        {Math.round(fuelPct)}%
       </span>
     </div>
   );
 };
 
-// Indicators row (Left Turn, CEL, MAINT, Right Turn)
-export const IndicatorsRow = ({ className = '' }) => {
+// Quarter-circle Coolant Gauge - for inside tachometer gap
+export const CoolantQuarterGauge = ({ className = '' }) => {
   const { signals } = useVehicleData();
+  const temp = signals.coolant_temp_c;
+  const highTemp = temp >= 95;
+  const critical = temp >= 105;
+  
+  const percentage = Math.min(Math.max((temp / 120) * 100, 0), 100);
+  
+  // Arc parameters - quarter circle from bottom-right curving up
+  const radius = 55;
+  const strokeWidth = 8;
+  const size = 120;
+  const center = 60;
+  
+  // Arc from 0° (right) to 90° (top) - quarter circle, reversed direction
+  const startAngle = 0;
+  const endAngle = 90;
+  
+  const polarToCartesian = (angle) => {
+    const rad = (angle - 90) * Math.PI / 180;
+    return {
+      x: center + radius * Math.cos(rad),
+      y: center + radius * Math.sin(rad)
+    };
+  };
+  
+  const describeArc = (start, end) => {
+    const startPt = polarToCartesian(start);
+    const endPt = polarToCartesian(end);
+    return `M ${startPt.x} ${startPt.y} A ${radius} ${radius} 0 0 0 ${endPt.x} ${endPt.y}`;
+  };
+  
+  const bgArc = describeArc(startAngle, endAngle);
+  const currentAngle = startAngle + (90 * percentage / 100);
+  const valueArc = percentage > 0 ? describeArc(startAngle, currentAngle) : '';
+  
+  let fillColor = '#06B6D4'; // cyan
+  if (critical) fillColor = '#EF4444';
+  else if (highTemp) fillColor = '#F59E0B';
   
   return (
-    <div className={`flex items-center justify-center gap-4 ${className}`} data-testid="indicators-row">
-      <IndicatorLight 
-        active={signals.turn_left} 
-        color="#28D86A" 
-        label=""
-        icon="◀"
-      />
-      <IndicatorLight 
-        active={signals.check_engine} 
-        color="#FFB020" 
-        label="CEL"
-      />
-      <IndicatorLight 
-        active={signals.maintenance} 
-        color="#4AA3FF" 
-        label="MAINT"
-      />
-      <IndicatorLight 
-        active={signals.turn_right} 
-        color="#28D86A" 
-        label=""
-        icon="▶"
-      />
-    </div>
-  );
-};
-
-// Fuel + Coolant bars (Phase 1 UI)
-export const FuelCoolantBars = ({ className = '' }) => {
-  const { signals } = useVehicleData();
-  
-  const fuelPct = signals.fuel_pct * 100;
-  const coolantTemp = signals.coolant_temp_c;
-  
-  // Warning states
-  const lowFuel = fuelPct <= 12;
-  const highCoolant = coolantTemp >= 105;
-  
-  return (
-    <div className={`flex items-start justify-center gap-4 ${className}`} data-testid="fuel-coolant-bars">
-      {/* Fuel */}
-      <div className="flex flex-col items-center w-24">
-        <span className="text-white/70 text-xs mb-1.5">FUEL</span>
-        <div className="w-full h-2.5 bg-zinc-800 rounded-full overflow-hidden">
-          <div 
-            className="h-full rounded-full transition-all duration-300"
-            style={{
-              width: `${fuelPct}%`,
-              backgroundColor: lowFuel ? '#FFB020' : '#10B981'
-            }}
+    <div className={`flex flex-col items-center ${className}`} data-testid="coolant-gauge">
+      <svg width={size} height={size/2 + 20} viewBox={`0 0 ${size} ${size/2 + 20}`}>
+        {/* Background arc */}
+        <path
+          d={bgArc}
+          fill="none"
+          stroke="#27272a"
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+        />
+        {/* Value arc */}
+        {valueArc && (
+          <path
+            d={valueArc}
+            fill="none"
+            stroke={fillColor}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            style={{ filter: `drop-shadow(0 0 8px ${fillColor}60)` }}
           />
-        </div>
-        <span className={`text-xs mt-1 ${lowFuel ? 'text-amber-400' : 'text-white/40'}`}>
-          {Math.round(fuelPct)}%
-        </span>
-      </div>
+        )}
+        
+        {/* Thermometer icon */}
+        <g transform={`translate(${center - 10}, ${center - 30})`}>
+          <Thermometer size={20} color={highTemp ? fillColor : '#71717a'} />
+        </g>
+      </svg>
       
-      {/* Divider */}
-      <div className="w-px h-12 bg-white/10 rounded-full" />
-      
-      {/* Coolant */}
-      <div className="flex flex-col items-center w-24">
-        <span className="text-white/70 text-xs mb-1.5">COOLANT</span>
-        <div className="w-full h-2.5 bg-zinc-800 rounded-full overflow-hidden">
-          <div 
-            className="h-full rounded-full transition-all duration-300"
-            style={{
-              width: `${Math.min((coolantTemp / 120) * 100, 100)}%`,
-              backgroundColor: highCoolant ? '#EF4444' : '#06B6D4'
-            }}
-          />
-        </div>
-        <span className={`text-xs mt-1 ${highCoolant ? 'text-red-400' : 'text-white/40'}`}>
-          {Math.round(coolantTemp)}°C
-        </span>
-      </div>
+      {/* Value */}
+      <span 
+        className="font-orbitron text-sm font-medium -mt-1"
+        style={{ color: critical ? '#EF4444' : highTemp ? '#F59E0B' : '#a1a1aa' }}
+      >
+        {Math.round(temp)}°C
+      </span>
     </div>
   );
 };

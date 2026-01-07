@@ -1,4 +1,24 @@
-@import url('https://fonts.googleapis.com/css2?family=Chivo:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+/* Custom Fonts */
+@font-face {
+  font-family: 'Eurostar';
+  src: url('/assets/fonts/EurostarRegular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Eurostar';
+  src: url('/assets/fonts/EurostarBlack.ttf') format('truetype');
+  font-weight: 900;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Orbitron';
+  src: url('/assets/fonts/Orbitron-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+}
 
 @tailwind base;
 @tailwind components;
@@ -42,7 +62,7 @@
 }
 
 body {
-  font-family: 'Chivo', sans-serif;
+  font-family: 'Eurostar', 'Orbitron', sans-serif;
   background-color: var(--hmi-bg);
   color: var(--hmi-text);
   -webkit-font-smoothing: antialiased;
@@ -51,12 +71,12 @@ body {
   user-select: none;
 }
 
-.font-mono {
-  font-family: 'JetBrains Mono', monospace;
+.font-eurostar {
+  font-family: 'Eurostar', sans-serif;
 }
 
-.font-display {
-  font-family: 'Chivo', sans-serif;
+.font-orbitron {
+  font-family: 'Orbitron', sans-serif;
 }
 
 /* Gauge animations */
@@ -76,20 +96,26 @@ body {
   50% { opacity: 0; }
 }
 
-@keyframes scan-line {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100vh); }
+@keyframes vtec-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1.0; }
+}
+
+@keyframes upshift-flash {
+  0% { opacity: 0.35; }
+  50% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+@keyframes downshift-flash {
+  0% { color: white; }
+  50% { color: #DD4444; }
+  100% { color: white; }
 }
 
 @keyframes boot-fade {
   0% { opacity: 0; transform: scale(0.95); }
   100% { opacity: 1; transform: scale(1); }
-}
-
-@keyframes value-update {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.02); }
-  100% { transform: scale(1); }
 }
 
 .animate-needle-sweep {
@@ -104,12 +130,20 @@ body {
   animation: blink 0.5s ease-in-out infinite;
 }
 
-.animate-boot-fade {
-  animation: boot-fade 0.5s ease-out forwards;
+.animate-vtec-glow {
+  animation: vtec-glow 1.1s ease-in-out infinite;
 }
 
-.animate-value-update {
-  animation: value-update 0.15s ease-out;
+.animate-upshift {
+  animation: upshift-flash 0.2s ease-out;
+}
+
+.animate-downshift {
+  animation: downshift-flash 0.24s ease-out;
+}
+
+.animate-boot-fade {
+  animation: boot-fade 0.5s ease-out forwards;
 }
 
 /* Warning light styles */
@@ -126,64 +160,12 @@ body {
   filter: drop-shadow(0 0 12px rgba(239, 68, 68, 0.8));
 }
 
-/* Carbon fiber texture */
-.texture-carbon {
-  background-image: 
-    repeating-linear-gradient(
-      45deg,
-      transparent,
-      transparent 2px,
-      rgba(255, 255, 255, 0.02) 2px,
-      rgba(255, 255, 255, 0.02) 4px
-    ),
-    repeating-linear-gradient(
-      -45deg,
-      transparent,
-      transparent 2px,
-      rgba(255, 255, 255, 0.02) 2px,
-      rgba(255, 255, 255, 0.02) 4px
-    );
-}
-
-/* Scanline texture for retro theme */
-.texture-scanlines {
-  background-image: 
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(0, 0, 0, 0.3) 2px,
-      rgba(0, 0, 0, 0.3) 4px
-    );
-  pointer-events: none;
-}
-
 /* Glass morphism for cards */
 .glass-card {
   background: rgba(9, 9, 11, 0.8);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
-}
-
-/* Gauge arc styling */
-.gauge-arc {
-  stroke-linecap: round;
-  transition: stroke-dashoffset 0.1s ease-out;
-}
-
-/* Data display with glow effect */
-.data-glow {
-  text-shadow: var(--hmi-accent-glow);
-}
-
-/* Turn signal styling */
-.turn-signal {
-  transition: opacity 0.1s ease;
-}
-
-.turn-signal.active {
-  filter: drop-shadow(0 0 15px currentColor);
 }
 
 /* Touch-friendly buttons */
