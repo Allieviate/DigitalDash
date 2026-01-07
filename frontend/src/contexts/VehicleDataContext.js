@@ -1,9 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import axios from 'axios';
 
 const VehicleDataContext = createContext();
 
-const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const DEFAULT_SIGNALS = {
   rpm: 0,
@@ -27,20 +26,78 @@ const DEFAULT_SIGNALS = {
   high_beams: false
 };
 
+// Convert HTTP URL to WebSocket URL
+const getWebSocketUrl = () => {
+  const baseUrl = API_URL || '';
+  // Replace http:// with ws:// or https:// with wss://
+  const wsUrl = baseUrl.replace(/^http/, 'ws');
+  return `${wsUrl}/api/ws/vehicle-data`;
+};
+
 export const VehicleDataProvider = ({ children }) => {
   const [signals, setSignals] = useState(DEFAULT_SIGNALS);
   const [dataSource, setDataSource] = useState('simulated');
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
-  const intervalRef = useRef(null);
+  const wsRef = useRef(null);
+  const reconnectTimeoutRef = useRef(null);
+  const reconnectAttempts = useRef(0);
+  const MAX_RECONNECT_ATTEMPTS = 10;
+  const BASE_RECONNECT_DELAY = 1000; // 1 second
 
-  const fetchData = useCallback(async () => {
+  const connectWebSocket = useCallback(() => {
+    // Cleanup existing connection
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+
+    const wsUrl = getWebSocketUrl();
+    
     try {
-      const response = await axios.get(`${API_URL}/vehicle-data`);
-      setSignals(response.data);
-      setIsConnected(true);
-      setConnectionError(null);
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log('Vehicle data WebSocket connected');
+        setIsConnected(true);
+        setConnectionError(null);
+        reconnectAttempts.current = 0;
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          setSignals(data);
+        } catch (e) {
+          console.error('Error parsing vehicle data:', e);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        setConnectionError('WebSocket connection error');
+      };
+
+      ws.onclose = (event) => {
+        console.log('WebSocket closed:', event.code, event.reason);
+        setIsConnected(false);
+        wsRef.current = null;
+
+        // Attempt reconnection with exponential backoff
+        if (reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
+          const delay = BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttempts.current);
+          console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttempts.current + 1}/${MAX_RECONNECT_ATTEMPTS})`);
+          reconnectTimeoutRef.current = setTimeout(() => {
+            reconnectAttempts.current++;
+            connectWebSocket();
+          }, delay);
+        } else {
+          setConnectionError('Max reconnection attempts reached');
+        }
+      };
     } catch (error) {
+      console.error('Failed to create WebSocket:', error);
       setConnectionError(error.message);
       setIsConnected(false);
     }
@@ -48,17 +105,20 @@ export const VehicleDataProvider = ({ children }) => {
 
   useEffect(() => {
     if (dataSource === 'simulated') {
-      // Poll at ~30fps for simulated data
-      fetchData();
-      intervalRef.current = setInterval(fetchData, 33);
+      connectWebSocket();
     }
 
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
+      // Cleanup on unmount
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
       }
     };
-  }, [dataSource, fetchData]);
+  }, [dataSource, connectWebSocket]);
 
   const switchDataSource = (source) => {
     setDataSource(source);
