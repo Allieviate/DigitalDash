@@ -4,16 +4,20 @@
 Build an OEM+ grade vehicle HMI for 1989 Honda Accord with custom gauge assets, VTEC functionality, Android Auto integration, PS3-style breathing background, and URUS-style gear indicator.
 
 ## Latest Updates (Jan 7, 2026)
-1. Android Auto panel moved UP (no longer blocking warning lights)
-2. x1000 RPM image moved BELOW the RPM digital readout
-3. Turn signals changed to clean automotive arrow SVG design
-4. Image rendering quality improved (reduced pixelation)
-5. Red background now gradually transitions from 86-120 mph (Type R mode)
-6. Real Android Auto DHU integration for Raspberry Pi 5 Linux
+1. **CRITICAL FIX**: Deployment issue resolved - Reduced polling from 33ms (30fps) to 200ms (5fps)
+2. Implemented WebSocket with HTTP polling fallback for production environments
+3. Fixed "OFFLINE" status race condition bug
+4. Android Auto panel moved UP (no longer blocking warning lights)
+5. x1000 RPM image moved BELOW the RPM digital readout
+6. Turn signals changed to clean automotive arrow SVG design
+7. Image rendering quality improved (reduced pixelation)
+8. Red background now gradually transitions from 86-120 mph (Type R mode)
+9. Real Android Auto DHU integration for Raspberry Pi 5 Linux
 
 ## Architecture
 - **Backend**: FastAPI + MongoDB + DHU Controller
 - **Frontend**: React with custom gauge components
+- **Data Flow**: WebSocket (preferred) with HTTP polling fallback at 200ms
 - **DHU Integration**: Subprocess management with X11 window control (wmctrl/xdotool)
 
 ## What's Been Implemented
@@ -31,6 +35,8 @@ Build an OEM+ grade vehicle HMI for 1989 Honda Accord with custom gauge assets, 
 - [x] Clean automotive arrow SVG turn signals
 - [x] Boot sequence with Honda logo + gauge sweep
 - [x] Improved image rendering quality (GPU acceleration)
+- [x] **WebSocket with HTTP polling fallback (200ms interval)**
+- [x] **LIVE/OFFLINE connection status indicator**
 
 ### Android Auto Integration
 - [x] Mock Android Auto panel (Maps, Music, Phone, Home)
@@ -72,3 +78,7 @@ DHU_CONFIG=/opt/android-auto/dhu.ini
 - [ ] Data logging/export
 - [ ] Custom gauge import in settings
 - [ ] Audio warning alerts
+
+## Test Reports
+- `/app/test_reports/iteration_4.json` - Latest (25/25 tests passed)
+- `/app/tests/test_vehicle_hmi_api.py` - Backend API tests
