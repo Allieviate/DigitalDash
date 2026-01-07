@@ -74,12 +74,13 @@ export const RpmGauge = ({
         draggable={false}
       />
       
-      {/* x1000 RPM label - BIGGER */}
-      <div className="absolute inset-0 flex items-center justify-center" style={{ paddingTop: '20%' }}>
+      {/* x1000 RPM label - BIGGER and more visible */}
+      <div className="absolute inset-0 flex items-center justify-center" style={{ paddingTop: '25%' }}>
         <img 
           src="/assets/gauges/x1000-rpm.png" 
           alt="x1000"
-          className="w-[45%] object-contain opacity-90"
+          className="w-[50%] object-contain"
+          style={{ opacity: 0.95 }}
           draggable={false}
         />
       </div>
