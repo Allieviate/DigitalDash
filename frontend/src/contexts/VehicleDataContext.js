@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import axios from 'axios';
 
 const VehicleDataContext = createContext();
 
@@ -26,10 +27,13 @@ const DEFAULT_SIGNALS = {
   high_beams: false
 };
 
+// Polling interval: 200ms (5fps) - enough for smooth dashboard updates
+// without overwhelming production servers (was 33ms/30fps before)
+const POLL_INTERVAL_MS = 200;
+
 // Convert HTTP URL to WebSocket URL
 const getWebSocketUrl = () => {
   const baseUrl = API_URL || '';
-  // Replace http:// with ws:// or https:// with wss://
   const wsUrl = baseUrl.replace(/^http/, 'ws');
   return `${wsUrl}/api/ws/vehicle-data`;
 };
@@ -39,13 +43,61 @@ export const VehicleDataProvider = ({ children }) => {
   const [dataSource, setDataSource] = useState('simulated');
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
+  const [connectionMode, setConnectionMode] = useState('initializing'); // 'websocket', 'polling', 'initializing'
+  
   const wsRef = useRef(null);
-  const reconnectTimeoutRef = useRef(null);
-  const reconnectAttempts = useRef(0);
-  const MAX_RECONNECT_ATTEMPTS = 10;
-  const BASE_RECONNECT_DELAY = 1000; // 1 second
+  const pollIntervalRef = useRef(null);
+  const wsFailedRef = useRef(false);
+  const mountedRef = useRef(true);
 
+  // HTTP polling fallback (for production/cloud environments)
+  const fetchData = useCallback(async () => {
+    if (!mountedRef.current) return;
+    
+    try {
+      const response = await axios.get(`${API_URL}/api/vehicle-data`);
+      if (mountedRef.current) {
+        setSignals(response.data);
+        setIsConnected(true);
+        setConnectionError(null);
+      }
+    } catch (error) {
+      if (mountedRef.current) {
+        setConnectionError(error.message);
+        setIsConnected(false);
+      }
+    }
+  }, []);
+
+  const startPolling = useCallback(() => {
+    // Clear any existing interval
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+    }
+    
+    console.log(`Starting HTTP polling at ${POLL_INTERVAL_MS}ms interval`);
+    setConnectionMode('polling');
+    
+    // Initial fetch
+    fetchData();
+    
+    // Start polling interval
+    pollIntervalRef.current = setInterval(fetchData, POLL_INTERVAL_MS);
+  }, [fetchData]);
+
+  const stopPolling = useCallback(() => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  }, []);
+
+  // WebSocket connection (preferred for local/Pi deployment)
   const connectWebSocket = useCallback(() => {
+    if (wsFailedRef.current || !mountedRef.current) {
+      return;
+    }
+
     // Cleanup existing connection
     if (wsRef.current) {
       wsRef.current.close();
@@ -57,15 +109,28 @@ export const VehicleDataProvider = ({ children }) => {
     try {
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
+      
+      // Set a connection timeout
+      const connectionTimeout = setTimeout(() => {
+        if (ws.readyState !== WebSocket.OPEN) {
+          console.log('WebSocket connection timeout, falling back to polling');
+          ws.close();
+          wsFailedRef.current = true;
+          startPolling();
+        }
+      }, 3000);
 
       ws.onopen = () => {
+        clearTimeout(connectionTimeout);
         console.log('Vehicle data WebSocket connected');
+        setConnectionMode('websocket');
         setIsConnected(true);
         setConnectionError(null);
-        reconnectAttempts.current = 0;
+        stopPolling(); // Ensure polling is stopped if WS connects
       };
 
       ws.onmessage = (event) => {
+        if (!mountedRef.current) return;
         try {
           const data = JSON.parse(event.data);
           setSignals(data);
@@ -74,51 +139,52 @@ export const VehicleDataProvider = ({ children }) => {
         }
       };
 
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        setConnectionError('WebSocket connection error');
+      ws.onerror = () => {
+        clearTimeout(connectionTimeout);
+        // WebSocket failed, fall back to polling
+        if (!wsFailedRef.current && mountedRef.current) {
+          console.log('WebSocket error, falling back to HTTP polling');
+          wsFailedRef.current = true;
+          startPolling();
+        }
       };
 
-      ws.onclose = (event) => {
-        console.log('WebSocket closed:', event.code, event.reason);
+      ws.onclose = () => {
+        if (!mountedRef.current) return;
         setIsConnected(false);
         wsRef.current = null;
 
-        // Attempt reconnection with exponential backoff
-        if (reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
-          const delay = BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttempts.current);
-          console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttempts.current + 1}/${MAX_RECONNECT_ATTEMPTS})`);
-          reconnectTimeoutRef.current = setTimeout(() => {
-            reconnectAttempts.current++;
-            connectWebSocket();
-          }, delay);
-        } else {
-          setConnectionError('Max reconnection attempts reached');
+        // If WebSocket was working but closed, try to reconnect
+        // Otherwise fall back to polling
+        if (!wsFailedRef.current && connectionMode === 'websocket') {
+          console.log('WebSocket closed, attempting reconnect...');
+          setTimeout(connectWebSocket, 1000);
         }
       };
     } catch (error) {
-      console.error('Failed to create WebSocket:', error);
-      setConnectionError(error.message);
-      setIsConnected(false);
+      console.log('WebSocket not available, using HTTP polling');
+      wsFailedRef.current = true;
+      startPolling();
     }
-  }, []);
+  }, [startPolling, stopPolling, connectionMode]);
 
   useEffect(() => {
+    mountedRef.current = true;
+    
     if (dataSource === 'simulated') {
+      // Try WebSocket first, fall back to polling if it fails
       connectWebSocket();
     }
 
     return () => {
-      // Cleanup on unmount
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
+      mountedRef.current = false;
+      stopPolling();
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
       }
     };
-  }, [dataSource, connectWebSocket]);
+  }, [dataSource, connectWebSocket, stopPolling]);
 
   const switchDataSource = (source) => {
     setDataSource(source);
