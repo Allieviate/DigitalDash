@@ -104,7 +104,7 @@ export const BootSequence = ({ onComplete }) => {
                   filter: 'drop-shadow(0 0 30px rgba(255, 255, 255, 0.3))'
                 }}
               />
-              <div className="text-sm uppercase tracking-[0.5em] text-zinc-500">
+              <div className="text-sm uppercase tracking-[0.5em] text-zinc-500 font-eurostar">
                 Digital Instrument Cluster
               </div>
             </motion.div>
@@ -112,7 +112,7 @@ export const BootSequence = ({ onComplete }) => {
 
           {/* Text phase */}
           {phase === 'text' && (
-            <div className="font-mono text-sm space-y-1 text-left w-80">
+            <div className="font-orbitron text-sm space-y-1 text-left w-80">
               {visibleSteps.map((text, index) => (
                 <motion.div
                   key={index}
@@ -169,7 +169,7 @@ export const BootSequence = ({ onComplete }) => {
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="text-sm uppercase tracking-widest text-zinc-500"
+                className="text-sm uppercase tracking-widest text-zinc-500 font-eurostar"
               >
                 Gauge Sweep Test
               </motion.div>

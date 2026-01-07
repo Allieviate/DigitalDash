@@ -6,7 +6,6 @@ import { DiagnosticsPanel } from './DiagnosticsPanel';
 import { 
   X, 
   Palette, 
-  Gauge, 
   Database, 
   Volume2,
   VolumeX,
@@ -19,13 +18,6 @@ import { Switch } from '../ui/switch';
 import { Slider } from '../ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { ScrollArea } from '../ui/scroll-area';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../ui/select';
 
 export const SettingsPanel = ({ onClose }) => {
   const { theme, themeId, switchTheme, themes } = useTheme();
@@ -35,14 +27,6 @@ export const SettingsPanel = ({ onClose }) => {
   const handleThemeChange = async (newThemeId) => {
     switchTheme(newThemeId);
     await updateSetting('theme_id', newThemeId);
-  };
-
-  const handleUnitsChange = async (units) => {
-    await updateSetting('units', units);
-  };
-
-  const handleGaugeStyleChange = async (style) => {
-    await updateSetting('gauge_style', style);
   };
 
   const handleSoundsToggle = async (enabled) => {
@@ -69,7 +53,7 @@ export const SettingsPanel = ({ onClose }) => {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
-          <h2 className="text-xl font-bold uppercase tracking-wider">Settings</h2>
+          <h2 className="text-xl font-bold uppercase tracking-wider font-eurostar">Settings</h2>
           <Button 
             variant="ghost" 
             size="icon"
@@ -84,19 +68,15 @@ export const SettingsPanel = ({ onClose }) => {
         {/* Content */}
         <Tabs defaultValue="appearance" className="h-[calc(100%-65px)]">
           <TabsList className="w-full justify-start px-6 py-2 bg-transparent border-b border-zinc-800 rounded-none">
-            <TabsTrigger value="appearance" className="data-[state=active]:bg-white/10">
+            <TabsTrigger value="appearance" className="data-[state=active]:bg-white/10 font-eurostar">
               <Palette size={16} className="mr-2" />
               Appearance
             </TabsTrigger>
-            <TabsTrigger value="gauges" className="data-[state=active]:bg-white/10">
-              <Gauge size={16} className="mr-2" />
-              Gauges
-            </TabsTrigger>
-            <TabsTrigger value="data" className="data-[state=active]:bg-white/10">
+            <TabsTrigger value="data" className="data-[state=active]:bg-white/10 font-eurostar">
               <Database size={16} className="mr-2" />
               Data Source
             </TabsTrigger>
-            <TabsTrigger value="diagnostics" className="data-[state=active]:bg-white/10">
+            <TabsTrigger value="diagnostics" className="data-[state=active]:bg-white/10 font-eurostar">
               <Activity size={16} className="mr-2" />
               Diagnostics
             </TabsTrigger>
@@ -107,7 +87,7 @@ export const SettingsPanel = ({ onClose }) => {
             <TabsContent value="appearance" className="p-6 space-y-8 m-0">
               {/* Theme Selection */}
               <div>
-                <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400 mb-4">
+                <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400 mb-4 font-eurostar">
                   Theme
                 </h3>
                 <div className="grid grid-cols-3 gap-4">
@@ -136,7 +116,7 @@ export const SettingsPanel = ({ onClose }) => {
                         }}
                       >
                         <span 
-                          className="font-mono text-2xl font-bold"
+                          className="font-orbitron text-2xl font-bold"
                           style={{ 
                             color: t.accent,
                             textShadow: t.glow
@@ -145,7 +125,7 @@ export const SettingsPanel = ({ onClose }) => {
                           120
                         </span>
                       </div>
-                      <span className="text-sm font-medium">{t.name}</span>
+                      <span className="text-sm font-medium font-eurostar">{t.name}</span>
                       
                       {/* Selected indicator */}
                       {themeId === t.id && (
@@ -163,7 +143,7 @@ export const SettingsPanel = ({ onClose }) => {
 
               {/* Brightness */}
               <div>
-                <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400 mb-4">
+                <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400 mb-4 font-eurostar">
                   Display Brightness
                 </h3>
                 <div className="flex items-center gap-4">
@@ -176,7 +156,7 @@ export const SettingsPanel = ({ onClose }) => {
                     step={5}
                     className="flex-1"
                   />
-                  <span className="font-mono text-sm w-12 text-right">
+                  <span className="font-orbitron text-sm w-12 text-right">
                     {settings.brightness}%
                   </span>
                 </div>
@@ -185,7 +165,7 @@ export const SettingsPanel = ({ onClose }) => {
               {/* Warning Sounds */}
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400">
+                  <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400 font-eurostar">
                     Warning Sounds
                   </h3>
                   <p className="text-xs text-zinc-600 mt-1">
@@ -205,49 +185,13 @@ export const SettingsPanel = ({ onClose }) => {
                   />
                 </div>
               </div>
-            </TabsContent>
 
-            {/* Gauges Tab */}
-            <TabsContent value="gauges" className="p-6 space-y-8 m-0">
-              {/* Units */}
-              <div>
-                <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400 mb-4">
-                  Units
-                </h3>
-                <Select value={settings.units} onValueChange={handleUnitsChange}>
-                  <SelectTrigger className="w-48" data-testid="units-select">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="imperial">Imperial (MPH, °F)</SelectItem>
-                    <SelectItem value="metric">Metric (KM/H, °C)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Gauge Style */}
-              <div>
-                <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400 mb-4">
-                  Gauge Style
-                </h3>
-                <Select value={settings.gauge_style} onValueChange={handleGaugeStyleChange}>
-                  <SelectTrigger className="w-48" data-testid="gauge-style-select">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="modern">Modern</SelectItem>
-                    <SelectItem value="classic">Classic</SelectItem>
-                    <SelectItem value="minimal">Minimal</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Custom Gauges Note */}
+              {/* Gauge Images Note */}
               <div className="p-4 rounded-lg border border-zinc-800 bg-zinc-900/50">
-                <h4 className="text-sm font-medium text-zinc-400 mb-2">Custom Gauges</h4>
+                <h4 className="text-sm font-medium text-zinc-400 mb-2 font-eurostar">Custom Gauge Images</h4>
                 <p className="text-xs text-zinc-600">
-                  Custom gauge import feature coming soon. You'll be able to upload your own 
-                  gauge designs and backgrounds.
+                  Your custom gauge PNG assets are loaded from /assets/gauges/. 
+                  To change gauge appearance, replace the PNG files in that directory.
                 </p>
               </div>
             </TabsContent>
@@ -255,7 +199,7 @@ export const SettingsPanel = ({ onClose }) => {
             {/* Data Source Tab */}
             <TabsContent value="data" className="p-6 space-y-8 m-0">
               <div>
-                <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400 mb-4">
+                <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400 mb-4 font-eurostar">
                   Data Source
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
@@ -272,7 +216,7 @@ export const SettingsPanel = ({ onClose }) => {
                   >
                     <div className="flex items-center gap-2 mb-2">
                       <Database size={18} className={dataSource === 'simulated' ? 'text-green-500' : 'text-zinc-500'} />
-                      <span className="font-medium">Simulated</span>
+                      <span className="font-medium font-eurostar">Simulated</span>
                     </div>
                     <p className="text-xs text-zinc-500">
                       Demo mode with simulated vehicle data for testing and development.
@@ -292,7 +236,7 @@ export const SettingsPanel = ({ onClose }) => {
                   >
                     <div className="flex items-center gap-2 mb-2">
                       <Activity size={18} className={dataSource === 'obd' ? 'text-blue-500' : 'text-zinc-500'} />
-                      <span className="font-medium">OBD-II / CAN</span>
+                      <span className="font-medium font-eurostar">OBD-II / CAN</span>
                     </div>
                     <p className="text-xs text-zinc-500">
                       Real vehicle data via OBD-II adapter or CAN bus connection.
@@ -302,7 +246,7 @@ export const SettingsPanel = ({ onClose }) => {
 
                 {dataSource === 'obd' && (
                   <div className="mt-4 p-4 rounded-lg border border-amber-500/30 bg-amber-500/10">
-                    <p className="text-sm text-amber-400">
+                    <p className="text-sm text-amber-400 font-eurostar">
                       <strong>Note:</strong> OBD-II mode requires hardware connection. 
                       This feature will be fully available in a future update.
                     </p>
