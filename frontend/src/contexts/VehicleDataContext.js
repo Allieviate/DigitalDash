@@ -151,14 +151,17 @@ export const VehicleDataProvider = ({ children }) => {
 
       ws.onclose = () => {
         if (!mountedRef.current) return;
-        setIsConnected(false);
         wsRef.current = null;
 
-        // If WebSocket was working but closed, try to reconnect
-        // Otherwise fall back to polling
-        if (!wsFailedRef.current && connectionMode === 'websocket') {
-          console.log('WebSocket closed, attempting reconnect...');
-          setTimeout(connectWebSocket, 1000);
+        // Only set disconnected if we're not already polling
+        // This prevents race condition where ws.onclose runs after polling starts
+        if (!wsFailedRef.current) {
+          setIsConnected(false);
+          // If WebSocket was working but closed, try to reconnect
+          if (connectionMode === 'websocket') {
+            console.log('WebSocket closed, attempting reconnect...');
+            setTimeout(connectWebSocket, 1000);
+          }
         }
       };
     } catch (error) {
