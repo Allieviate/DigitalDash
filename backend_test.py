@@ -249,6 +249,61 @@ class VehicleHMITester:
             self.log_test("Data Consistency", False, f"Error: {str(e)}")
             return False
 
+    def test_dhu_endpoints(self):
+        """Test Android Auto DHU endpoints"""
+        try:
+            # Test DHU status
+            response = requests.get(f"{self.base_url}/dhu/status", timeout=10)
+            success = response.status_code == 200
+            
+            if not success:
+                self.log_test("DHU Status", False, f"Status: {response.status_code}")
+                return False
+            
+            status_data = response.json()
+            if 'status' not in status_data:
+                self.log_test("DHU Status", False, "Missing status field")
+                return False
+            
+            self.log_test("DHU Status", True, f"DHU Status: {status_data['status']}")
+            
+            # Test DHU start (expected to fail in this environment)
+            start_data = {"x": 750, "y": 180, "width": 420, "height": 340}
+            response = requests.post(f"{self.base_url}/dhu/start", json=start_data, timeout=10)
+            success = response.status_code == 200
+            
+            if success:
+                start_result = response.json()
+                if 'status' in start_result:
+                    self.log_test("DHU Start", True, f"DHU Start Response: {start_result['status']}")
+                else:
+                    self.log_test("DHU Start", False, "Missing status in response")
+                    return False
+            else:
+                self.log_test("DHU Start", False, f"Status: {response.status_code}")
+                return False
+            
+            # Test DHU stop
+            response = requests.post(f"{self.base_url}/dhu/stop", timeout=10)
+            success = response.status_code == 200
+            
+            if success:
+                stop_result = response.json()
+                if 'status' in stop_result:
+                    self.log_test("DHU Stop", True, f"DHU Stop Response: {stop_result['status']}")
+                else:
+                    self.log_test("DHU Stop", False, "Missing status in response")
+                    return False
+            else:
+                self.log_test("DHU Stop", False, f"Status: {response.status_code}")
+                return False
+            
+            return True
+            
+        except Exception as e:
+            self.log_test("DHU Endpoints", False, f"Error: {str(e)}")
+            return False
+
     def run_all_tests(self):
         """Run all backend tests"""
         print("🚗 Starting Vehicle HMI Backend Tests")
