@@ -4,6 +4,7 @@
   src: url('./assets/fonts/EurostarRegular.ttf') format('truetype');
   font-weight: 400;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
@@ -11,6 +12,7 @@
   src: url('./assets/fonts/EurostarBlack.ttf') format('truetype');
   font-weight: 900;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
@@ -18,6 +20,7 @@
   src: url('./assets/fonts/Orbitron-Medium.ttf') format('truetype');
   font-weight: 500;
   font-style: normal;
+  font-display: swap;
 }
 
 @tailwind base;
@@ -61,6 +64,13 @@
   box-sizing: border-box;
 }
 
+html {
+  /* Improve rendering quality */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
 body {
   font-family: 'Orbitron', 'Eurostar', sans-serif;
   background-color: var(--hmi-bg);
@@ -69,6 +79,19 @@ body {
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
   user-select: none;
+  /* Smooth rendering for the whole app */
+  image-rendering: auto;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+/* Improve image rendering quality */
+img {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: auto;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 .font-eurostar {
@@ -179,6 +202,11 @@ body {
   touch-action: manipulation;
 }
 
+/* Smooth transitions for all interactive elements */
+button, a, [role="button"] {
+  transition: all 0.15s ease;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
@@ -196,6 +224,12 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--hmi-text-muted);
+}
+
+/* Hardware acceleration for smooth animations */
+.gpu-accelerated {
+  transform: translateZ(0);
+  will-change: transform, opacity;
 }
 
 @layer base {

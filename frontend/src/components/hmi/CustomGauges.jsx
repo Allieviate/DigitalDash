@@ -37,6 +37,7 @@ export const RpmGauge = ({
         src="/assets/gauges/rpm-gauge.png" 
         alt="RPM Gauge"
         className="absolute inset-0 w-full h-full object-contain"
+        style={{ imageRendering: 'auto' }}
         draggable={false}
       />
       
@@ -45,6 +46,7 @@ export const RpmGauge = ({
         src="/assets/gauges/rpm-small-ticks.png" 
         alt=""
         className="absolute inset-0 w-full h-full object-contain"
+        style={{ imageRendering: 'auto' }}
         draggable={false}
       />
       
@@ -53,6 +55,7 @@ export const RpmGauge = ({
         src="/assets/gauges/rpm-medium-ticks.png" 
         alt=""
         className="absolute inset-0 w-full h-full object-contain"
+        style={{ imageRendering: 'auto' }}
         draggable={false}
       />
       
@@ -61,6 +64,7 @@ export const RpmGauge = ({
         src="/assets/gauges/rpm-large-ticks.png" 
         alt=""
         className="absolute inset-0 w-full h-full object-contain"
+        style={{ imageRendering: 'auto' }}
         draggable={false}
       />
       
@@ -69,35 +73,9 @@ export const RpmGauge = ({
         src="/assets/gauges/rpm-numbers.png" 
         alt=""
         className="absolute inset-0 w-full h-full object-contain"
+        style={{ imageRendering: 'auto' }}
         draggable={false}
       />
-      
-      {/* x1000 RPM label */}
-      <div className="absolute inset-0 flex items-center justify-center" style={{ paddingTop: '25%' }}>
-        <img 
-          src="/assets/gauges/x1000-rpm.png" 
-          alt="x1000"
-          className="w-[50%] object-contain"
-          style={{ opacity: 0.95 }}
-          draggable={false}
-        />
-      </div>
-      
-      {/* RPM Digital Readout - Added back with Orbitron font */}
-      <div 
-        className="absolute inset-0 flex items-center justify-center"
-        style={{ paddingTop: '55%' }}
-      >
-        <span 
-          className="font-orbitron text-2xl font-medium text-white/90"
-          style={{ 
-            textShadow: inVtec ? '0 0 10px rgba(255, 0, 0, 0.5)' : 'none',
-            letterSpacing: '2px'
-          }}
-        >
-          {Math.round(rpm)}
-        </span>
-      </div>
       
       {/* Shift light at top */}
       <div 
@@ -127,7 +105,8 @@ export const RpmGauge = ({
           style={{
             transformOrigin: '50% 76.3%',
             transform: `rotate(${needleAngle}deg)`,
-            transition: 'transform 0.1s ease-out'
+            transition: 'transform 0.1s ease-out',
+            imageRendering: 'auto'
           }}
           draggable={false}
         />
@@ -142,7 +121,8 @@ export const RpmGauge = ({
             className="w-[15%] object-contain animate-pulse"
             style={{
               filter: 'drop-shadow(0 0 28px rgba(255, 0, 0, 1))',
-              opacity: 0.8
+              opacity: 0.8,
+              imageRendering: 'auto'
             }}
             draggable={false}
           />
@@ -155,6 +135,34 @@ export const RpmGauge = ({
           src="/assets/gauges/rpm-needle-center.png" 
           alt=""
           className="w-[15%] object-contain"
+          style={{ imageRendering: 'auto' }}
+          draggable={false}
+        />
+      </div>
+      
+      {/* RPM Digital Readout - with Orbitron font */}
+      <div 
+        className="absolute inset-0 flex items-center justify-center"
+        style={{ paddingTop: '42%' }}
+      >
+        <span 
+          className="font-orbitron text-2xl font-medium text-white/90"
+          style={{ 
+            textShadow: inVtec ? '0 0 10px rgba(255, 0, 0, 0.5)' : 'none',
+            letterSpacing: '2px'
+          }}
+        >
+          {Math.round(rpm)}
+        </span>
+      </div>
+      
+      {/* x1000 RPM label - BELOW the RPM readout */}
+      <div className="absolute inset-0 flex items-center justify-center" style={{ paddingTop: '58%' }}>
+        <img 
+          src="/assets/gauges/x1000-rpm.png" 
+          alt="x1000"
+          className="w-[40%] object-contain"
+          style={{ opacity: 0.9, imageRendering: 'auto' }}
           draggable={false}
         />
       </div>
@@ -190,6 +198,7 @@ export const SpeedGauge = ({
         src="/assets/gauges/spd-gauge.png" 
         alt="Speed Gauge"
         className="absolute inset-0 w-full h-full object-contain"
+        style={{ imageRendering: 'auto' }}
         draggable={false}
       />
       
@@ -198,6 +207,7 @@ export const SpeedGauge = ({
         src="/assets/gauges/spd-medium-ticks.png" 
         alt=""
         className="absolute inset-0 w-full h-full object-contain"
+        style={{ imageRendering: 'auto' }}
         draggable={false}
       />
       
@@ -206,6 +216,7 @@ export const SpeedGauge = ({
         src="/assets/gauges/spd-large-ticks.png" 
         alt=""
         className="absolute inset-0 w-full h-full object-contain"
+        style={{ imageRendering: 'auto' }}
         draggable={false}
       />
       
@@ -214,6 +225,7 @@ export const SpeedGauge = ({
         src="/assets/gauges/spd-numbers.png" 
         alt=""
         className="absolute inset-0 w-full h-full object-contain"
+        style={{ imageRendering: 'auto' }}
         draggable={false}
       />
       
@@ -229,7 +241,8 @@ export const SpeedGauge = ({
           style={{
             transformOrigin: '50% 76.4%',
             transform: `rotate(${needleAngle}deg)`,
-            transition: 'transform 0.1s ease-out'
+            transition: 'transform 0.1s ease-out',
+            imageRendering: 'auto'
           }}
           draggable={false}
         />
@@ -241,6 +254,7 @@ export const SpeedGauge = ({
           src="/assets/gauges/rpm-needle-center.png" 
           alt=""
           className="w-[15%] object-contain"
+          style={{ imageRendering: 'auto' }}
           draggable={false}
         />
       </div>

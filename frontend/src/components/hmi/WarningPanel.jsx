@@ -109,7 +109,7 @@ export const WarningPanel = ({ className = '' }) => {
   return (
     <div 
       className={`flex items-center justify-center ${className}`} 
-      style={{ gap: '32px' }}
+      style={{ gap: '40px' }}
       data-testid="warning-panel"
     >
       {warnings.map(({ type, active }) => (
@@ -119,46 +119,49 @@ export const WarningPanel = ({ className = '' }) => {
   );
 };
 
-// Indicator Light Component (for turn signals)
-export const IndicatorLight = ({ active, color, icon, className = '' }) => {
+// Turn Signal Arrow SVG Component - Clean automotive style
+const TurnArrow = ({ direction, active }) => {
+  const color = active ? '#28D86A' : '#3f3f46';
+  const isLeft = direction === 'left';
+  
   return (
-    <div 
-      className={`
-        flex items-center justify-center transition-all duration-100
-        ${active ? 'opacity-100' : 'opacity-20'}
-        ${className}
-      `}
+    <svg 
+      width="48" 
+      height="36" 
+      viewBox="0 0 48 36"
+      style={{ 
+        transform: isLeft ? 'scaleX(-1)' : 'none',
+        filter: active ? `drop-shadow(0 0 8px ${color})` : 'none',
+        transition: 'all 0.1s ease'
+      }}
     >
-      <span 
-        className="text-2xl"
-        style={{ 
-          color: active ? color : '#3f3f46',
-          filter: active ? `drop-shadow(0 0 10px ${color})` : 'none',
-          textShadow: active ? `0 0 15px ${color}` : 'none'
-        }}
-      >
-        {icon}
-      </span>
-    </div>
+      {/* Arrow shape - clean automotive style */}
+      <path 
+        d="M4 18 L20 4 L20 12 L44 12 L44 24 L20 24 L20 32 Z"
+        fill={color}
+        stroke={active ? '#3AD87A' : 'transparent'}
+        strokeWidth="1"
+      />
+    </svg>
   );
 };
 
-// Turn Signals Row
+// Turn Signals Row - Using clean arrow design
 export const TurnSignalsRow = ({ className = '' }) => {
   const { signals } = useVehicleData();
   
   return (
-    <div className={`flex items-center justify-center gap-8 ${className}`} data-testid="turn-signals">
-      <IndicatorLight 
-        active={signals.turn_left} 
-        color="#28D86A" 
-        icon="◀◀"
-      />
-      <IndicatorLight 
-        active={signals.turn_right} 
-        color="#28D86A" 
-        icon="▶▶"
-      />
+    <div className={`flex items-center justify-center gap-12 ${className}`} data-testid="turn-signals">
+      <div 
+        className={`transition-opacity duration-100 ${signals.turn_left ? 'opacity-100' : 'opacity-25'}`}
+      >
+        <TurnArrow direction="left" active={signals.turn_left} />
+      </div>
+      <div 
+        className={`transition-opacity duration-100 ${signals.turn_right ? 'opacity-100' : 'opacity-25'}`}
+      >
+        <TurnArrow direction="right" active={signals.turn_right} />
+      </div>
     </div>
   );
 };
