@@ -4,7 +4,6 @@ import {
   Droplet, 
   Thermometer, 
   Fuel, 
-  Zap, 
   CircleAlert,
   ShieldAlert,
   CircleDot
@@ -53,12 +52,6 @@ const WARNING_CONFIG = {
     label: 'ABS',
     color: '#F59E0B',
     critical: false
-  },
-  airbag_warning: {
-    icon: ShieldAlert,
-    label: 'AIRBAG',
-    color: '#EF4444',
-    critical: true
   }
 };
 
@@ -90,7 +83,7 @@ export const WarningLight = ({ type, active, className = '' }) => {
         }}
       />
       <span 
-        className="text-[10px] uppercase tracking-wider mt-1 font-medium font-eurostar"
+        className="text-[10px] uppercase tracking-wider mt-1 font-medium font-orbitron"
         style={{ color: active ? config.color : '#3f3f46' }}
       >
         {config.label}
@@ -99,7 +92,7 @@ export const WarningLight = ({ type, active, className = '' }) => {
   );
 };
 
-// ORIGINAL WARNING PANEL LAYOUT - RESTORED
+// WARNING PANEL - MORE SPREAD OUT
 export const WarningPanel = ({ className = '' }) => {
   const { signals } = useVehicleData();
   
@@ -114,7 +107,11 @@ export const WarningPanel = ({ className = '' }) => {
   ];
   
   return (
-    <div className={`flex items-center justify-center gap-4 ${className}`} data-testid="warning-panel">
+    <div 
+      className={`flex items-center justify-center ${className}`} 
+      style={{ gap: '32px' }}
+      data-testid="warning-panel"
+    >
       {warnings.map(({ type, active }) => (
         <WarningLight key={type} type={type} active={active} />
       ))}
@@ -186,7 +183,7 @@ export const CriticalWarningBanner = ({ className = '' }) => {
       data-testid="critical-warning-banner"
     >
       <AlertTriangle className="text-red-500" size={24} />
-      <span className="text-red-500 font-bold text-lg uppercase tracking-widest font-eurostar">
+      <span className="text-red-500 font-bold text-lg uppercase tracking-widest font-orbitron">
         {primaryWarning}
       </span>
       <AlertTriangle className="text-red-500" size={24} />

@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react';
-import { useTheme } from '../../contexts/ThemeContext';
 import { useVehicleData } from '../../contexts/VehicleDataContext';
 
 // RPM Gauge using your custom PNG assets
@@ -10,7 +9,6 @@ export const RpmGauge = ({
   shiftRpm = 7800,
   maxRpm = 8000
 }) => {
-  const { theme } = useTheme();
   const { signals } = useVehicleData();
   const rpm = signals.rpm;
 
@@ -22,7 +20,7 @@ export const RpmGauge = ({
     return minAngle + (clampedRpm / maxRpm) * (maxAngle - minAngle);
   }, [rpm, maxRpm]);
 
-  // VTEC engagement (above 3000 RPM)
+  // VTEC engagement (above 3000 RPM) - ORIGINAL CODE
   const inVtec = rpm >= vtecStartRpm;
   
   // Shift light (near redline)
@@ -74,7 +72,7 @@ export const RpmGauge = ({
         draggable={false}
       />
       
-      {/* x1000 RPM label - BIGGER and more visible */}
+      {/* x1000 RPM label */}
       <div className="absolute inset-0 flex items-center justify-center" style={{ paddingTop: '25%' }}>
         <img 
           src="/assets/gauges/x1000-rpm.png" 
@@ -83,6 +81,22 @@ export const RpmGauge = ({
           style={{ opacity: 0.95 }}
           draggable={false}
         />
+      </div>
+      
+      {/* RPM Digital Readout - Added back with Orbitron font */}
+      <div 
+        className="absolute inset-0 flex items-center justify-center"
+        style={{ paddingTop: '55%' }}
+      >
+        <span 
+          className="font-orbitron text-2xl font-medium text-white/90"
+          style={{ 
+            textShadow: inVtec ? '0 0 10px rgba(255, 0, 0, 0.5)' : 'none',
+            letterSpacing: '2px'
+          }}
+        >
+          {Math.round(rpm)}
+        </span>
       </div>
       
       {/* Shift light at top */}
@@ -119,20 +133,21 @@ export const RpmGauge = ({
         />
       </div>
       
-      {/* VTEC Glow center (behind the cap) - RESTORED */}
-      <div 
-        className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${inVtec ? 'opacity-100' : 'opacity-0'}`}
-      >
-        <img 
-          src="/assets/gauges/rpm-needle-center.png" 
-          alt=""
-          className={`w-[15%] object-contain ${inVtec ? 'animate-vtec-glow' : ''}`}
-          style={{
-            filter: inVtec ? 'drop-shadow(0 0 28px rgba(255, 0, 0, 1)) drop-shadow(0 0 15px rgba(255, 0, 0, 0.8))' : 'none',
-          }}
-          draggable={false}
-        />
-      </div>
+      {/* VTEC Glow center - ORIGINAL CODE RESTORED */}
+      {inVtec && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <img 
+            src="/assets/gauges/rpm-needle-center.png" 
+            alt=""
+            className="w-[15%] object-contain animate-pulse"
+            style={{
+              filter: 'drop-shadow(0 0 28px rgba(255, 0, 0, 1))',
+              opacity: 0.8
+            }}
+            draggable={false}
+          />
+        </div>
+      )}
       
       {/* Needle center cap */}
       <div className="absolute inset-0 flex items-center justify-center">
@@ -229,101 +244,6 @@ export const SpeedGauge = ({
           draggable={false}
         />
       </div>
-    </div>
-  );
-};
-
-// Quarter-circle gauge for Fuel/Coolant - positioned inside the main gauges gap
-export const QuarterGauge = ({
-  value,
-  max,
-  label,
-  icon,
-  position = 'left', // 'left' for fuel (speedometer side), 'right' for coolant (tach side)
-  warning = false,
-  danger = false,
-  className = ''
-}) => {
-  const percentage = Math.min(Math.max((value / max) * 100, 0), 100);
-  
-  // Calculate arc for quarter circle
-  const radius = 60;
-  const strokeWidth = 8;
-  const center = 70;
-  
-  // For left side (fuel): arc from top to right (0 to 90 deg)
-  // For right side (coolant): arc from top to left (0 to -90 deg)
-  const startAngle = position === 'left' ? -90 : -90;
-  const endAngle = position === 'left' ? 0 : -180;
-  const sweepAngle = Math.abs(endAngle - startAngle);
-  
-  const polarToCartesian = (angle) => {
-    const rad = (angle) * Math.PI / 180;
-    return {
-      x: center + radius * Math.cos(rad),
-      y: center + radius * Math.sin(rad)
-    };
-  };
-  
-  const describeArc = (startAng, endAng) => {
-    const start = polarToCartesian(startAng);
-    const end = polarToCartesian(endAng);
-    const largeArc = Math.abs(endAng - startAng) > 180 ? 1 : 0;
-    const sweep = position === 'left' ? 1 : 0;
-    return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} ${sweep} ${end.x} ${end.y}`;
-  };
-  
-  const bgArc = describeArc(startAngle, endAngle);
-  const currentEndAngle = startAngle + (position === 'left' ? 1 : -1) * (sweepAngle * percentage / 100);
-  const valueArc = percentage > 0 ? describeArc(startAngle, currentEndAngle) : '';
-  
-  let fillColor = '#10B981'; // green
-  if (danger) fillColor = '#EF4444';
-  else if (warning) fillColor = '#F59E0B';
-  
-  return (
-    <div className={`flex flex-col items-center ${className}`}>
-      <svg width="140" height="80" viewBox="0 0 140 80">
-        {/* Background arc */}
-        <path
-          d={bgArc}
-          fill="none"
-          stroke="#27272a"
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-        />
-        {/* Value arc */}
-        {valueArc && (
-          <path
-            d={valueArc}
-            fill="none"
-            stroke={fillColor}
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-            style={{ filter: `drop-shadow(0 0 6px ${fillColor}50)` }}
-          />
-        )}
-      </svg>
-      
-      {/* Icon and label */}
-      <div className="flex items-center gap-1 -mt-2">
-        <span className="text-lg">{icon}</span>
-        <span 
-          className="font-eurostar text-sm"
-          style={{ color: danger ? '#EF4444' : warning ? '#F59E0B' : '#a1a1aa' }}
-        >
-          {label}
-        </span>
-      </div>
-      
-      {/* Value */}
-      <span 
-        className="font-orbitron text-base font-medium"
-        style={{ color: danger ? '#EF4444' : warning ? '#F59E0B' : '#ffffff' }}
-      >
-        {typeof value === 'number' ? Math.round(value) : value}
-        {label === 'FUEL' ? '%' : '°C'}
-      </span>
     </div>
   );
 };
