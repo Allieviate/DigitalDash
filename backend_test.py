@@ -320,7 +320,8 @@ class VehicleHMITester:
             self.test_themes,
             self.test_settings,
             self.test_diagnostics,
-            self.test_data_consistency
+            self.test_data_consistency,
+            self.test_dhu_endpoints
         ]
         
         for test in tests:
