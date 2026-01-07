@@ -146,7 +146,7 @@ const TurnArrow = ({ direction, active }) => {
   );
 };
 
-// Turn Signals Row - Using clean arrow design
+// Turn Signals Row - Using clean arrow design (LEFT points left, RIGHT points right)
 export const TurnSignalsRow = ({ className = '' }) => {
   const { signals } = useVehicleData();
   
@@ -155,12 +155,12 @@ export const TurnSignalsRow = ({ className = '' }) => {
       <div 
         className={`transition-opacity duration-100 ${signals.turn_left ? 'opacity-100' : 'opacity-25'}`}
       >
-        <TurnArrow direction="left" active={signals.turn_left} />
+        <TurnArrow direction="right" active={signals.turn_left} />
       </div>
       <div 
         className={`transition-opacity duration-100 ${signals.turn_right ? 'opacity-100' : 'opacity-25'}`}
       >
-        <TurnArrow direction="right" active={signals.turn_right} />
+        <TurnArrow direction="left" active={signals.turn_right} />
       </div>
     </div>
   );
