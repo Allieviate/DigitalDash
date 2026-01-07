@@ -1,21 +1,21 @@
-/* Custom Fonts - loaded from public/assets/fonts */
+/* Custom Fonts */
 @font-face {
   font-family: 'Eurostar';
-  src: url('../../../public/assets/fonts/EurostarRegular.ttf') format('truetype');
+  src: url('./assets/fonts/EurostarRegular.ttf') format('truetype');
   font-weight: 400;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Eurostar';
-  src: url('../../../public/assets/fonts/EurostarBlack.ttf') format('truetype');
+  src: url('./assets/fonts/EurostarBlack.ttf') format('truetype');
   font-weight: 900;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Orbitron';
-  src: url('../../../public/assets/fonts/Orbitron-Medium.ttf') format('truetype');
+  src: url('./assets/fonts/Orbitron-Medium.ttf') format('truetype');
   font-weight: 500;
   font-style: normal;
 }
