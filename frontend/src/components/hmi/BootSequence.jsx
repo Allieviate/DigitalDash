@@ -1,25 +1,25 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../../contexts/ThemeContext';
 
 const BOOT_STEPS = [
   { text: 'ACCORD HMI v2.0', delay: 0 },
-  { text: 'INITIALIZING SYSTEMS...', delay: 500 },
-  { text: 'ECU LINK: OK', delay: 800 },
-  { text: 'SENSORS: ONLINE', delay: 1100 },
-  { text: 'DISPLAY: READY', delay: 1400 },
-  { text: 'LOADING DASHBOARD...', delay: 1700 },
+  { text: 'INITIALIZING SYSTEMS...', delay: 400 },
+  { text: 'ECU LINK: OK', delay: 700 },
+  { text: 'SENSORS: ONLINE', delay: 1000 },
+  { text: 'VTEC: READY', delay: 1300 },
+  { text: 'DISPLAY: READY', delay: 1500 },
 ];
 
 export const BootSequence = ({ onComplete }) => {
   const { theme } = useTheme();
   const [phase, setPhase] = useState('logo'); // logo, text, sweep, complete
   const [visibleSteps, setVisibleSteps] = useState([]);
-  const [sweepProgress, setSweepProgress] = useState(0);
+  const [sweepAngle, setSweepAngle] = useState(-135);
 
-  // Phase 1: Logo display
+  // Phase 1: Logo display (with your Honda Frankenstein logo)
   useEffect(() => {
-    const timer = setTimeout(() => setPhase('text'), 1500);
+    const timer = setTimeout(() => setPhase('text'), 1800);
     return () => clearTimeout(timer);
   }, []);
 
@@ -31,7 +31,7 @@ export const BootSequence = ({ onComplete }) => {
       setTimeout(() => {
         setVisibleSteps(prev => [...prev, step.text]);
         if (index === BOOT_STEPS.length - 1) {
-          setTimeout(() => setPhase('sweep'), 500);
+          setTimeout(() => setPhase('sweep'), 400);
         }
       }, step.delay);
     });
@@ -41,29 +41,30 @@ export const BootSequence = ({ onComplete }) => {
   useEffect(() => {
     if (phase !== 'sweep') return;
 
-    const duration = 2000; // 2 seconds for sweep
+    const duration = 2000;
     const startTime = Date.now();
 
     const animate = () => {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(elapsed / duration, 1);
       
-      // Ease-in-out curve for smooth sweep
-      const eased = progress < 0.5
-        ? 4 * progress * progress * progress
-        : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-
-      // Go up to 100%, then back to 0%
+      // Sweep from -135 to +135 and back
       if (progress < 0.5) {
-        setSweepProgress(eased * 2 * 100);
+        // Sweep up
+        const t = progress * 2;
+        const eased = 1 - Math.pow(1 - t, 3); // ease-out
+        setSweepAngle(-135 + (270 * eased));
       } else {
-        setSweepProgress((1 - (eased - 0.5) * 2) * 100);
+        // Sweep down
+        const t = (progress - 0.5) * 2;
+        const eased = 1 - Math.pow(1 - t, 3);
+        setSweepAngle(135 - (270 * eased));
       }
 
       if (progress < 1) {
         requestAnimationFrame(animate);
       } else {
-        setSweepProgress(0);
+        setSweepAngle(-135);
         setTimeout(() => {
           setPhase('complete');
           onComplete?.();
@@ -78,7 +79,10 @@ export const BootSequence = ({ onComplete }) => {
     <AnimatePresence>
       {phase !== 'complete' && (
         <motion.div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center"
+          style={{
+            background: 'radial-gradient(ellipse 90% 100% at 50% 35%, #2B2B2B 0%, #101010 25%, #000000 100%)'
+          }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.5 }}
           data-testid="boot-sequence"
@@ -91,16 +95,15 @@ export const BootSequence = ({ onComplete }) => {
               transition={{ duration: 0.8, ease: 'easeOut' }}
               className="flex flex-col items-center"
             >
-              {/* Honda-inspired Logo */}
-              <div 
-                className="text-6xl font-black tracking-tight mb-4"
-                style={{ 
-                  color: theme.accent,
-                  textShadow: theme.glow
+              {/* Your Honda Frankenstein Logo */}
+              <img 
+                src="/assets/gauges/honda-logo.png"
+                alt="Honda"
+                className="w-48 h-auto mb-6"
+                style={{
+                  filter: 'drop-shadow(0 0 30px rgba(255, 255, 255, 0.3))'
                 }}
-              >
-                ACCORD
-              </div>
+              />
               <div className="text-sm uppercase tracking-[0.5em] text-zinc-500">
                 Digital Instrument Cluster
               </div>
@@ -117,38 +120,51 @@ export const BootSequence = ({ onComplete }) => {
                   animate={{ opacity: 1, x: 0 }}
                   className="flex items-center gap-2"
                 >
-                  <span style={{ color: theme.accent }}>›</span>
+                  <span className="text-red-500">›</span>
                   <span className="text-zinc-400">{text}</span>
                 </motion.div>
               ))}
             </div>
           )}
 
-          {/* Sweep phase */}
+          {/* Sweep phase - shows gauge with animated needle */}
           {phase === 'sweep' && (
-            <div className="flex flex-col items-center gap-8">
-              {/* Animated gauge representation */}
-              <svg width="200" height="200" viewBox="0 0 200 200">
-                {/* Background arc */}
-                <path
-                  d="M 30 150 A 85 85 0 1 1 170 150"
-                  fill="none"
-                  stroke="#27272a"
-                  strokeWidth="10"
-                  strokeLinecap="round"
+            <div className="flex flex-col items-center gap-6">
+              {/* Mini gauge preview with needle sweep */}
+              <div className="relative w-64 h-64">
+                <img 
+                  src="/assets/gauges/rpm-gauge.png"
+                  alt="RPM"
+                  className="absolute inset-0 w-full h-full object-contain opacity-80"
                 />
-                {/* Animated arc */}
-                <path
-                  d="M 30 150 A 85 85 0 1 1 170 150"
-                  fill="none"
-                  stroke={theme.accent}
-                  strokeWidth="10"
-                  strokeLinecap="round"
-                  strokeDasharray="267"
-                  strokeDashoffset={267 - (267 * sweepProgress / 100)}
-                  style={{ filter: `drop-shadow(${theme.glow})` }}
+                <img 
+                  src="/assets/gauges/rpm-numbers.png"
+                  alt=""
+                  className="absolute inset-0 w-full h-full object-contain opacity-80"
                 />
-              </svg>
+                {/* Animated needle */}
+                <div 
+                  className="absolute inset-0 flex items-center justify-center"
+                  style={{ paddingBottom: '23%' }}
+                >
+                  <img 
+                    src="/assets/gauges/rpm-needle.png" 
+                    alt="Needle"
+                    className="w-[43%] object-contain"
+                    style={{
+                      transformOrigin: '50% 76.3%',
+                      transform: `rotate(${sweepAngle}deg)`,
+                    }}
+                  />
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <img 
+                    src="/assets/gauges/rpm-needle-center.png" 
+                    alt=""
+                    className="w-[15%] object-contain"
+                  />
+                </div>
+              </div>
               
               <motion.div
                 initial={{ opacity: 0 }}
@@ -164,13 +180,12 @@ export const BootSequence = ({ onComplete }) => {
           <div className="absolute bottom-12 left-1/2 -translate-x-1/2 w-64">
             <div className="h-1 bg-zinc-900 rounded-full overflow-hidden">
               <motion.div
-                className="h-full rounded-full"
-                style={{ backgroundColor: theme.accent }}
+                className="h-full rounded-full bg-red-600"
                 initial={{ width: '0%' }}
                 animate={{ 
-                  width: phase === 'logo' ? '20%' : 
+                  width: phase === 'logo' ? '25%' : 
                          phase === 'text' ? '60%' : 
-                         phase === 'sweep' ? '90%' : '100%'
+                         phase === 'sweep' ? '95%' : '100%'
                 }}
                 transition={{ duration: 0.5 }}
               />
