@@ -289,6 +289,189 @@ async def websocket_vehicle_data(websocket: WebSocket):
     except WebSocketDisconnect:
         pass
 
+# ============ ANDROID AUTO DHU CONTROLLER ============
+# For Raspberry Pi 5 Linux - manages DHU subprocess with window control
+
+import subprocess
+import signal
+
+class DHUController:
+    """
+    Android Auto Desktop Head Unit Controller
+    Manages DHU as a subprocess with window positioning for Raspberry Pi Linux
+    """
+    def __init__(self):
+        self.process = None
+        self.dhu_path = os.environ.get('DHU_PATH', '/opt/android-auto/desktop-head-unit')
+        self.dhu_config = os.environ.get('DHU_CONFIG', '/opt/android-auto/dhu.ini')
+        self.window_id = None
+        
+    def is_running(self):
+        return self.process is not None and self.process.poll() is None
+    
+    async def start(self, x=750, y=180, width=420, height=340, borderless=True):
+        """Launch DHU and configure window"""
+        if self.is_running():
+            return {"status": "running", "message": "DHU already running"}
+        
+        # Check if DHU executable exists
+        if not os.path.exists(self.dhu_path):
+            return {
+                "status": "error", 
+                "message": f"DHU not found at {self.dhu_path}. Install Android Auto DHU first."
+            }
+        
+        try:
+            # Build command
+            cmd = [self.dhu_path, "--usb"]
+            if os.path.exists(self.dhu_config):
+                cmd.extend(["-c", self.dhu_config])
+            
+            # Launch DHU subprocess
+            self.process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                preexec_fn=os.setsid  # Create new process group for clean termination
+            )
+            
+            # Wait briefly for window to appear
+            await asyncio.sleep(1.0)
+            
+            # Find and configure DHU window using wmctrl/xdotool
+            await self._configure_window(x, y, width, height, borderless)
+            
+            return {"status": "running", "message": "DHU started successfully", "pid": self.process.pid}
+            
+        except Exception as e:
+            logger.error(f"Failed to start DHU: {e}")
+            return {"status": "error", "message": str(e)}
+    
+    async def _configure_window(self, x, y, width, height, borderless):
+        """Configure DHU window position and style using X11 tools"""
+        try:
+            # Find DHU window by title (wmctrl -l)
+            result = subprocess.run(
+                ["wmctrl", "-l"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            window_id = None
+            for line in result.stdout.splitlines():
+                if "android" in line.lower() or "dhu" in line.lower() or "head unit" in line.lower():
+                    window_id = line.split()[0]
+                    break
+            
+            if not window_id:
+                logger.warning("Could not find DHU window")
+                return
+            
+            self.window_id = window_id
+            
+            # Remove window decorations if borderless
+            if borderless:
+                subprocess.run(
+                    ["wmctrl", "-i", "-r", window_id, "-b", "add,above"],  # Keep on top
+                    timeout=5
+                )
+                # Use xdotool for more control
+                subprocess.run(
+                    ["xdotool", "windowmove", window_id, str(x), str(y)],
+                    timeout=5
+                )
+                subprocess.run(
+                    ["xdotool", "windowsize", window_id, str(width), str(height)],
+                    timeout=5
+                )
+            else:
+                # Just move and resize
+                subprocess.run(
+                    ["wmctrl", "-i", "-r", window_id, "-e", f"0,{x},{y},{width},{height}"],
+                    timeout=5
+                )
+            
+            # Activate/focus the window
+            subprocess.run(
+                ["wmctrl", "-i", "-a", window_id],
+                timeout=5
+            )
+            
+            logger.info(f"DHU window configured: {window_id} at ({x},{y}) {width}x{height}")
+            
+        except FileNotFoundError:
+            logger.warning("wmctrl/xdotool not installed. Window positioning unavailable.")
+        except Exception as e:
+            logger.error(f"Error configuring DHU window: {e}")
+    
+    async def stop(self):
+        """Stop DHU subprocess cleanly"""
+        if not self.is_running():
+            return {"status": "stopped", "message": "DHU not running"}
+        
+        try:
+            # Send SIGTERM to process group
+            os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
+            
+            # Wait for graceful shutdown
+            try:
+                self.process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                # Force kill if needed
+                os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
+                self.process.wait(timeout=2)
+            
+            self.process = None
+            self.window_id = None
+            return {"status": "stopped", "message": "DHU stopped successfully"}
+            
+        except Exception as e:
+            logger.error(f"Error stopping DHU: {e}")
+            return {"status": "error", "message": str(e)}
+    
+    def get_status(self):
+        """Get current DHU status"""
+        if self.is_running():
+            return {
+                "status": "running",
+                "pid": self.process.pid,
+                "window_id": self.window_id
+            }
+        return {"status": "stopped"}
+
+# Global DHU controller instance
+dhu_controller = DHUController()
+
+class DHUStartRequest(BaseModel):
+    x: int = 750
+    y: int = 180
+    width: int = 420
+    height: int = 340
+    borderless: bool = True
+    alwaysOnTop: bool = False
+
+@api_router.post("/dhu/start")
+async def start_dhu(config: DHUStartRequest):
+    """Start Android Auto DHU with window configuration"""
+    return await dhu_controller.start(
+        x=config.x,
+        y=config.y,
+        width=config.width,
+        height=config.height,
+        borderless=config.borderless
+    )
+
+@api_router.post("/dhu/stop")
+async def stop_dhu():
+    """Stop Android Auto DHU"""
+    return await dhu_controller.stop()
+
+@api_router.get("/dhu/status")
+async def get_dhu_status():
+    """Get DHU status"""
+    return dhu_controller.get_status()
+
 # Include the router in the main app
 app.include_router(api_router)
 
