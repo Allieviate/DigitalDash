@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useVehicleData } from '../../contexts/VehicleDataContext';
 
 // RPM Gauge using your custom PNG assets
@@ -13,12 +13,10 @@ export const RpmGauge = ({
   const rpm = signals.rpm;
 
   // Calculate needle angle: 0 RPM = -135deg, 8000 RPM = +135deg (270 degree sweep)
-  const needleAngle = useMemo(() => {
-    const minAngle = -135;
-    const maxAngle = 135;
-    const clampedRpm = Math.min(Math.max(rpm, 0), maxRpm);
-    return minAngle + (clampedRpm / maxRpm) * (maxAngle - minAngle);
-  }, [rpm, maxRpm]);
+  const minAngle = -135;
+  const maxAngle = 135;
+  const clampedRpm = Math.min(Math.max(rpm, 0), maxRpm);
+  const needleAngle = minAngle + (clampedRpm / maxRpm) * (maxAngle - minAngle);
 
   // VTEC engagement (above 3000 RPM) - ORIGINAL CODE
   const inVtec = rpm >= vtecStartRpm;
