@@ -178,12 +178,10 @@ export const SpeedGauge = ({
   const speed = signals.speed_mph;
 
   // Calculate needle angle: 0 MPH = -135deg, 170 MPH = +135deg (270 degree sweep)
-  const needleAngle = useMemo(() => {
-    const minAngle = -135;
-    const maxAngle = 135;
-    const clampedSpeed = Math.min(Math.max(speed, 0), maxSpeed);
-    return minAngle + (clampedSpeed / maxSpeed) * (maxAngle - minAngle);
-  }, [speed, maxSpeed]);
+  const minAngle = -135;
+  const maxAngle = 135;
+  const clampedSpeed = Math.min(Math.max(speed, 0), maxSpeed);
+  const needleAngle = minAngle + (clampedSpeed / maxSpeed) * (maxAngle - minAngle);
 
   return (
     <div 
