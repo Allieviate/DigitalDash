@@ -144,7 +144,7 @@ export const RpmGauge = ({
         style={{ paddingTop: '42%' }}
       >
         <span 
-          className="font-orbitron text-2xl font-medium text-white/90"
+          className="font-orbitron text-3xl font-medium text-white/90"
           style={{ 
             textShadow: inVtec ? '0 0 10px rgba(255, 0, 0, 0.5)' : 'none',
             letterSpacing: '2px'
