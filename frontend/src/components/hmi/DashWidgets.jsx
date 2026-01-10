@@ -32,20 +32,20 @@ export const ShiftLightsBar = ({ className = '' }) => {
 
   return (
     <div 
-      className={`flex items-center justify-center gap-2 ${className}`}
+      className={`flex items-center justify-center gap-3 ${className}`}
       style={{ opacity: isRedline ? flashState : 1 }}
       data-testid="shift-lights-bar"
     >
       {[0, 1, 2, 3, 4, 5, 6].map((i) => (
         <div
           key={i}
-          className="w-[22px] h-[22px] rounded-full transition-opacity duration-75"
+          className="w-[28px] h-[28px] rounded-full transition-opacity duration-75"
           style={{
             opacity: getLightOpacity(i),
             // ORANGISH-RED gradient
             background: 'radial-gradient(circle at 30% 30%, #FFCC4040 -20%, #FF6B35 60%, #E83A14 100%)',
             boxShadow: getLightOpacity(i) > 0.5 
-              ? '0 0 12px 4px rgba(255, 107, 53, 0.6)' 
+              ? '0 0 16px 5px rgba(255, 107, 53, 0.6)' 
               : 'none'
           }}
         />
