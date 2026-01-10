@@ -64,7 +64,7 @@ export const WarningLight = ({ type, active, className = '' }) => {
   return (
     <div 
       className={`
-        flex flex-col items-center justify-center p-2 rounded-lg transition-all duration-200
+        flex flex-col items-center justify-center p-3 rounded-lg transition-all duration-200
         ${active ? 'opacity-100' : 'opacity-20'}
         ${className}
       `}
@@ -72,18 +72,18 @@ export const WarningLight = ({ type, active, className = '' }) => {
       data-active={active}
     >
       <Icon 
-        size={24} 
+        size={32} 
         className={`
           warning-light
           ${active ? (config.critical ? 'critical' : 'active animate-pulse-glow') : ''}
         `}
         style={{ 
           color: active ? config.color : '#3f3f46',
-          filter: active ? `drop-shadow(0 0 8px ${config.color})` : 'none'
+          filter: active ? `drop-shadow(0 0 10px ${config.color})` : 'none'
         }}
       />
       <span 
-        className="text-[10px] uppercase tracking-wider mt-1 font-medium font-orbitron"
+        className="text-xs uppercase tracking-wider mt-2 font-medium font-orbitron"
         style={{ color: active ? config.color : '#3f3f46' }}
       >
         {config.label}
