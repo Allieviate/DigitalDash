@@ -126,12 +126,12 @@ const TurnArrow = ({ direction, active }) => {
   
   return (
     <svg 
-      width="48" 
-      height="36" 
+      width="60" 
+      height="44" 
       viewBox="0 0 48 36"
       style={{ 
         transform: isLeft ? 'scaleX(-1)' : 'none',
-        filter: active ? `drop-shadow(0 0 8px ${color})` : 'none',
+        filter: active ? `drop-shadow(0 0 10px ${color})` : 'none',
         transition: 'all 0.1s ease'
       }}
     >
@@ -151,7 +151,7 @@ export const TurnSignalsRow = ({ className = '' }) => {
   const { signals } = useVehicleData();
   
   return (
-    <div className={`flex items-center justify-center gap-12 ${className}`} data-testid="turn-signals">
+    <div className={`flex items-center justify-center gap-16 ${className}`} data-testid="turn-signals">
       <div 
         className={`transition-opacity duration-100 ${signals.turn_left ? 'opacity-100' : 'opacity-25'}`}
       >
