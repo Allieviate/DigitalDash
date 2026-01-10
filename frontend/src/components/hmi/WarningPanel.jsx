@@ -109,7 +109,7 @@ export const WarningPanel = ({ className = '' }) => {
   return (
     <div 
       className={`flex items-center justify-center ${className}`} 
-      style={{ gap: '40px' }}
+      style={{ gap: '50px' }}
       data-testid="warning-panel"
     >
       {warnings.map(({ type, active }) => (
