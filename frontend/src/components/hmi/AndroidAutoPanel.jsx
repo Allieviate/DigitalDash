@@ -17,7 +17,7 @@ import {
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-// Real Android Auto DHU Controller
+// OpenAuto Controller Hook
 export const useAndroidAutoDHU = () => {
   const [dhuStatus, setDhuStatus] = useState('stopped'); // stopped, starting, running, error
   const [dhuError, setDhuError] = useState(null);
@@ -27,12 +27,12 @@ export const useAndroidAutoDHU = () => {
     setDhuError(null);
     try {
       const response = await axios.post(`${API_URL}/dhu/start`, {
-        x: windowConfig.x || 750,      // Center position
-        y: windowConfig.y || 180,
-        width: windowConfig.width || 420,
-        height: windowConfig.height || 340,
+        x: windowConfig.x || 640,       // Centered for 1920 width
+        y: windowConfig.y || 200,
+        width: windowConfig.width || 640,
+        height: windowConfig.height || 480,
         borderless: true,
-        alwaysOnTop: false
+        alwaysOnTop: true
       });
       if (response.data.status === 'running') {
         setDhuStatus('running');
