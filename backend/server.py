@@ -290,67 +290,86 @@ async def websocket_vehicle_data(websocket: WebSocket):
         pass
 
 # ============ ANDROID AUTO DHU CONTROLLER ============
-# For Raspberry Pi 5 Linux - manages DHU subprocess with window control
+# For Raspberry Pi 5 Linux - manages OpenAuto subprocess with window control
 
 import subprocess
 import signal
 
 class DHUController:
     """
-    Android Auto Desktop Head Unit Controller
-    Manages DHU as a subprocess with window positioning for Raspberry Pi Linux
+    OpenAuto Controller for Raspberry Pi
+    Manages OpenAuto as a subprocess with window positioning
     """
     def __init__(self):
         self.process = None
-        self.dhu_path = os.environ.get('DHU_PATH', '/opt/android-auto/desktop-head-unit')
-        self.dhu_config = os.environ.get('DHU_CONFIG', '/opt/android-auto/dhu.ini')
+        # OpenAuto launcher path
+        self.openauto_launcher = os.environ.get('OPENAUTO_PATH', '/usr/local/bin/openauto-launcher')
+        self.openauto_bin = '/opt/openauto/openauto/build/bin/autoapp'
         self.window_id = None
         
     def is_running(self):
-        return self.process is not None and self.process.poll() is None
+        if self.process is not None and self.process.poll() is None:
+            return True
+        # Also check if autoapp is running independently
+        try:
+            result = subprocess.run(['pgrep', '-f', 'autoapp'], capture_output=True, text=True)
+            return result.returncode == 0
+        except:
+            return False
     
-    async def start(self, x=750, y=180, width=420, height=340, borderless=True):
-        """Launch DHU and configure window"""
+    async def start(self, x=640, y=200, width=640, height=480, borderless=True):
+        """Launch OpenAuto and configure window"""
         if self.is_running():
-            return {"status": "running", "message": "DHU already running"}
+            return {"status": "running", "message": "OpenAuto already running"}
         
-        # Check if DHU executable exists
-        if not os.path.exists(self.dhu_path):
+        # Check if OpenAuto is installed
+        openauto_exists = os.path.exists(self.openauto_bin) or os.path.exists(self.openauto_launcher)
+        
+        if not openauto_exists:
             return {
                 "status": "error", 
-                "message": f"DHU not found at {self.dhu_path}. Install Android Auto DHU first."
+                "message": "OpenAuto not installed. Run: sudo bash ~/projects/DigitalDash/scripts/install_openauto.sh"
             }
         
         try:
-            # Build command
-            cmd = [self.dhu_path, "--usb"]
-            if os.path.exists(self.dhu_config):
-                cmd.extend(["-c", self.dhu_config])
+            # Set display environment
+            env = os.environ.copy()
+            env['DISPLAY'] = ':0'
             
-            # Launch DHU subprocess
+            # Determine which binary to use
+            if os.path.exists(self.openauto_launcher):
+                cmd = [self.openauto_launcher]
+            else:
+                cmd = [self.openauto_bin]
+            
+            # Launch OpenAuto subprocess
             self.process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                env=env,
                 preexec_fn=os.setsid  # Create new process group for clean termination
             )
             
-            # Wait briefly for window to appear
-            await asyncio.sleep(1.0)
+            # Wait for window to appear
+            await asyncio.sleep(2.0)
             
-            # Find and configure DHU window using wmctrl/xdotool
+            # Find and configure OpenAuto window
             await self._configure_window(x, y, width, height, borderless)
             
-            return {"status": "running", "message": "DHU started successfully", "pid": self.process.pid}
+            return {"status": "running", "message": "OpenAuto started successfully", "pid": self.process.pid}
             
         except Exception as e:
-            logger.error(f"Failed to start DHU: {e}")
+            logger.error(f"Failed to start OpenAuto: {e}")
             return {"status": "error", "message": str(e)}
     
     async def _configure_window(self, x, y, width, height, borderless):
-        """Configure DHU window position and style using X11 tools"""
+        """Configure OpenAuto window position and style using X11 tools"""
         try:
-            # Find DHU window by title (wmctrl -l)
+            # Wait a bit more for window to fully initialize
+            await asyncio.sleep(1.0)
+            
+            # Find OpenAuto window by various possible titles
             result = subprocess.run(
                 ["wmctrl", "-l"],
                 capture_output=True,
@@ -359,24 +378,41 @@ class DHUController:
             )
             
             window_id = None
+            search_terms = ['openauto', 'autoapp', 'android auto', 'aasdk']
+            
             for line in result.stdout.splitlines():
-                if "android" in line.lower() or "dhu" in line.lower() or "head unit" in line.lower():
-                    window_id = line.split()[0]
+                line_lower = line.lower()
+                for term in search_terms:
+                    if term in line_lower:
+                        window_id = line.split()[0]
+                        break
+                if window_id:
                     break
             
             if not window_id:
-                logger.warning("Could not find DHU window")
+                # Try to find by process ID
+                if self.process:
+                    try:
+                        result = subprocess.run(
+                            ["xdotool", "search", "--pid", str(self.process.pid)],
+                            capture_output=True,
+                            text=True,
+                            timeout=5
+                        )
+                        if result.stdout.strip():
+                            window_id = result.stdout.strip().split('\n')[0]
+                    except:
+                        pass
+            
+            if not window_id:
+                logger.warning("Could not find OpenAuto window - it may need manual positioning")
                 return
             
             self.window_id = window_id
             
-            # Remove window decorations if borderless
+            # Configure window
             if borderless:
-                subprocess.run(
-                    ["wmctrl", "-i", "-r", window_id, "-b", "add,above"],  # Keep on top
-                    timeout=5
-                )
-                # Use xdotool for more control
+                # Remove decorations
                 subprocess.run(
                     ["xdotool", "windowmove", window_id, str(x), str(y)],
                     timeout=5
@@ -385,57 +421,64 @@ class DHUController:
                     ["xdotool", "windowsize", window_id, str(width), str(height)],
                     timeout=5
                 )
+                # Keep on top
+                subprocess.run(
+                    ["wmctrl", "-i", "-r", window_id, "-b", "add,above"],
+                    timeout=5
+                )
             else:
-                # Just move and resize
                 subprocess.run(
                     ["wmctrl", "-i", "-r", window_id, "-e", f"0,{x},{y},{width},{height}"],
                     timeout=5
                 )
             
-            # Activate/focus the window
+            # Focus the window
             subprocess.run(
                 ["wmctrl", "-i", "-a", window_id],
                 timeout=5
             )
             
-            logger.info(f"DHU window configured: {window_id} at ({x},{y}) {width}x{height}")
+            logger.info(f"OpenAuto window configured: {window_id} at ({x},{y}) {width}x{height}")
             
         except FileNotFoundError:
-            logger.warning("wmctrl/xdotool not installed. Window positioning unavailable.")
+            logger.warning("wmctrl/xdotool not installed. Run: sudo apt install wmctrl xdotool")
         except Exception as e:
-            logger.error(f"Error configuring DHU window: {e}")
+            logger.error(f"Error configuring OpenAuto window: {e}")
     
     async def stop(self):
-        """Stop DHU subprocess cleanly"""
-        if not self.is_running():
-            return {"status": "stopped", "message": "DHU not running"}
-        
+        """Stop OpenAuto subprocess cleanly"""
         try:
-            # Send SIGTERM to process group
-            os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
+            # Kill by process name first
+            subprocess.run(['pkill', '-f', 'autoapp'], timeout=5)
+            await asyncio.sleep(0.5)
             
-            # Wait for graceful shutdown
-            try:
-                self.process.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                # Force kill if needed
-                os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
-                self.process.wait(timeout=2)
+            # Also kill our tracked process if exists
+            if self.process is not None:
+                try:
+                    os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
+                    self.process.wait(timeout=3)
+                except:
+                    try:
+                        os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
+                        self.process.wait(timeout=2)
+                    except:
+                        pass
             
             self.process = None
             self.window_id = None
-            return {"status": "stopped", "message": "DHU stopped successfully"}
+            return {"status": "stopped", "message": "OpenAuto stopped successfully"}
             
         except Exception as e:
-            logger.error(f"Error stopping DHU: {e}")
+            logger.error(f"Error stopping OpenAuto: {e}")
             return {"status": "error", "message": str(e)}
     
     def get_status(self):
-        """Get current DHU status"""
+        """Get current OpenAuto status"""
         if self.is_running():
+            pid = self.process.pid if self.process else "unknown"
             return {
                 "status": "running",
-                "pid": self.process.pid,
+                "pid": pid,
                 "window_id": self.window_id
             }
         return {"status": "stopped"}
