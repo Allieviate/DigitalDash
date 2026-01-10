@@ -487,12 +487,12 @@ class DHUController:
 dhu_controller = DHUController()
 
 class DHUStartRequest(BaseModel):
-    x: int = 750
-    y: int = 180
-    width: int = 420
-    height: int = 340
+    x: int = 640      # Centered for 1920 width
+    y: int = 200      # Below top widgets
+    width: int = 640  # OpenAuto default
+    height: int = 480 # OpenAuto default
     borderless: bool = True
-    alwaysOnTop: bool = False
+    alwaysOnTop: bool = True
 
 @api_router.post("/dhu/start")
 async def start_dhu(config: DHUStartRequest):
