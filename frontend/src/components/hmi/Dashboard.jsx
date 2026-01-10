@@ -107,25 +107,25 @@ export const Dashboard = ({ onOpenSettings }) => {
       <div className="absolute inset-0">
         
         {/* TOP CENTER SECTION */}
-        <div className="absolute top-0 left-0 right-0 z-10 flex flex-col items-center pt-2">
+        <div className="absolute top-0 left-0 right-0 z-10 flex flex-col items-center pt-4">
           
           {/* Shift Lights Bar */}
-          <ShiftLightsBar className="mb-2" />
+          <ShiftLightsBar className="mb-3" />
           
           {/* Digital Speed + Gear (URUS style) */}
-          <DigitalSpeedGear className="mb-2" />
+          <DigitalSpeedGear className="mb-3" />
           
           {/* Turn Signals */}
-          <TurnSignalsRow className="mb-2" />
+          <TurnSignalsRow className="mb-3" />
         </div>
 
         {/* GAUGES ROW */}
-        <div className="absolute inset-0 flex items-end justify-center pb-20 px-4">
+        <div className="absolute inset-0 flex items-end justify-center pb-24 px-8">
           
           {/* LEFT: RPM Gauge */}
           <div className="relative flex items-end justify-center">
             <RpmGauge 
-              size={520}
+              size={640}
               vtecStartRpm={3000}
               shiftRpm={7800}
               maxRpm={8000}
@@ -134,8 +134,8 @@ export const Dashboard = ({ onOpenSettings }) => {
 
           {/* CENTER GAP - Android Auto (MOVED UP) */}
           <div 
-            className="flex flex-col items-center justify-start mx-4 pt-8" 
-            style={{ width: '420px', height: '380px' }}
+            className="flex flex-col items-center justify-start mx-6 pt-10" 
+            style={{ width: '500px', height: '450px' }}
           >
             {showAndroidAuto ? (
               <AndroidAutoPanel onClose={() => setShowAndroidAuto(false)} />
@@ -147,7 +147,7 @@ export const Dashboard = ({ onOpenSettings }) => {
           {/* RIGHT: Speed Gauge */}
           <div className="relative flex items-end justify-center">
             <SpeedGauge 
-              size={520}
+              size={640}
               maxSpeed={170}
             />
           </div>
@@ -155,7 +155,7 @@ export const Dashboard = ({ onOpenSettings }) => {
 
         {/* Bottom Warning Strip - MORE SPREAD OUT */}
         <div className="absolute bottom-0 left-0 right-0 z-10">
-          <WarningPanel className="py-4 px-16" />
+          <WarningPanel className="py-5 px-20" />
         </div>
       </div>
     </div>
