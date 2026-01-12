@@ -1,0 +1,35 @@
+/* Custom App CSS for Accord HMI */
+
+/* Remove default margins */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Full height app */
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* App container */
+.App {
+  width: 100%;
+  height: 100%;
+}
+
+/* Smooth transitions for theme changes */
+* {
+  transition-property: color, background-color, border-color;
+  transition-duration: 0.15s;
+  transition-timing-function: ease-out;
+}
+
+/* Disable transitions on animations */
+.animate-pulse-glow,
+.animate-blink,
+.animate-needle-sweep {
+  transition: none;
+}
