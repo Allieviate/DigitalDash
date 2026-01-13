@@ -66,8 +66,12 @@ export const SettingsPanel = ({ onClose }) => {
         </div>
 
         {/* Content */}
-        <Tabs defaultValue="appearance" className="h-[calc(100%-65px)]">
+        <Tabs defaultValue="diagnostics" className="h-[calc(100%-65px)]">
           <TabsList className="w-full justify-start px-6 py-2 bg-transparent border-b border-zinc-800 rounded-none">
+            <TabsTrigger value="diagnostics" className="data-[state=active]:bg-white/10 font-eurostar">
+              <Activity size={16} className="mr-2" />
+              Diagnostics
+            </TabsTrigger>
             <TabsTrigger value="appearance" className="data-[state=active]:bg-white/10 font-eurostar">
               <Palette size={16} className="mr-2" />
               Appearance
@@ -75,10 +79,6 @@ export const SettingsPanel = ({ onClose }) => {
             <TabsTrigger value="data" className="data-[state=active]:bg-white/10 font-eurostar">
               <Database size={16} className="mr-2" />
               Data Source
-            </TabsTrigger>
-            <TabsTrigger value="diagnostics" className="data-[state=active]:bg-white/10 font-eurostar">
-              <Activity size={16} className="mr-2" />
-              Diagnostics
             </TabsTrigger>
           </TabsList>
 
