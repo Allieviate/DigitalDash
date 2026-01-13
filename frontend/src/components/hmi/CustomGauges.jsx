@@ -127,12 +127,12 @@ export const RpmGauge = ({
         </div>
       )}
       
-      {/* Needle center cap */}
+      {/* Needle center cap - LARGER */}
       <div className="absolute inset-0 flex items-center justify-center">
         <img 
           src="/assets/gauges/rpm-needle-center.png" 
           alt=""
-          className="w-[15%] object-contain"
+          className="w-[20%] object-contain"
           style={{ imageRendering: 'auto' }}
           draggable={false}
         />
@@ -266,12 +266,12 @@ export const SpeedGauge = ({
         />
       </div>
       
-      {/* Needle center cap */}
+      {/* Needle center cap - LARGER */}
       <div className="absolute inset-0 flex items-center justify-center">
         <img 
           src="/assets/gauges/rpm-needle-center.png" 
           alt=""
-          className="w-[15%] object-contain"
+          className="w-[20%] object-contain"
           style={{ imageRendering: 'auto' }}
           draggable={false}
         />
