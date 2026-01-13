@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useSettings } from '../../contexts/SettingsContext';
 import { 
   Thermometer, 
   Droplet, 
@@ -9,10 +10,13 @@ import {
   Gauge,
   Activity,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  Settings2
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { ScrollArea } from '../ui/scroll-area';
+import { Slider } from '../ui/slider';
+import { Switch } from '../ui/switch';
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
