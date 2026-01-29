@@ -62,7 +62,7 @@ class UserSettings(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     theme_id: str = "type_r"
-    data_source: str = "simulated"  # simulated or obd
+    data_source: str = "simulation"  # simulation, obd1, or obd2
     units: str = "imperial"  # imperial or metric
     gauge_style: str = "modern"  # modern, classic, minimal
     warning_sounds: bool = True
@@ -115,10 +115,11 @@ class VehicleSimulator:
         self.last_blink = 0.0
         self.blink_state = False
         self.signals = VehicleSignals()
+        self.tick_seconds = 1.0 / 60.0
     
     def update(self) -> VehicleSignals:
         t = time.time() - self.t0
-        dt = 0.033  # ~30fps
+        dt = self.tick_seconds  # ~60fps
         
         # Simulate driving pattern
         load = (math.sin(t * 0.15 - math.pi / 2) * 0.5) + 0.5
@@ -285,7 +286,7 @@ async def websocket_vehicle_data(websocket: WebSocket):
         while True:
             data = simulator.update()
             await websocket.send_json(data.model_dump())
-            await asyncio.sleep(0.033)  # ~30fps
+            await asyncio.sleep(simulator.tick_seconds)  # ~60fps
     except WebSocketDisconnect:
         pass
 
