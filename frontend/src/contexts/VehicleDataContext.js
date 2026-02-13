@@ -27,12 +27,12 @@ const DEFAULT_SIGNALS = {
   high_beams: false
 };
 
-// Polling interval: 50ms (20fps) for smooth gauge animations
-const POLL_INTERVAL_MS = 50;
+// Polling interval: ~60fps for smooth gauge animations
+const POLL_INTERVAL_MS = 1000 / 60;
 
 export const VehicleDataProvider = ({ children }) => {
   const [signals, setSignals] = useState(DEFAULT_SIGNALS);
-  const [dataSource, setDataSource] = useState('simulated');
+  const [dataSource, setDataSource] = useState('simulation');
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
   
@@ -62,7 +62,7 @@ export const VehicleDataProvider = ({ children }) => {
   useEffect(() => {
     mountedRef.current = true;
     
-    if (dataSource === 'simulated') {
+    if (dataSource === 'simulation' || dataSource === 'simulated') {
       console.log(`Starting HTTP polling at ${POLL_INTERVAL_MS}ms interval (${1000/POLL_INTERVAL_MS} fps)`);
       
       // Initial fetch
@@ -83,7 +83,7 @@ export const VehicleDataProvider = ({ children }) => {
 
   const switchDataSource = (source) => {
     setDataSource(source);
-    if (source === 'obd') {
+    if (source === 'obd1' || source === 'obd2') {
       console.log('OBD mode not yet implemented');
     }
   };
