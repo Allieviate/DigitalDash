@@ -32,8 +32,9 @@ sudo apt install -y \
     python3-venv \
     nodejs \
     npm \
-    mongodb \
-    chromium-browser \
+    chromium \
+    gnupg \
+    ca-certificates \
     wmctrl \
     xdotool \
     unclutter \
@@ -43,10 +44,50 @@ sudo apt install -y \
     git \
     curl
 
+install_mongodb() {
+    echo -e "${YELLOW}Installing MongoDB...${NC}"
+
+    if apt-cache show mongodb >/dev/null 2>&1; then
+        sudo apt install -y mongodb
+        return
+    fi
+
+    if apt-cache show mongodb-server >/dev/null 2>&1; then
+        sudo apt install -y mongodb-server
+        return
+    fi
+
+    echo -e "${YELLOW}MongoDB package not available in default repo. Installing mongodb-org...${NC}"
+
+    # Add MongoDB official repository for Debian
+    if [ ! -f /usr/share/keyrings/mongodb-server-7.0.gpg ]; then
+        curl -fsSL https://pgp.mongodb.com/server-7.0.asc | \
+            sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
+    fi
+
+    CODENAME="$(. /etc/os-release && echo ${VERSION_CODENAME})"
+    ARCH="$(dpkg --print-architecture)"
+
+    echo "deb [ arch=${ARCH} signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/debian ${CODENAME}/mongodb-org/7.0 main" | \
+        sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list > /dev/null
+
+    sudo apt update
+    sudo apt install -y mongodb-org
+}
+
+install_mongodb
+
 # Start MongoDB
 echo -e "${YELLOW}[3/7] Starting MongoDB service...${NC}"
-sudo systemctl enable mongodb
-sudo systemctl start mongodb
+if systemctl list-unit-files | grep -q '^mongod\.service'; then
+    sudo systemctl enable mongod
+    sudo systemctl start mongod
+elif systemctl list-unit-files | grep -q '^mongodb\.service'; then
+    sudo systemctl enable mongodb
+    sudo systemctl start mongodb
+else
+    echo -e "${YELLOW}MongoDB service not found after install. Please check installation logs.${NC}"
+fi
 
 # Setup Python virtual environment
 echo -e "${YELLOW}[4/7] Setting up Python backend...${NC}"
