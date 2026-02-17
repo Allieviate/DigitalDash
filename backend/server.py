@@ -66,6 +66,8 @@ class UserSettings(BaseModel):
     units: str = "imperial"  # imperial or metric
     gauge_style: str = "modern"  # modern, classic, minimal
     warning_sounds: bool = True
+    chime_volume: int = 70
+    bluetooth_enabled: bool = True
     brightness: int = 100
     show_diagnostics: bool = False
     custom_gauges: Dict[str, Any] = Field(default_factory=dict)
@@ -74,9 +76,12 @@ class UserSettings(BaseModel):
 class UserSettingsUpdate(BaseModel):
     theme_id: Optional[str] = None
     data_source: Optional[str] = None
+    performance_mode: Optional[str] = None
     units: Optional[str] = None
     gauge_style: Optional[str] = None
     warning_sounds: Optional[bool] = None
+    chime_volume: Optional[int] = None
+    bluetooth_enabled: Optional[bool] = None
     brightness: Optional[int] = None
     show_diagnostics: Optional[bool] = None
     custom_gauges: Optional[Dict[str, Any]] = None

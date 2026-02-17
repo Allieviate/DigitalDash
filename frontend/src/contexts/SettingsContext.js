@@ -11,6 +11,8 @@ const DEFAULT_SETTINGS = {
   units: 'imperial',
   gauge_style: 'modern',
   warning_sounds: true,
+  chime_volume: 70,
+  bluetooth_enabled: true,
   brightness: 100,
   show_diagnostics: false,
   custom_gauges: {}

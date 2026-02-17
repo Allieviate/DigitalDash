@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import { useSettings } from './SettingsContext';
 
 const VehicleDataContext = createContext();
 
@@ -44,6 +45,7 @@ const sanitizeSignals = (incoming = {}) => ({
 
 
 export const VehicleDataProvider = ({ children }) => {
+  const { settings } = useSettings();
   const [signals, setSignals] = useState(DEFAULT_SIGNALS);
   const [dataSource, setDataSource] = useState('simulation');
   const [isConnected, setIsConnected] = useState(false);
@@ -51,6 +53,8 @@ export const VehicleDataProvider = ({ children }) => {
   
   const pollIntervalRef = useRef(null);
   const mountedRef = useRef(true);
+  const performanceMode = settings.performance_mode || 'high_performance';
+  const pollIntervalMs = POLL_INTERVALS[performanceMode] || POLL_INTERVALS.high_performance;
 
   // Simple HTTP polling - most reliable for all environments
   const fetchData = useCallback(async () => {
@@ -82,7 +86,7 @@ export const VehicleDataProvider = ({ children }) => {
       fetchData();
       
       // Start polling interval
-      pollIntervalRef.current = setInterval(fetchData, POLL_INTERVAL_MS);
+      pollIntervalRef.current = setInterval(fetchData, pollIntervalMs);
     }
 
     return () => {
@@ -92,7 +96,7 @@ export const VehicleDataProvider = ({ children }) => {
         pollIntervalRef.current = null;
       }
     };
-  }, [dataSource, fetchData]);
+  }, [dataSource, fetchData, performanceMode, pollIntervalMs]);
 
   const switchDataSource = (source) => {
     setDataSource(source);
