@@ -149,8 +149,8 @@ class VehicleSimulator:
         self.signals.fuel_pct = max(0.0, 1.0 - (t * 0.001))
         
         # Coolant temperature based on load
-        coolant_target = 35.0 + load * 55.0 + (self.signals.speed_mph / 170.0) * 10.0
-        coolant_target = max(20.0, min(110.0, coolant_target))
+        coolant_target = 35.0 + load * 45.0 + (self.signals.speed_mph / 170.0) * 8.0
+        coolant_target = max(20.0, min(98.0, coolant_target))
         self.signals.coolant_temp_c += (coolant_target - self.signals.coolant_temp_c) * 0.35 * dt
         
         # Oil pressure based on RPM
@@ -161,10 +161,10 @@ class VehicleSimulator:
         
         # Warning flags
         self.signals.low_fuel = self.signals.fuel_pct <= 0.12
-        self.signals.high_coolant = self.signals.coolant_temp_c >= 105.0
+        self.signals.high_coolant = self.signals.coolant_temp_c >= 110.0
         self.signals.oil_pressure_warning = self.signals.oil_pressure_psi < 15
-        self.signals.check_engine = self.signals.high_coolant
-        self.signals.maintenance = t >= 60.0
+        self.signals.check_engine = False
+        self.signals.maintenance = False
         
         # Turn signal simulation
         phase = t % 20.0

@@ -104,25 +104,21 @@ img {
 
 /* PS3 Breathing Animation - Normal (subtle gray) */
 @keyframes breathe {
-  0%, 100% { 
-    opacity: 0.3;
-    transform: scale(1);
+  0%, 100% {
+    opacity: 0.24;
   }
-  50% { 
-    opacity: 0.6;
-    transform: scale(1.02);
+  50% {
+    opacity: 0.44;
   }
 }
 
 /* PS3 Breathing Animation - High Speed (subtle red) */
 @keyframes breathe-red {
-  0%, 100% { 
-    opacity: 0.2;
-    transform: scale(1);
+  0%, 100% {
+    opacity: 0.16;
   }
-  50% { 
-    opacity: 0.5;
-    transform: scale(1.03);
+  50% {
+    opacity: 0.34;
   }
 }
 

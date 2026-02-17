@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const VehicleDataContext = createContext();
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
 const DEFAULT_SIGNALS = {
   rpm: 0,
@@ -30,6 +30,19 @@ const DEFAULT_SIGNALS = {
 // Polling interval: ~60fps for smooth gauge animations
 const POLL_INTERVAL_MS = 1000 / 60;
 
+const sanitizeSignals = (incoming = {}) => ({
+  ...DEFAULT_SIGNALS,
+  ...incoming,
+  rpm: Number.isFinite(Number(incoming.rpm)) ? Number(incoming.rpm) : DEFAULT_SIGNALS.rpm,
+  speed_mph: Number.isFinite(Number(incoming.speed_mph)) ? Number(incoming.speed_mph) : DEFAULT_SIGNALS.speed_mph,
+  gear: Number.isFinite(Number(incoming.gear)) ? Number(incoming.gear) : DEFAULT_SIGNALS.gear,
+  fuel_pct: Number.isFinite(Number(incoming.fuel_pct)) ? Number(incoming.fuel_pct) : DEFAULT_SIGNALS.fuel_pct,
+  coolant_temp_c: Number.isFinite(Number(incoming.coolant_temp_c)) ? Number(incoming.coolant_temp_c) : DEFAULT_SIGNALS.coolant_temp_c,
+  oil_pressure_psi: Number.isFinite(Number(incoming.oil_pressure_psi)) ? Number(incoming.oil_pressure_psi) : DEFAULT_SIGNALS.oil_pressure_psi,
+  battery_voltage: Number.isFinite(Number(incoming.battery_voltage)) ? Number(incoming.battery_voltage) : DEFAULT_SIGNALS.battery_voltage,
+});
+
+
 export const VehicleDataProvider = ({ children }) => {
   const [signals, setSignals] = useState(DEFAULT_SIGNALS);
   const [dataSource, setDataSource] = useState('simulation');
@@ -46,7 +59,7 @@ export const VehicleDataProvider = ({ children }) => {
     try {
       const response = await axios.get(`${API_URL}/api/vehicle-data`);
       if (mountedRef.current) {
-        setSignals(response.data);
+        setSignals(sanitizeSignals(response.data));
         setIsConnected(true);
         setConnectionError(null);
       }

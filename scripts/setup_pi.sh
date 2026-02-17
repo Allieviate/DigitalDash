@@ -124,19 +124,19 @@ deactivate
 echo -e "${YELLOW}[5/7] Setting up React frontend...${NC}"
 cd "$PROJECT_DIR/frontend"
 
-# Use npm since yarn might not be available
-npm install
-
-# Create production build
-npm run build
-
-# Create .env file if not exists
+# Create .env file if not exists (must exist before build)
 if [ ! -f .env ]; then
     cat > .env << EOF
 REACT_APP_BACKEND_URL=http://localhost:8001
 EOF
     echo -e "${GREEN}Created frontend/.env file${NC}"
 fi
+
+# Use npm since yarn might not be available
+npm install
+
+# Create production build
+npm run build
 
 # Install serve for production
 sudo npm install -g serve
