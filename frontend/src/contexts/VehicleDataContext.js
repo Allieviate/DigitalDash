@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import { useSettings } from './SettingsContext';
 
 const VehicleDataContext = createContext();
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
 const DEFAULT_SIGNALS = {
   rpm: 0,
@@ -27,17 +28,35 @@ const DEFAULT_SIGNALS = {
   high_beams: false
 };
 
-// Polling interval: 50ms (20fps) for smooth gauge animations
-const POLL_INTERVAL_MS = 50;
+const POLL_INTERVALS = {
+  high_performance: 1000 / 60,
+  low_performance: 1000 / 30
+};
+
+const sanitizeSignals = (incoming = {}) => ({
+  ...DEFAULT_SIGNALS,
+  ...incoming,
+  rpm: Number.isFinite(Number(incoming.rpm)) ? Number(incoming.rpm) : DEFAULT_SIGNALS.rpm,
+  speed_mph: Number.isFinite(Number(incoming.speed_mph)) ? Number(incoming.speed_mph) : DEFAULT_SIGNALS.speed_mph,
+  gear: Number.isFinite(Number(incoming.gear)) ? Number(incoming.gear) : DEFAULT_SIGNALS.gear,
+  fuel_pct: Number.isFinite(Number(incoming.fuel_pct)) ? Number(incoming.fuel_pct) : DEFAULT_SIGNALS.fuel_pct,
+  coolant_temp_c: Number.isFinite(Number(incoming.coolant_temp_c)) ? Number(incoming.coolant_temp_c) : DEFAULT_SIGNALS.coolant_temp_c,
+  oil_pressure_psi: Number.isFinite(Number(incoming.oil_pressure_psi)) ? Number(incoming.oil_pressure_psi) : DEFAULT_SIGNALS.oil_pressure_psi,
+  battery_voltage: Number.isFinite(Number(incoming.battery_voltage)) ? Number(incoming.battery_voltage) : DEFAULT_SIGNALS.battery_voltage,
+});
+
 
 export const VehicleDataProvider = ({ children }) => {
+  const { settings } = useSettings();
   const [signals, setSignals] = useState(DEFAULT_SIGNALS);
-  const [dataSource, setDataSource] = useState('simulated');
+  const [dataSource, setDataSource] = useState('simulation');
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
   
   const pollIntervalRef = useRef(null);
   const mountedRef = useRef(true);
+  const performanceMode = settings.performance_mode || 'high_performance';
+  const pollIntervalMs = POLL_INTERVALS[performanceMode] || POLL_INTERVALS.high_performance;
 
   // Simple HTTP polling - most reliable for all environments
   const fetchData = useCallback(async () => {
@@ -46,7 +65,7 @@ export const VehicleDataProvider = ({ children }) => {
     try {
       const response = await axios.get(`${API_URL}/api/vehicle-data`);
       if (mountedRef.current) {
-        setSignals(response.data);
+        setSignals(sanitizeSignals(response.data));
         setIsConnected(true);
         setConnectionError(null);
       }
@@ -62,14 +81,14 @@ export const VehicleDataProvider = ({ children }) => {
   useEffect(() => {
     mountedRef.current = true;
     
-    if (dataSource === 'simulated') {
-      console.log(`Starting HTTP polling at ${POLL_INTERVAL_MS}ms interval (${1000/POLL_INTERVAL_MS} fps)`);
+    if (dataSource === 'simulation' || dataSource === 'simulated') {
+      console.log(`Starting HTTP polling at ${pollIntervalMs}ms interval (${Math.round(1000 / pollIntervalMs)} fps) using ${performanceMode}`);
       
       // Initial fetch
       fetchData();
       
       // Start polling interval
-      pollIntervalRef.current = setInterval(fetchData, POLL_INTERVAL_MS);
+      pollIntervalRef.current = setInterval(fetchData, pollIntervalMs);
     }
 
     return () => {
@@ -79,11 +98,11 @@ export const VehicleDataProvider = ({ children }) => {
         pollIntervalRef.current = null;
       }
     };
-  }, [dataSource, fetchData]);
+  }, [dataSource, fetchData, performanceMode, pollIntervalMs]);
 
   const switchDataSource = (source) => {
     setDataSource(source);
-    if (source === 'obd') {
+    if (source === 'obd1' || source === 'obd2') {
       console.log('OBD mode not yet implemented');
     }
   };
