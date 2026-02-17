@@ -62,7 +62,7 @@ class UserSettings(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     theme_id: str = "type_r"
-    data_source: str = "simulated"  # simulated or obd
+    data_source: str = "simulation"  # simulation, obd1, or obd2
     units: str = "imperial"  # imperial or metric
     gauge_style: str = "modern"  # modern, classic, minimal
     warning_sounds: bool = True
@@ -115,10 +115,11 @@ class VehicleSimulator:
         self.last_blink = 0.0
         self.blink_state = False
         self.signals = VehicleSignals()
+        self.tick_seconds = 1.0 / 60.0
     
     def update(self) -> VehicleSignals:
         t = time.time() - self.t0
-        dt = 0.033  # ~30fps
+        dt = self.tick_seconds  # ~60fps
         
         # Simulate driving pattern
         load = (math.sin(t * 0.15 - math.pi / 2) * 0.5) + 0.5
@@ -148,8 +149,8 @@ class VehicleSimulator:
         self.signals.fuel_pct = max(0.0, 1.0 - (t * 0.001))
         
         # Coolant temperature based on load
-        coolant_target = 35.0 + load * 55.0 + (self.signals.speed_mph / 170.0) * 10.0
-        coolant_target = max(20.0, min(110.0, coolant_target))
+        coolant_target = 35.0 + load * 45.0 + (self.signals.speed_mph / 170.0) * 8.0
+        coolant_target = max(20.0, min(98.0, coolant_target))
         self.signals.coolant_temp_c += (coolant_target - self.signals.coolant_temp_c) * 0.35 * dt
         
         # Oil pressure based on RPM
@@ -160,10 +161,10 @@ class VehicleSimulator:
         
         # Warning flags
         self.signals.low_fuel = self.signals.fuel_pct <= 0.12
-        self.signals.high_coolant = self.signals.coolant_temp_c >= 105.0
+        self.signals.high_coolant = self.signals.coolant_temp_c >= 110.0
         self.signals.oil_pressure_warning = self.signals.oil_pressure_psi < 15
-        self.signals.check_engine = self.signals.high_coolant
-        self.signals.maintenance = t >= 60.0
+        self.signals.check_engine = False
+        self.signals.maintenance = False
         
         # Turn signal simulation
         phase = t % 20.0
@@ -285,7 +286,7 @@ async def websocket_vehicle_data(websocket: WebSocket):
         while True:
             data = simulator.update()
             await websocket.send_json(data.model_dump())
-            await asyncio.sleep(0.033)  # ~30fps
+            await asyncio.sleep(simulator.tick_seconds)  # ~60fps
     except WebSocketDisconnect:
         pass
 

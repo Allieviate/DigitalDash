@@ -32,8 +32,9 @@ sudo apt install -y \
     python3-venv \
     nodejs \
     npm \
-    mongodb \
-    chromium-browser \
+    chromium \
+    gnupg \
+    ca-certificates \
     wmctrl \
     xdotool \
     unclutter \
@@ -43,10 +44,57 @@ sudo apt install -y \
     git \
     curl
 
+install_mongodb() {
+    echo -e "${YELLOW}Installing MongoDB...${NC}"
+
+    has_install_candidate() {
+        local package_name="$1"
+        local candidate
+        candidate="$(apt-cache policy "$package_name" 2>/dev/null | awk '/Candidate:/ {print $2}')"
+        [[ -n "$candidate" && "$candidate" != "(none)" ]]
+    }
+
+    if has_install_candidate mongodb; then
+        sudo apt install -y mongodb
+        return
+    fi
+
+    if has_install_candidate mongodb-server; then
+        sudo apt install -y mongodb-server
+        return
+    fi
+
+    echo -e "${YELLOW}MongoDB package not available in default repo. Installing mongodb-org...${NC}"
+
+    # Add MongoDB official repository for Debian
+    if [ ! -f /usr/share/keyrings/mongodb-server-7.0.gpg ]; then
+        curl -fsSL https://pgp.mongodb.com/server-7.0.asc | \
+            sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
+    fi
+
+    CODENAME="$(. /etc/os-release && echo ${VERSION_CODENAME})"
+    ARCH="$(dpkg --print-architecture)"
+
+    echo "deb [ arch=${ARCH} signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/debian ${CODENAME}/mongodb-org/7.0 main" | \
+        sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list > /dev/null
+
+    sudo apt update
+    sudo apt install -y mongodb-org
+}
+
+install_mongodb
+
 # Start MongoDB
 echo -e "${YELLOW}[3/7] Starting MongoDB service...${NC}"
-sudo systemctl enable mongodb
-sudo systemctl start mongodb
+if systemctl list-unit-files | grep -q '^mongod\.service'; then
+    sudo systemctl enable mongod
+    sudo systemctl start mongod
+elif systemctl list-unit-files | grep -q '^mongodb\.service'; then
+    sudo systemctl enable mongodb
+    sudo systemctl start mongodb
+else
+    echo -e "${YELLOW}MongoDB service not found after install. Please check installation logs.${NC}"
+fi
 
 # Setup Python virtual environment
 echo -e "${YELLOW}[4/7] Setting up Python backend...${NC}"
@@ -76,19 +124,19 @@ deactivate
 echo -e "${YELLOW}[5/7] Setting up React frontend...${NC}"
 cd "$PROJECT_DIR/frontend"
 
-# Use npm since yarn might not be available
-npm install
-
-# Create production build
-npm run build
-
-# Create .env file if not exists
+# Create .env file if not exists (must exist before build)
 if [ ! -f .env ]; then
     cat > .env << EOF
 REACT_APP_BACKEND_URL=http://localhost:8001
 EOF
     echo -e "${GREEN}Created frontend/.env file${NC}"
 fi
+
+# Use npm since yarn might not be available
+npm install
+
+# Create production build
+npm run build
 
 # Install serve for production
 sudo npm install -g serve

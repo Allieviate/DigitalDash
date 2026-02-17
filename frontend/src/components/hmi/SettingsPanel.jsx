@@ -202,21 +202,21 @@ export const SettingsPanel = ({ onClose }) => {
                 <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400 mb-4 font-eurostar">
                   Data Source
                 </h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <button
-                    onClick={() => handleDataSourceChange('simulated')}
+                    onClick={() => handleDataSourceChange('simulation')}
                     className={`
                       p-4 rounded-xl border-2 text-left transition-all
-                      ${dataSource === 'simulated' 
+                      ${dataSource === 'simulation' || dataSource === 'simulated'
                         ? 'border-green-500/50 bg-green-500/10' 
                         : 'border-zinc-800 hover:border-zinc-700'
                       }
                     `}
-                    data-testid="data-source-simulated"
+                    data-testid="data-source-simulation"
                   >
                     <div className="flex items-center gap-2 mb-2">
-                      <Database size={18} className={dataSource === 'simulated' ? 'text-green-500' : 'text-zinc-500'} />
-                      <span className="font-medium font-eurostar">Simulated</span>
+                      <Database size={18} className={dataSource === 'simulation' || dataSource === 'simulated' ? 'text-green-500' : 'text-zinc-500'} />
+                      <span className="font-medium font-eurostar">Simulation</span>
                     </div>
                     <p className="text-xs text-zinc-500">
                       Demo mode with simulated vehicle data for testing and development.
@@ -224,18 +224,38 @@ export const SettingsPanel = ({ onClose }) => {
                   </button>
 
                   <button
-                    onClick={() => handleDataSourceChange('obd')}
+                    onClick={() => handleDataSourceChange('obd1')}
                     className={`
                       p-4 rounded-xl border-2 text-left transition-all
-                      ${dataSource === 'obd' 
+                      ${dataSource === 'obd1' 
+                        ? 'border-amber-500/50 bg-amber-500/10' 
+                        : 'border-zinc-800 hover:border-zinc-700'
+                      }
+                    `}
+                    data-testid="data-source-obd1"
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <Activity size={18} className={dataSource === 'obd1' ? 'text-amber-500' : 'text-zinc-500'} />
+                      <span className="font-medium font-eurostar">OBD0/OBD1</span>
+                    </div>
+                    <p className="text-xs text-zinc-500">
+                      Legacy vehicle data via compatible OBD0/OBD1 adapters.
+                    </p>
+                  </button>
+
+                  <button
+                    onClick={() => handleDataSourceChange('obd2')}
+                    className={`
+                      p-4 rounded-xl border-2 text-left transition-all
+                      ${dataSource === 'obd2' 
                         ? 'border-blue-500/50 bg-blue-500/10' 
                         : 'border-zinc-800 hover:border-zinc-700'
                       }
                     `}
-                    data-testid="data-source-obd"
+                    data-testid="data-source-obd2"
                   >
                     <div className="flex items-center gap-2 mb-2">
-                      <Activity size={18} className={dataSource === 'obd' ? 'text-blue-500' : 'text-zinc-500'} />
+                      <Activity size={18} className={dataSource === 'obd2' ? 'text-blue-500' : 'text-zinc-500'} />
                       <span className="font-medium font-eurostar">OBD-II / CAN</span>
                     </div>
                     <p className="text-xs text-zinc-500">
@@ -244,10 +264,10 @@ export const SettingsPanel = ({ onClose }) => {
                   </button>
                 </div>
 
-                {dataSource === 'obd' && (
+                {(dataSource === 'obd1' || dataSource === 'obd2') && (
                   <div className="mt-4 p-4 rounded-lg border border-amber-500/30 bg-amber-500/10">
                     <p className="text-sm text-amber-400 font-eurostar">
-                      <strong>Note:</strong> OBD-II mode requires hardware connection. 
+                      <strong>Note:</strong> OBD modes require hardware connection. 
                       This feature will be fully available in a future update.
                     </p>
                   </div>
