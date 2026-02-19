@@ -103,7 +103,9 @@ export const RpmGauge = ({
           style={{
             transformOrigin: '50% 76.3%',
             transform: `rotate(${needleAngle}deg)`,
-            transition: 'transform 0.1s ease-out',
+            transition: 'transform 0.06s linear',
+            willChange: 'transform',
+            backfaceVisibility: 'hidden',
             imageRendering: 'auto'
           }}
           draggable={false}
@@ -112,13 +114,14 @@ export const RpmGauge = ({
       
       {/* VTEC Glow center - ORIGINAL CODE RESTORED */}
       {inVtec && (
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 5 }}>
           <img 
             src="/assets/gauges/rpm-needle-center.png" 
             alt=""
-            className="w-[15%] object-contain animate-pulse"
+            className="w-[20%] object-contain animate-pulse"
             style={{
-              filter: 'drop-shadow(0 0 28px rgba(255, 0, 0, 1))',
+              filter: 'drop-shadow(0 0 34px rgba(255, 0, 0, 1))',
+              zIndex: 5,
               opacity: 0.8,
               imageRendering: 'auto'
             }}
@@ -128,11 +131,11 @@ export const RpmGauge = ({
       )}
       
       {/* Needle center cap - LARGER */}
-      <div className="absolute inset-0 flex items-center justify-center">
+      <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 12 }}>
         <img 
           src="/assets/gauges/rpm-needle-center.png" 
           alt=""
-          className="w-[20%] object-contain"
+          className="w-[26%] object-contain"
           style={{ imageRendering: 'auto' }}
           draggable={false}
         />
@@ -155,11 +158,11 @@ export const RpmGauge = ({
       </div>
       
       {/* x1000 RPM label - BELOW the RPM readout - LARGER */}
-      <div className="absolute inset-0 flex items-center justify-center" style={{ paddingTop: '58%' }}>
+      <div className="absolute inset-0 flex items-center justify-center" style={{ paddingTop: '63%' }}>
         <img 
           src="/assets/gauges/x1000-rpm.png" 
           alt="x1000"
-          className="w-[55%] object-contain"
+          className="w-[68%] object-contain"
           style={{ opacity: 0.9, imageRendering: 'auto' }}
           draggable={false}
         />
@@ -170,16 +173,17 @@ export const RpmGauge = ({
         <div 
           className="absolute flex items-center justify-center"
           style={{ 
-            top: '68%', 
+            top: '66%', 
             left: '50%', 
-            transform: 'translateX(-50%)'
+            transform: 'translateX(-50%)',
+            zIndex: 4
           }}
         >
           <span 
             className="font-orbitron text-lg font-bold tracking-wider animate-pulse"
             style={{ 
               color: '#FF0000',
-              textShadow: '0 0 15px rgba(255, 0, 0, 0.9), 0 0 30px rgba(255, 0, 0, 0.6)'
+              textShadow: '0 0 12px rgba(255, 0, 0, 0.85), 0 0 24px rgba(255, 0, 0, 0.55)'
             }}
           >
             VTEC
@@ -259,7 +263,9 @@ export const SpeedGauge = ({
           style={{
             transformOrigin: '50% 76.4%',
             transform: `rotate(${needleAngle}deg)`,
-            transition: 'transform 0.1s ease-out',
+            transition: 'transform 0.06s linear',
+            willChange: 'transform',
+            backfaceVisibility: 'hidden',
             imageRendering: 'auto'
           }}
           draggable={false}
@@ -267,12 +273,12 @@ export const SpeedGauge = ({
       </div>
       
       {/* Needle center cap - LARGER */}
-      <div className="absolute inset-0 flex items-center justify-center">
+      <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 12 }}>
         <img 
           src="/assets/gauges/rpm-needle-center.png" 
           alt=""
-          className="w-[20%] object-contain"
-          style={{ imageRendering: 'auto' }}
+          className="w-[26%] object-contain"
+          style={{ imageRendering: 'auto', filter: 'drop-shadow(0 0 8px rgba(255, 0, 0, 0.28))' }}
           draggable={false}
         />
       </div>
