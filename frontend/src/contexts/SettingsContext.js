@@ -8,7 +8,6 @@ const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const DEFAULT_SETTINGS = {
   theme_id: 'type_r',
   data_source: 'simulation',
-  performance_mode: 'high_performance',
   units: 'imperial',
   gauge_style: 'modern',
   warning_sounds: true,

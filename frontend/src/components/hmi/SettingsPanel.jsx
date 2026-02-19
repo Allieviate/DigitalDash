@@ -15,7 +15,8 @@ import {
   SlidersHorizontal,
   Bluetooth,
   Gauge,
-  Zap
+  Zap,
+  Turtle
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/switch';
@@ -202,7 +203,7 @@ export const SettingsPanel = ({ onClose }) => {
                     data-testid="performance-low"
                   >
                     <div className="flex items-center gap-2 mb-2">
-                      <Gauge size={18} className={settings.performance_mode === 'low_performance' ? 'text-amber-400' : 'text-zinc-500'} />
+                      <Turtle size={18} className={settings.performance_mode === 'low_performance' ? 'text-amber-400' : 'text-zinc-500'} />
                       <span className="font-medium font-eurostar">Low Performance</span>
                     </div>
                     <p className="text-xs text-zinc-500">
@@ -311,7 +312,7 @@ export const SettingsPanel = ({ onClose }) => {
                     className={`
                       p-4 rounded-xl border-2 text-left transition-all
                       ${dataSource === 'simulation' || dataSource === 'simulated'
-                        ? 'border-green-500/50 bg-green-500/10'
+                        ? 'border-green-500/50 bg-green-500/10' 
                         : 'border-zinc-800 hover:border-zinc-700'
                       }
                     `}
@@ -330,8 +331,8 @@ export const SettingsPanel = ({ onClose }) => {
                     onClick={() => handleDataSourceChange('obd1')}
                     className={`
                       p-4 rounded-xl border-2 text-left transition-all
-                      ${dataSource === 'obd1'
-                        ? 'border-amber-500/50 bg-amber-500/10'
+                      ${dataSource === 'obd1' 
+                        ? 'border-amber-500/50 bg-amber-500/10' 
                         : 'border-zinc-800 hover:border-zinc-700'
                       }
                     `}
@@ -350,15 +351,15 @@ export const SettingsPanel = ({ onClose }) => {
                     onClick={() => handleDataSourceChange('obd2')}
                     className={`
                       p-4 rounded-xl border-2 text-left transition-all
-                      ${dataSource === 'obd2'
-                        ? 'border-blue-500/50 bg-blue-500/10'
+                      ${dataSource === 'obd2' 
+                        ? 'border-blue-500/50 bg-blue-500/10' 
                         : 'border-zinc-800 hover:border-zinc-700'
                       }
                     `}
                     data-testid="data-source-obd2"
                   >
                     <div className="flex items-center gap-2 mb-2">
-                      <Gauge size={18} className={dataSource === 'obd2' ? 'text-blue-500' : 'text-zinc-500'} />
+                      <Activity size={18} className={dataSource === 'obd2' ? 'text-blue-500' : 'text-zinc-500'} />
                       <span className="font-medium font-eurostar">OBD-II / CAN</span>
                     </div>
                     <p className="text-xs text-zinc-500">
@@ -370,7 +371,7 @@ export const SettingsPanel = ({ onClose }) => {
                 {(dataSource === 'obd1' || dataSource === 'obd2') && (
                   <div className="mt-4 p-4 rounded-lg border border-amber-500/30 bg-amber-500/10">
                     <p className="text-sm text-amber-400 font-eurostar">
-                      <strong>Note:</strong> OBD modes require hardware connection.
+                      <strong>Note:</strong> OBD modes require hardware connection. 
                       This feature will be fully available in a future update.
                     </p>
                   </div>

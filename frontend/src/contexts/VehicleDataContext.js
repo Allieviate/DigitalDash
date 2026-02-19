@@ -28,10 +28,8 @@ const DEFAULT_SIGNALS = {
   high_beams: false
 };
 
-const POLL_INTERVALS = {
-  high_performance: 1000 / 60,
-  low_performance: 1000 / 30
-};
+// Polling interval: ~60fps for smooth gauge animations
+const POLL_INTERVAL_MS = 1000 / 60;
 
 const sanitizeSignals = (incoming = {}) => ({
   ...DEFAULT_SIGNALS,
@@ -82,7 +80,7 @@ export const VehicleDataProvider = ({ children }) => {
     mountedRef.current = true;
     
     if (dataSource === 'simulation' || dataSource === 'simulated') {
-      console.log(`Starting HTTP polling at ${pollIntervalMs}ms interval (${Math.round(1000 / pollIntervalMs)} fps) using ${performanceMode}`);
+      console.log(`Starting HTTP polling at ${POLL_INTERVAL_MS}ms interval (${1000/POLL_INTERVAL_MS} fps)`);
       
       // Initial fetch
       fetchData();
