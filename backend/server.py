@@ -63,7 +63,6 @@ class UserSettings(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     theme_id: str = "type_r"
     data_source: str = "simulation"  # simulation, obd1, or obd2
-    performance_mode: str = "high_performance"  # high_performance or low_performance
     units: str = "imperial"  # imperial or metric
     gauge_style: str = "modern"  # modern, classic, minimal
     warning_sounds: bool = True
