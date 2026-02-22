@@ -70,6 +70,50 @@ sudo apt install -y \
     git \
     curl
 
+install_mongodb_docker_fallback() {
+    echo -e "${YELLOW}Falling back to Docker-based MongoDB due apt repository signature/policy issues...${NC}"
+
+    sudo apt install -y docker.io
+    sudo systemctl enable docker
+    sudo systemctl start docker
+
+    if ! sudo docker image inspect mongo:7 >/dev/null 2>&1; then
+        sudo docker pull mongo:7
+    fi
+
+    if sudo docker ps -a --format '{{.Names}}' | grep -q '^frank-mongodb$'; then
+        sudo docker start frank-mongodb >/dev/null
+    else
+        sudo mkdir -p /var/lib/frank-mongodb
+        sudo docker run -d             --name frank-mongodb             --restart unless-stopped             -p 27017:27017             -v /var/lib/frank-mongodb:/data/db             mongo:7 >/dev/null
+    fi
+
+    echo -e "${GREEN}MongoDB is running via Docker container 'frank-mongodb'.${NC}"
+}
+
+start_mongodb_runtime() {
+    if systemctl list-unit-files | grep -q '^mongod\.service'; then
+        sudo systemctl enable mongod
+        sudo systemctl start mongod
+        return
+    fi
+
+    if systemctl list-unit-files | grep -q '^mongodb\.service'; then
+        sudo systemctl enable mongodb
+        sudo systemctl start mongodb
+        return
+    fi
+
+    if command -v docker >/dev/null 2>&1 && sudo docker ps -a --format '{{.Names}}' | grep -q '^frank-mongodb$'; then
+        sudo systemctl enable docker || true
+        sudo systemctl start docker || true
+        sudo docker start frank-mongodb >/dev/null || true
+        return
+    fi
+
+    echo -e "${YELLOW}MongoDB runtime service/container not found after install. Please check installation logs.${NC}"
+}
+
 install_mongodb() {
     echo -e "${YELLOW}Installing MongoDB...${NC}"
 
@@ -123,7 +167,24 @@ install_mongodb() {
 
     echo "deb [ arch=${ARCH} signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/debian ${REPO_CODENAME}/mongodb-org/7.0 main" |         sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list > /dev/null
 
-    sudo apt update
+    echo "deb [ arch=${ARCH} signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/debian ${REPO_CODENAME}/mongodb-org/7.0 main" |         sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list > /dev/null
+
+    local apt_log
+    apt_log="$(mktemp)"
+
+    if ! sudo apt update 2> >(tee "$apt_log" >&2); then
+        if grep -Eqi "SHA1 is not considered secure|repository .* is not signed|OpenPGP signature verification failed" "$apt_log"; then
+            rm -f "$apt_log"
+            install_mongodb_docker_fallback
+            return
+        fi
+
+        rm -f "$apt_log"
+        echo -e "${RED}Failed to refresh package metadata for MongoDB repository.${NC}"
+        exit 1
+    fi
+
+    rm -f "$apt_log"
     sudo apt install -y mongodb-org
 }
 
@@ -131,15 +192,7 @@ install_mongodb
 
 # Start MongoDB
 echo -e "${YELLOW}[3/7] Starting MongoDB service...${NC}"
-if systemctl list-unit-files | grep -q '^mongod\.service'; then
-    sudo systemctl enable mongod
-    sudo systemctl start mongod
-elif systemctl list-unit-files | grep -q '^mongodb\.service'; then
-    sudo systemctl enable mongodb
-    sudo systemctl start mongodb
-else
-    echo -e "${YELLOW}MongoDB service not found after install. Please check installation logs.${NC}"
-fi
+start_mongodb_runtime
 
 # Setup Python virtual environment
 echo -e "${YELLOW}[4/7] Setting up Python backend...${NC}"
