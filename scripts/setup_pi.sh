@@ -230,8 +230,10 @@ EOF
     echo -e "${GREEN}Created frontend/.env file${NC}"
 fi
 
-# Use npm since yarn might not be available
-npm install
+# Use npm since yarn might not be available.
+# This repo currently has known peer conflicts (e.g. date-fns/react-day-picker),
+# so use legacy peer resolution for consistent Pi installs.
+npm install --legacy-peer-deps
 
 # Create production build
 npm run build
