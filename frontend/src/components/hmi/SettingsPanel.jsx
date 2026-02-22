@@ -1,385 +1,276 @@
-import React from 'react';
-import { useTheme } from '../../contexts/ThemeContext';
+import React, { useMemo } from 'react';
+import { X, CarFront, LayoutGrid, Save } from 'lucide-react';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useVehicleData } from '../../contexts/VehicleDataContext';
-import { DiagnosticsPanel } from './DiagnosticsPanel';
-import {
-  X,
-  Palette,
-  Database,
-  Volume2,
-  VolumeX,
-  Sun,
-  Activity,
-  Check,
-  SlidersHorizontal,
-  Bluetooth,
-  Gauge,
-  Zap
-} from 'lucide-react';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/switch';
-import { Slider } from '../ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { ScrollArea } from '../ui/scroll-area';
+import { Input } from '../ui/input';
+
+/**
+ * Shared, known-safe gauge image assets from /public/assets/gauges.
+ * Keeping this list explicit prevents typo-prone manual entry for common paths.
+ */
+const GAUGE_ASSET_OPTIONS = [
+  '/assets/gauges/rpm-gauge.png',
+  '/assets/gauges/spd-gauge.png',
+  '/assets/gauges/rpm-needle.png',
+  '/assets/gauges/rpm-medium-ticks.png',
+  '/assets/gauges/spd-medium-ticks.png',
+  '/assets/gauges/rpm-large-ticks.png',
+  '/assets/gauges/spd-large-ticks.png',
+];
+
+const WIDGET_TYPE_OPTIONS = [
+  'RpmGauge',
+  'SpeedGauge',
+  'ShiftLightsBar',
+  'DigitalSpeedGear',
+  'TurnSignalsRow',
+  'WarningPanel',
+  'CriticalWarningBanner',
+  'AndroidAutoPanel',
+  'ConnectionStatus',
+  'InfoGauge',
+  'CircularGauge',
+];
+
+/**
+ * Helper row used by both tabs for consistent motorsport-themed settings styling.
+ */
+const SettingRow = ({ label, description, children, testId }) => (
+  <div
+    className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3"
+    data-testid={testId}
+  >
+    <div className="pr-4">
+      <h4 className="font-eurostar text-sm uppercase tracking-wider text-zinc-100">{label}</h4>
+      {description && <p className="mt-1 text-xs text-zinc-500">{description}</p>}
+    </div>
+    {children}
+  </div>
+);
 
 export const SettingsPanel = ({ onClose }) => {
-  const { themeId, switchTheme, themes } = useTheme();
-  const { settings, updateSetting } = useSettings();
+  const { settings, updateLayout, updateFeatureToggle, updateSetting } = useSettings();
   const { dataSource, switchDataSource } = useVehicleData();
 
-  const handleThemeChange = async (newThemeId) => {
-    switchTheme(newThemeId);
-    await updateSetting('theme_id', newThemeId);
+  /**
+   * We always edit one widget at a time in this step.
+   * Default to first available item when a prior selection isn't available.
+   */
+  const selectedWidgetId = settings?.selectedLayoutWidgetId || settings?.layout?.[0]?.id || '';
+
+  const selectedWidget = useMemo(
+    () => settings.layout.find((widget) => widget.id === selectedWidgetId) || settings.layout[0],
+    [selectedWidgetId, settings.layout],
+  );
+
+  const handleTelemetryModeToggle = async (useObd) => {
+    const nextSource = useObd ? 'obd2' : 'simulation';
+    switchDataSource(nextSource);
+    await updateSetting('data_source', nextSource);
   };
 
-  const handleSoundsToggle = async (enabled) => {
-    await updateSetting('warning_sounds', enabled);
+  const FEATURE_LAYOUT_LINKS = {
+    showTurnSignals: ['turn_signals'],
+    showDiagnostics: ['warning_panel'],
+    showAndroidAutoPanel: ['android_auto_panel'],
   };
 
-  const handleBrightnessChange = async (value) => {
-    await updateSetting('brightness', value[0]);
+  const handleFeatureToggle = (key) => (enabled) => {
+    // Dispatch directly through SettingsContext to persist immediately.
+    updateFeatureToggle(key, enabled);
+
+    // Keep JSON layout in sync so toggles also drive runtime widget visibility.
+    const linkedWidgetIds = FEATURE_LAYOUT_LINKS[key];
+    if (linkedWidgetIds?.length) {
+      updateLayout((currentLayout) =>
+        currentLayout.map((widget) =>
+          linkedWidgetIds.includes(widget.id)
+            ? {
+                ...widget,
+                visible: Boolean(enabled),
+              }
+            : widget,
+        ),
+      );
+    }
   };
 
-  const handleDataSourceChange = async (source) => {
-    switchDataSource(source);
-    await updateSetting('data_source', source);
+  const handleWidgetSelection = async (event) => {
+    await updateSetting('selectedLayoutWidgetId', event.target.value);
   };
 
-  const handleChimeVolumeChange = async (value) => {
-    await updateSetting('chime_volume', value[0]);
-  };
+  const patchSelectedWidget = (patch) => {
+    if (!selectedWidget) return;
 
-  const handleBluetoothToggle = async (enabled) => {
-    await updateSetting('bluetooth_enabled', enabled);
-  };
-
-  const handlePerformanceModeChange = async (mode) => {
-    await updateSetting('performance_mode', mode);
+    // Update layout with immutable map to preserve referential clarity.
+    updateLayout((currentLayout) =>
+      currentLayout.map((widget) =>
+        widget.id === selectedWidget.id
+          ? {
+              ...widget,
+              ...patch,
+            }
+          : widget,
+      ),
+    );
   };
 
   return (
-    <div
-      className="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-      data-testid="settings-panel"
-    >
-      <div
-        className="w-full max-w-4xl h-[90vh] bg-[#09090b] border border-zinc-800 rounded-xl overflow-hidden"
-        style={{ boxShadow: '0 0 60px rgba(0,0,0,0.8)' }}
-      >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
-          <h2 className="text-xl font-bold uppercase tracking-wider font-eurostar">Settings</h2>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="hover:bg-white/10"
-            data-testid="close-settings-btn"
-          >
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" data-testid="settings-panel">
+      <div className="h-[90vh] w-full max-w-5xl overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-[0_0_60px_rgba(0,0,0,0.8)]">
+        <div className="flex items-center justify-between border-b border-zinc-800 px-6 py-4">
+          <div>
+            <h2 className="font-eurostar text-xl font-bold uppercase tracking-wider text-zinc-50">Project Fran Settings</h2>
+            <p className="mt-1 text-xs text-zinc-500">Drive Mode performance-safe editor controls</p>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose} className="text-zinc-300 hover:bg-zinc-800" data-testid="close-settings-btn">
             <X size={20} />
           </Button>
         </div>
 
-        <Tabs defaultValue="diagnostics" className="h-[calc(100%-65px)]">
-          <TabsList className="w-full justify-start px-6 py-2 bg-transparent border-b border-zinc-800 rounded-none">
-            <TabsTrigger value="diagnostics" className="data-[state=active]:bg-white/10 font-eurostar">
-              <Activity size={16} className="mr-2" />
-              Diagnostics
+        <Tabs defaultValue="vehicle-features" className="h-[calc(100%-73px)]">
+          <TabsList className="w-full justify-start gap-2 rounded-none border-b border-zinc-800 bg-zinc-950 px-6 py-2">
+            <TabsTrigger value="vehicle-features" className="font-eurostar data-[state=active]:bg-red-600/20 data-[state=active]:text-red-500">
+              <CarFront size={15} className="mr-2" />
+              Vehicle Features
             </TabsTrigger>
-            <TabsTrigger value="appearance" className="data-[state=active]:bg-white/10 font-eurostar">
-              <Palette size={16} className="mr-2" />
-              Appearance
-            </TabsTrigger>
-            <TabsTrigger value="general" className="data-[state=active]:bg-white/10 font-eurostar">
-              <SlidersHorizontal size={16} className="mr-2" />
-              General
-            </TabsTrigger>
-            <TabsTrigger value="data" className="data-[state=active]:bg-white/10 font-eurostar">
-              <Database size={16} className="mr-2" />
-              Data Source
+            <TabsTrigger value="dashboard-layout" className="font-eurostar data-[state=active]:bg-red-600/20 data-[state=active]:text-red-500">
+              <LayoutGrid size={15} className="mr-2" />
+              Dashboard Layout
             </TabsTrigger>
           </TabsList>
 
           <ScrollArea className="h-[calc(100%-50px)]">
-            <TabsContent value="appearance" className="p-6 space-y-8 m-0">
-              <div>
-                <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400 mb-4 font-eurostar">
-                  Theme
-                </h3>
-                <div className="grid grid-cols-3 gap-4">
-                  {Object.values(themes).map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => handleThemeChange(t.id)}
-                      className={`
-                        relative p-4 rounded-xl border-2 transition-all
-                        ${themeId === t.id
-                          ? 'border-white/30'
-                          : 'border-zinc-800 hover:border-zinc-700'
-                        }
-                      `}
-                      style={{
-                        background: themeId === t.id ? 'rgba(255,255,255,0.05)' : 'transparent'
-                      }}
-                      data-testid={`theme-${t.id}`}
-                    >
-                      <div
-                        className="w-full h-20 rounded-lg mb-3 flex items-center justify-center"
-                        style={{
-                          background: '#050505',
-                          border: `2px solid ${t.accent}`
-                        }}
-                      >
-                        <span
-                          className="font-orbitron text-2xl font-bold"
-                          style={{
-                            color: t.accent,
-                            textShadow: t.glow
-                          }}
-                        >
-                          120
-                        </span>
-                      </div>
-                      <span className="text-sm font-medium font-eurostar">{t.name}</span>
+            <TabsContent value="vehicle-features" className="m-0 space-y-4 p-6">
+              <SettingRow
+                label="Enable Boost Gauge"
+                description="Shows boost telemetry widget when turbo/supercharger data is present."
+                testId="feature-enableBoostGauge"
+              >
+                <Switch checked={Boolean(settings.featureToggles.enableBoostGauge)} onCheckedChange={handleFeatureToggle('enableBoostGauge')} />
+              </SettingRow>
 
-                      {themeId === t.id && (
-                        <div
-                          className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center"
-                          style={{ backgroundColor: t.accent }}
-                        >
-                          <Check size={14} className="text-black" />
-                        </div>
-                      )}
-                    </button>
+              <SettingRow
+                label="Enable A/C Status"
+                description="Displays compressor/request state indicators in the dash layer."
+                testId="feature-enableACStatus"
+              >
+                <Switch checked={Boolean(settings.featureToggles.enableACStatus)} onCheckedChange={handleFeatureToggle('enableACStatus')} />
+              </SettingRow>
+
+              <SettingRow
+                label="Show Turn Signals"
+                description="Toggles left/right indicator widget visibility from the layout model."
+                testId="feature-showTurnSignals"
+              >
+                <Switch checked={Boolean(settings.featureToggles.showTurnSignals)} onCheckedChange={handleFeatureToggle('showTurnSignals')} />
+              </SettingRow>
+
+              <SettingRow
+                label="OBD Telemetry Mode"
+                description="Switch between simulated telemetry and live OBD stream."
+                testId="feature-telemetryMode"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="font-orbitron text-xs text-zinc-500">SIM</span>
+                  <Switch
+                    checked={dataSource === 'obd1' || dataSource === 'obd2'}
+                    onCheckedChange={handleTelemetryModeToggle}
+                    data-testid="telemetry-source-switch"
+                  />
+                  <span className="font-orbitron text-xs text-red-600">OBD</span>
+                </div>
+              </SettingRow>
+            </TabsContent>
+
+            <TabsContent value="dashboard-layout" className="m-0 space-y-6 p-6">
+              <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+                <h3 className="mb-3 font-eurostar text-sm uppercase tracking-wider text-zinc-300">Widget Selection</h3>
+                <select
+                  className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 font-orbitron text-sm text-zinc-100 outline-none focus:border-red-600"
+                  value={selectedWidget?.id || ''}
+                  onChange={handleWidgetSelection}
+                  data-testid="layout-widget-selector"
+                >
+                  {settings.layout.map((widget) => (
+                    <option key={widget.id} value={widget.id}>
+                      {widget.id}
+                    </option>
                   ))}
-                </div>
+                </select>
               </div>
 
-              <div className="p-4 rounded-lg border border-zinc-800 bg-zinc-900/50">
-                <h4 className="text-sm font-medium text-zinc-400 mb-2 font-eurostar">Custom Gauge Images</h4>
-                <p className="text-xs text-zinc-600">
-                  Your custom gauge PNG assets are loaded from /assets/gauges/.
-                  To change gauge appearance, replace the PNG files in that directory.
-                </p>
-              </div>
-            </TabsContent>
+              {selectedWidget && (
+                <div className="space-y-4 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4" data-testid="layout-widget-editor">
+                  <h3 className="font-eurostar text-sm uppercase tracking-wider text-zinc-300">Selected Widget Editor</h3>
 
-            <TabsContent value="general" className="p-6 space-y-8 m-0">
-              <div>
-                <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400 mb-4 font-eurostar">
-                  Performance Profile
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <button
-                    onClick={() => handlePerformanceModeChange('high_performance')}
-                    className={`
-                      p-4 rounded-xl border-2 text-left transition-all
-                      ${settings.performance_mode === 'high_performance'
-                        ? 'border-emerald-500/50 bg-emerald-500/10'
-                        : 'border-zinc-800 hover:border-zinc-700'
-                      }
-                    `}
-                    data-testid="performance-high"
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <Zap size={18} className={settings.performance_mode === 'high_performance' ? 'text-emerald-400' : 'text-zinc-500'} />
-                      <span className="font-medium font-eurostar">High Performance</span>
+                  <SettingRow label="Visible" description="Render this widget in drive mode.">
+                    <Switch checked={Boolean(selectedWidget.visible)} onCheckedChange={(value) => patchSelectedWidget({ visible: value })} />
+                  </SettingRow>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block font-eurostar text-xs uppercase tracking-wider text-zinc-400">Widget Type</label>
+                      <select
+                        className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 font-orbitron text-sm text-zinc-100 outline-none focus:border-red-600"
+                        value={selectedWidget.type}
+                        onChange={(event) => patchSelectedWidget({ type: event.target.value })}
+                        data-testid="layout-widget-type"
+                      >
+                        {WIDGET_TYPE_OPTIONS.map((type) => (
+                          <option key={type} value={type}>
+                            {type}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                    <p className="text-xs text-zinc-500">
-                      60 FPS signal polling and smoother gauge transitions. Best for faster hardware.
-                    </p>
-                  </button>
 
-                  <button
-                    onClick={() => handlePerformanceModeChange('low_performance')}
-                    className={`
-                      p-4 rounded-xl border-2 text-left transition-all
-                      ${settings.performance_mode === 'low_performance'
-                        ? 'border-amber-500/50 bg-amber-500/10'
-                        : 'border-zinc-800 hover:border-zinc-700'
-                      }
-                    `}
-                    data-testid="performance-low"
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <Gauge size={18} className={settings.performance_mode === 'low_performance' ? 'text-amber-400' : 'text-zinc-500'} />
-                      <span className="font-medium font-eurostar">Low Performance</span>
+                    <div>
+                      <label className="mb-2 block font-eurostar text-xs uppercase tracking-wider text-zinc-400">Face Image</label>
+                      <Input
+                        value={selectedWidget.faceImage || ''}
+                        onChange={(event) => patchSelectedWidget({ faceImage: event.target.value })}
+                        placeholder="/assets/gauges/rpm-gauge.png"
+                        className="border-zinc-700 bg-zinc-950 font-orbitron text-zinc-100 focus-visible:ring-red-600"
+                        data-testid="layout-face-image"
+                        list="faceImageOptions"
+                      />
                     </div>
-                    <p className="text-xs text-zinc-500">
-                      30 FPS signal polling to reduce rendering workload on Pi-class and lower-power systems.
-                    </p>
-                  </button>
-                </div>
-              </div>
 
-              <div>
-                <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400 mb-4 font-eurostar">
-                  Display Brightness
-                </h3>
-                <div className="flex items-center gap-4">
-                  <Sun size={18} className="text-zinc-500" />
-                  <Slider
-                    value={[settings.brightness]}
-                    onValueChange={handleBrightnessChange}
-                    min={20}
-                    max={100}
-                    step={5}
-                    className="flex-1"
-                  />
-                  <span className="font-orbitron text-sm w-12 text-right">
-                    {settings.brightness}%
-                  </span>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400 mb-4 font-eurostar">
-                  Chime Volume
-                </h3>
-                <div className="flex items-center gap-4">
-                  {settings.warning_sounds ? (
-                    <Volume2 size={18} className="text-zinc-500" />
-                  ) : (
-                    <VolumeX size={18} className="text-zinc-600" />
-                  )}
-                  <Slider
-                    value={[settings.chime_volume ?? 70]}
-                    onValueChange={handleChimeVolumeChange}
-                    min={0}
-                    max={100}
-                    step={5}
-                    className="flex-1"
-                    disabled={!settings.warning_sounds}
-                  />
-                  <span className="font-orbitron text-sm w-12 text-right">
-                    {settings.chime_volume ?? 70}%
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400 font-eurostar">
-                    Warning Sounds
-                  </h3>
-                  <p className="text-xs text-zinc-600 mt-1">
-                    Play audio alerts for critical warnings
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  {settings.warning_sounds ? (
-                    <Volume2 size={18} className="text-zinc-400" />
-                  ) : (
-                    <VolumeX size={18} className="text-zinc-600" />
-                  )}
-                  <Switch
-                    checked={settings.warning_sounds}
-                    onCheckedChange={handleSoundsToggle}
-                    data-testid="sounds-toggle"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400 font-eurostar">
-                    Bluetooth
-                  </h3>
-                  <p className="text-xs text-zinc-600 mt-1">
-                    Enable Bluetooth audio and future hands-free integrations
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Bluetooth size={18} className={settings.bluetooth_enabled ? 'text-blue-400' : 'text-zinc-600'} />
-                  <Switch
-                    checked={settings.bluetooth_enabled ?? true}
-                    onCheckedChange={handleBluetoothToggle}
-                    data-testid="bluetooth-toggle"
-                  />
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="data" className="p-6 space-y-8 m-0">
-              <div>
-                <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400 mb-4 font-eurostar">
-                  Data Source
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <button
-                    onClick={() => handleDataSourceChange('simulation')}
-                    className={`
-                      p-4 rounded-xl border-2 text-left transition-all
-                      ${dataSource === 'simulation' || dataSource === 'simulated'
-                        ? 'border-green-500/50 bg-green-500/10'
-                        : 'border-zinc-800 hover:border-zinc-700'
-                      }
-                    `}
-                    data-testid="data-source-simulation"
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <Database size={18} className={dataSource === 'simulation' || dataSource === 'simulated' ? 'text-green-500' : 'text-zinc-500'} />
-                      <span className="font-medium font-eurostar">Simulation</span>
+                    <div>
+                      <label className="mb-2 block font-eurostar text-xs uppercase tracking-wider text-zinc-400">Needle Image</label>
+                      <Input
+                        value={selectedWidget.needleImage || ''}
+                        onChange={(event) => patchSelectedWidget({ needleImage: event.target.value })}
+                        placeholder="/assets/gauges/rpm-needle.png"
+                        className="border-zinc-700 bg-zinc-950 font-orbitron text-zinc-100 focus-visible:ring-red-600"
+                        data-testid="layout-needle-image"
+                        list="needleImageOptions"
+                      />
                     </div>
-                    <p className="text-xs text-zinc-500">
-                      Demo mode with simulated vehicle data for testing and development.
-                    </p>
-                  </button>
-
-                  <button
-                    onClick={() => handleDataSourceChange('obd1')}
-                    className={`
-                      p-4 rounded-xl border-2 text-left transition-all
-                      ${dataSource === 'obd1'
-                        ? 'border-amber-500/50 bg-amber-500/10'
-                        : 'border-zinc-800 hover:border-zinc-700'
-                      }
-                    `}
-                    data-testid="data-source-obd1"
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <Activity size={18} className={dataSource === 'obd1' ? 'text-amber-500' : 'text-zinc-500'} />
-                      <span className="font-medium font-eurostar">OBD0/OBD1</span>
-                    </div>
-                    <p className="text-xs text-zinc-500">
-                      Legacy vehicle data via compatible OBD0/OBD1 adapters.
-                    </p>
-                  </button>
-
-                  <button
-                    onClick={() => handleDataSourceChange('obd2')}
-                    className={`
-                      p-4 rounded-xl border-2 text-left transition-all
-                      ${dataSource === 'obd2'
-                        ? 'border-blue-500/50 bg-blue-500/10'
-                        : 'border-zinc-800 hover:border-zinc-700'
-                      }
-                    `}
-                    data-testid="data-source-obd2"
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <Gauge size={18} className={dataSource === 'obd2' ? 'text-blue-500' : 'text-zinc-500'} />
-                      <span className="font-medium font-eurostar">OBD-II / CAN</span>
-                    </div>
-                    <p className="text-xs text-zinc-500">
-                      Real vehicle data via OBD-II adapter or CAN bus connection.
-                    </p>
-                  </button>
-                </div>
-
-                {(dataSource === 'obd1' || dataSource === 'obd2') && (
-                  <div className="mt-4 p-4 rounded-lg border border-amber-500/30 bg-amber-500/10">
-                    <p className="text-sm text-amber-400 font-eurostar">
-                      <strong>Note:</strong> OBD modes require hardware connection.
-                      This feature will be fully available in a future update.
-                    </p>
                   </div>
-                )}
-              </div>
-            </TabsContent>
 
-            <TabsContent value="diagnostics" className="h-full m-0">
-              <DiagnosticsPanel className="h-full" />
+                  <datalist id="faceImageOptions">
+                    {GAUGE_ASSET_OPTIONS.map((assetPath) => (
+                      <option key={`face-${assetPath}`} value={assetPath} />
+                    ))}
+                  </datalist>
+                  <datalist id="needleImageOptions">
+                    {GAUGE_ASSET_OPTIONS.map((assetPath) => (
+                      <option key={`needle-${assetPath}`} value={assetPath} />
+                    ))}
+                  </datalist>
+
+                  <div className="flex items-center gap-2 border-t border-zinc-800 pt-3 text-xs text-zinc-500">
+                    <Save size={14} className="text-red-600" />
+                    Changes are written to SettingsContext immediately and persisted locally.
+                  </div>
+                </div>
+              )}
             </TabsContent>
           </ScrollArea>
         </Tabs>
