@@ -117,8 +117,6 @@ start_mongodb_runtime() {
 install_mongodb() {
     echo -e "${YELLOW}Installing MongoDB...${NC}"
 
-    ensure_valid_system_time
-
     # MongoDB does not always publish Release metadata for newest Debian codenames
     # (e.g. trixie) immediately. Fall back to a known-good codename when needed.
     pick_mongodb_repo_codename() {
@@ -166,6 +164,8 @@ install_mongodb() {
 
     # Clean up stale/bad mongodb list files from previous attempts.
     sudo rm -f /etc/apt/sources.list.d/mongodb-org-*.list
+
+    echo "deb [ arch=${ARCH} signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/debian ${REPO_CODENAME}/mongodb-org/7.0 main" |         sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list > /dev/null
 
     echo "deb [ arch=${ARCH} signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/debian ${REPO_CODENAME}/mongodb-org/7.0 main" |         sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list > /dev/null
 
@@ -454,6 +454,9 @@ echo "  ./scripts/stop.sh"
 echo ""
 echo "To check status:"
 echo "  ./scripts/status.sh"
+
+echo "To check if you need to pull updates:"
+echo "  ./scripts/check_updates.sh"
 echo ""
 echo "Kiosk service helper:"
 echo "  ./scripts/frank-kiosk.service.sh status"
