@@ -35,7 +35,8 @@ ensure_valid_system_time() {
     if [ "$current_year" -ge 2026 ]; then
         echo -e "${YELLOW}System clock appears ahead (${current_year}). Attempting HTTP time sync...${NC}"
         local http_date
-        http_date="$(curl -fsI https://deb.debian.org 2>/dev/null | awk -F': ' '/^date:/I {print $2}' | tr -d '')"
+        http_date="$(curl -fsI https://deb.debian.org 2>/dev/null | awk -F': ' '/^date:/I {print $2}' | tr -d '
+')"
         if [ -n "$http_date" ]; then
             sudo date -s "$http_date" >/dev/null 2>&1 || true
         fi
@@ -71,8 +72,6 @@ sudo apt install -y \
 
 install_mongodb() {
     echo -e "${YELLOW}Installing MongoDB...${NC}"
-
-    ensure_valid_system_time
 
     # MongoDB does not always publish Release metadata for newest Debian codenames
     # (e.g. trixie) immediately. Fall back to a known-good codename when needed.
