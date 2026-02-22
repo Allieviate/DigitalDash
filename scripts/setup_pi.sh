@@ -22,6 +22,32 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
+ensure_valid_system_time() {
+    # Some fresh Pi images boot with incorrect RTC/system time.
+    # When clock is far in the future, apt signature validation can fail.
+    local current_year
+    current_year="$(date +%Y)"
+
+    if command -v timedatectl >/dev/null 2>&1; then
+        sudo timedatectl set-ntp true || true
+    fi
+
+    if [ "$current_year" -ge 2026 ]; then
+        echo -e "${YELLOW}System clock appears ahead (${current_year}). Attempting HTTP time sync...${NC}"
+        local http_date
+        http_date="$(curl -fsI https://deb.debian.org 2>/dev/null | awk -F': ' '/^date:/I {print $2}' | tr -d '
+')"
+        if [ -n "$http_date" ]; then
+            sudo date -s "$http_date" >/dev/null 2>&1 || true
+        fi
+    fi
+}
+
+# Cleanup stale MongoDB apt source files from previous failed runs before first apt update.
+sudo rm -f /etc/apt/sources.list.d/mongodb-org-*.list || true
+
+ensure_valid_system_time
+
 echo -e "${YELLOW}[1/7] Updating system packages...${NC}"
 sudo apt update && sudo apt upgrade -y
 
@@ -285,9 +311,46 @@ sudo systemctl enable frank-kiosk.service
 
 echo -e "${YELLOW}[7/7] Creating helper scripts...${NC}"
 
+# Create git update reminder script
+cat > "$PROJECT_DIR/scripts/check_updates.sh" << 'EOF'
+#!/bin/bash
+set -euo pipefail
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if ! command -v git >/dev/null 2>&1; then
+  echo "⚠️  git is not installed. Cannot check for updates."
+  exit 0
+fi
+
+if ! git -C "$REPO_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "⚠️  $REPO_DIR is not a git repository."
+  exit 0
+fi
+
+current_branch="$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD)"
+echo "Checking updates for branch: $current_branch"
+
+if ! git -C "$REPO_DIR" fetch --quiet origin "$current_branch"; then
+  echo "⚠️  Could not reach origin to check updates."
+  exit 0
+fi
+
+local_rev="$(git -C "$REPO_DIR" rev-parse "$current_branch")"
+remote_rev="$(git -C "$REPO_DIR" rev-parse "origin/$current_branch")"
+
+if [ "$local_rev" != "$remote_rev" ]; then
+  echo "🔔 Update available: run 'git -C $REPO_DIR pull --ff-only origin $current_branch' before driving."
+else
+  echo "✅ Repo is up to date."
+fi
+EOF
+chmod +x "$PROJECT_DIR/scripts/check_updates.sh"
+
 # Create start script
 cat > "$PROJECT_DIR/scripts/start.sh" << 'EOF'
 #!/bin/bash
+"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check_updates.sh"
 sudo systemctl start frank-backend
 sudo systemctl start frank-frontend
 sleep 3
@@ -309,6 +372,7 @@ chmod +x "$PROJECT_DIR/scripts/stop.sh"
 # Create status script
 cat > "$PROJECT_DIR/scripts/status.sh" << 'EOF'
 #!/bin/bash
+"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check_updates.sh"
 echo "=== FRANK HMI Status ==="
 echo ""
 echo "Backend:"
@@ -335,6 +399,9 @@ echo "  ./scripts/stop.sh"
 echo ""
 echo "To check status:"
 echo "  ./scripts/status.sh"
+
+echo "To check if you need to pull updates:"
+echo "  ./scripts/check_updates.sh"
 echo ""
 echo "The HMI will auto-start on boot. To disable:"
 echo "  sudo systemctl disable frank-kiosk.service"
