@@ -47,6 +47,23 @@ sudo apt install -y \
 install_mongodb() {
     echo -e "${YELLOW}Installing MongoDB...${NC}"
 
+    # MongoDB does not always publish Release metadata for newest Debian codenames
+    # (e.g. trixie) immediately. Fall back to a known-good codename when needed.
+    pick_mongodb_repo_codename() {
+        local detected_codename="$1"
+        local fallback_codename="bookworm"
+
+        case "$detected_codename" in
+            bullseye|bookworm)
+                echo "$detected_codename"
+                ;;
+            *)
+                echo -e "${YELLOW}MongoDB repo does not currently publish '$detected_codename'. Falling back to '$fallback_codename'.${NC}" >&2
+                echo "$fallback_codename"
+                ;;
+        esac
+    }
+
     has_install_candidate() {
         local package_name="$1"
         local candidate
@@ -68,15 +85,17 @@ install_mongodb() {
 
     # Add MongoDB official repository for Debian
     if [ ! -f /usr/share/keyrings/mongodb-server-7.0.gpg ]; then
-        curl -fsSL https://pgp.mongodb.com/server-7.0.asc | \
-            sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
+        curl -fsSL https://pgp.mongodb.com/server-7.0.asc |             sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
     fi
 
     CODENAME="$(. /etc/os-release && echo ${VERSION_CODENAME})"
+    REPO_CODENAME="$(pick_mongodb_repo_codename "$CODENAME")"
     ARCH="$(dpkg --print-architecture)"
 
-    echo "deb [ arch=${ARCH} signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/debian ${CODENAME}/mongodb-org/7.0 main" | \
-        sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list > /dev/null
+    # Clean up stale/bad mongodb list files from previous attempts.
+    sudo rm -f /etc/apt/sources.list.d/mongodb-org-*.list
+
+    echo "deb [ arch=${ARCH} signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/debian ${REPO_CODENAME}/mongodb-org/7.0 main" |         sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list > /dev/null
 
     sudo apt update
     sudo apt install -y mongodb-org
@@ -152,6 +171,53 @@ if [ -z "$CHROMIUM_BIN" ]; then
     exit 1
 fi
 
+# Kiosk launcher detects Wayland sessions and applies proper Chromium flags.
+cat > "$PROJECT_DIR/scripts/launch_kiosk.sh" << 'EOF'
+#!/bin/bash
+set -euo pipefail
+
+CHROMIUM_BIN="$(command -v chromium || command -v chromium-browser || true)"
+if [ -z "$CHROMIUM_BIN" ]; then
+  echo "Chromium binary not found for kiosk startup."
+  exit 1
+fi
+
+APP_URL="http://localhost:3000"
+
+COMMON_FLAGS=(
+  --kiosk
+  --noerrdialogs
+  --disable-infobars
+  --disable-session-crashed-bubble
+  --disable-restore-session-state
+  --no-first-run
+  --start-fullscreen
+  --disable-background-networking
+  --disable-component-update
+  --disable-features=OptimizationGuideModelDownloading,MediaRouter
+  --user-data-dir="$HOME/.config/chromium-kiosk"
+)
+
+WAYLAND_FLAGS=(
+  --ozone-platform=wayland
+  --enable-features=UseOzonePlatform
+)
+
+if [ -z "${WAYLAND_DISPLAY:-}" ] && [ -S "/run/user/$(id -u)/wayland-0" ]; then
+  export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+  export WAYLAND_DISPLAY="wayland-0"
+fi
+
+if [ -n "${WAYLAND_DISPLAY:-}" ]; then
+  exec "$CHROMIUM_BIN" "${COMMON_FLAGS[@]}" "${WAYLAND_FLAGS[@]}" --app="$APP_URL"
+fi
+
+export DISPLAY="${DISPLAY:-:0}"
+export XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}"
+exec "$CHROMIUM_BIN" "${COMMON_FLAGS[@]}" --app="$APP_URL"
+EOF
+chmod +x "$PROJECT_DIR/scripts/launch_kiosk.sh"
+
 # Create systemd services
 echo -e "${YELLOW}[6/7] Creating systemd services...${NC}"
 
@@ -202,10 +268,8 @@ Wants=frank-frontend.service
 [Service]
 Type=simple
 User=$USER
-Environment=DISPLAY=:0
-Environment=XAUTHORITY=/home/$USER/.Xauthority
 ExecStartPre=/bin/sleep 5
-ExecStart=$CHROMIUM_BIN --kiosk --noerrdialogs --disable-infobars --disable-session-crashed-bubble --disable-restore-session-state --no-first-run --start-fullscreen --disable-background-networking --disable-component-update --disable-features=OptimizationGuideModelDownloading,MediaRouter --user-data-dir=/home/$USER/.config/chromium-kiosk --app=http://localhost:3000
+ExecStart=$PROJECT_DIR/scripts/launch_kiosk.sh
 Restart=always
 RestartSec=5
 
