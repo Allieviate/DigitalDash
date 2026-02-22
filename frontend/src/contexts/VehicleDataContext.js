@@ -1,8 +1,17 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import axios from 'axios';
-import { useSettings } from './SettingsContext';
+import { useSettingsSelector } from './SettingsContext';
 
-const VehicleDataContext = createContext();
+const VehicleDataContext = createContext(null);
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -10,10 +19,12 @@ const DEFAULT_SIGNALS = {
   rpm: 0,
   speed_mph: 0,
   gear: 0,
-  fuel_pct: 1.0,
-  coolant_temp_c: 25.0,
-  oil_pressure_psi: 40.0,
+  fuel_pct: 1,
+  coolant_temp_c: 25,
+  oil_pressure_psi: 40,
   battery_voltage: 12.6,
+  boost_psi: 0,
+  ac_on: false,
   turn_left: false,
   turn_right: false,
   check_engine: false,
@@ -25,12 +36,12 @@ const DEFAULT_SIGNALS = {
   airbag_warning: false,
   brake_warning: false,
   headlights: false,
-  high_beams: false
+  high_beams: false,
 };
 
 const POLL_INTERVALS = {
   high_performance: 1000 / 60,
-  low_performance: 1000 / 30
+  low_performance: 1000 / 30,
 };
 
 const sanitizeSignals = (incoming = {}) => ({
@@ -40,96 +51,138 @@ const sanitizeSignals = (incoming = {}) => ({
   speed_mph: Number.isFinite(Number(incoming.speed_mph)) ? Number(incoming.speed_mph) : DEFAULT_SIGNALS.speed_mph,
   gear: Number.isFinite(Number(incoming.gear)) ? Number(incoming.gear) : DEFAULT_SIGNALS.gear,
   fuel_pct: Number.isFinite(Number(incoming.fuel_pct)) ? Number(incoming.fuel_pct) : DEFAULT_SIGNALS.fuel_pct,
-  coolant_temp_c: Number.isFinite(Number(incoming.coolant_temp_c)) ? Number(incoming.coolant_temp_c) : DEFAULT_SIGNALS.coolant_temp_c,
-  oil_pressure_psi: Number.isFinite(Number(incoming.oil_pressure_psi)) ? Number(incoming.oil_pressure_psi) : DEFAULT_SIGNALS.oil_pressure_psi,
-  battery_voltage: Number.isFinite(Number(incoming.battery_voltage)) ? Number(incoming.battery_voltage) : DEFAULT_SIGNALS.battery_voltage,
+  coolant_temp_c: Number.isFinite(Number(incoming.coolant_temp_c))
+    ? Number(incoming.coolant_temp_c)
+    : DEFAULT_SIGNALS.coolant_temp_c,
+  oil_pressure_psi: Number.isFinite(Number(incoming.oil_pressure_psi))
+    ? Number(incoming.oil_pressure_psi)
+    : DEFAULT_SIGNALS.oil_pressure_psi,
+  battery_voltage: Number.isFinite(Number(incoming.battery_voltage))
+    ? Number(incoming.battery_voltage)
+    : DEFAULT_SIGNALS.battery_voltage,
+  boost_psi: Number.isFinite(Number(incoming.boost_psi)) ? Number(incoming.boost_psi) : DEFAULT_SIGNALS.boost_psi,
 });
 
+const createSignalStore = (initialSignals) => {
+  let state = initialSignals;
+  const listeners = new Set();
+
+  return {
+    getState: () => state,
+    setState: (next) => {
+      state = sanitizeSignals(typeof next === 'function' ? next(state) : next);
+      listeners.forEach((listener) => listener());
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+};
 
 export const VehicleDataProvider = ({ children }) => {
-  const { settings } = useSettings();
-  const [signals, setSignals] = useState(DEFAULT_SIGNALS);
-  const [dataSource, setDataSource] = useState('simulation');
+  const dataSourceSetting = useSettingsSelector((state) => state.data_source || 'simulation');
+  const performanceMode = useSettingsSelector((state) => state.performance_mode || 'high_performance');
+
+  const [dataSource, setDataSource] = useState(dataSourceSetting);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
-  
+
+  const signalStoreRef = useRef(null);
+  const wsRef = useRef(null);
   const pollIntervalRef = useRef(null);
-  const mountedRef = useRef(true);
-  const performanceMode = settings.performance_mode || 'high_performance';
+
+  if (!signalStoreRef.current) {
+    signalStoreRef.current = createSignalStore(DEFAULT_SIGNALS);
+  }
+
+  const signalStore = signalStoreRef.current;
   const pollIntervalMs = POLL_INTERVALS[performanceMode] || POLL_INTERVALS.high_performance;
 
-  // Simple HTTP polling - most reliable for all environments
-  const fetchData = useCallback(async () => {
-    if (!mountedRef.current) return;
-    
-    try {
-      const response = await axios.get(`${API_URL}/api/vehicle-data`);
-      if (mountedRef.current) {
-        setSignals(sanitizeSignals(response.data));
-        setIsConnected(true);
-        setConnectionError(null);
-      }
-    } catch (error) {
-      if (mountedRef.current) {
-        setConnectionError(error.message);
-        setIsConnected(false);
-      }
+  const stopStreams = useCallback(() => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
     }
   }, []);
 
-  // Start polling on mount
+  const fetchData = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/vehicle-data`);
+      signalStore.setState(response.data);
+      setIsConnected(true);
+      setConnectionError(null);
+    } catch (error) {
+      setIsConnected(false);
+      setConnectionError(error.message);
+    }
+  }, [signalStore]);
+
   useEffect(() => {
-    mountedRef.current = true;
-    
-    if (dataSource === 'simulation' || dataSource === 'simulated') {
-      console.log(`Starting HTTP polling at ${pollIntervalMs}ms interval (${Math.round(1000 / pollIntervalMs)} fps) using ${performanceMode}`);
-      
-      // Initial fetch
-      fetchData();
-      
-      // Start polling interval
-      pollIntervalRef.current = setInterval(fetchData, pollIntervalMs);
-    }
+    setDataSource(dataSourceSetting);
+  }, [dataSourceSetting]);
 
-    return () => {
-      mountedRef.current = false;
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
+  useEffect(() => {
+    stopStreams();
+
+    if (dataSource === 'obd1' || dataSource === 'obd2') {
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsHost = process.env.REACT_APP_BACKEND_WS || `${wsProtocol}//${window.location.host}`;
+      const wsUrl = `${wsHost}/ws/vehicle-data`;
+
+      try {
+        wsRef.current = new WebSocket(wsUrl);
+        wsRef.current.onopen = () => {
+          setIsConnected(true);
+          setConnectionError(null);
+        };
+        wsRef.current.onmessage = (event) => {
+          const payload = JSON.parse(event.data);
+          signalStore.setState(payload);
+        };
+        wsRef.current.onerror = () => {
+          setConnectionError('WebSocket telemetry unavailable, falling back to polling.');
+          setIsConnected(false);
+        };
+        wsRef.current.onclose = () => {
+          setIsConnected(false);
+        };
+      } catch (error) {
+        setConnectionError(`Failed to initialize WebSocket: ${error.message}`);
+        setIsConnected(false);
       }
-    };
-  }, [dataSource, fetchData, performanceMode, pollIntervalMs]);
 
-  const switchDataSource = (source) => {
-    setDataSource(source);
-    if (source === 'obd1' || source === 'obd2') {
-      console.log('OBD mode not yet implemented');
+      return stopStreams;
     }
-  };
 
-  // Computed values
-  const criticalWarnings = {
-    hasWarning: signals.oil_pressure_warning || signals.high_coolant || signals.check_engine,
-    warnings: [
-      signals.oil_pressure_warning && 'LOW OIL PRESSURE',
-      signals.high_coolant && 'ENGINE OVERHEAT',
-      signals.low_fuel && 'LOW FUEL',
-      signals.check_engine && 'CHECK ENGINE'
-    ].filter(Boolean)
-  };
+    fetchData();
+    pollIntervalRef.current = setInterval(fetchData, pollIntervalMs);
 
-  return (
-    <VehicleDataContext.Provider value={{
-      signals,
+    return stopStreams;
+  }, [dataSource, fetchData, pollIntervalMs, signalStore, stopStreams]);
+
+  const switchDataSource = useCallback((source) => {
+    setDataSource(source);
+  }, []);
+
+  const providerValue = useMemo(
+    () => ({
       dataSource,
       switchDataSource,
       isConnected,
       connectionError,
-      criticalWarnings
-    }}>
-      {children}
-    </VehicleDataContext.Provider>
+      subscribeToSignals: signalStore.subscribe,
+      getSignalsSnapshot: signalStore.getState,
+    }),
+    [connectionError, dataSource, isConnected, signalStore, switchDataSource],
   );
+
+  return <VehicleDataContext.Provider value={providerValue}>{children}</VehicleDataContext.Provider>;
 };
 
 export const useVehicleData = () => {
@@ -137,5 +190,55 @@ export const useVehicleData = () => {
   if (!context) {
     throw new Error('useVehicleData must be used within a VehicleDataProvider');
   }
-  return context;
+
+  const signals = useSyncExternalStore(
+    context.subscribeToSignals,
+    context.getSignalsSnapshot,
+    context.getSignalsSnapshot,
+  );
+
+  const criticalWarnings = {
+    hasWarning: signals.oil_pressure_warning || signals.high_coolant || signals.check_engine,
+    warnings: [
+      signals.oil_pressure_warning && 'LOW OIL PRESSURE',
+      signals.high_coolant && 'ENGINE OVERHEAT',
+      signals.low_fuel && 'LOW FUEL',
+      signals.check_engine && 'CHECK ENGINE',
+    ].filter(Boolean),
+  };
+
+  return {
+    signals,
+    dataSource: context.dataSource,
+    switchDataSource: context.switchDataSource,
+    isConnected: context.isConnected,
+    connectionError: context.connectionError,
+    criticalWarnings,
+  };
+};
+
+export const useVehicleSignal = (signalKey) => {
+  const context = useContext(VehicleDataContext);
+  if (!context) {
+    throw new Error('useVehicleSignal must be used within a VehicleDataProvider');
+  }
+
+  return useSyncExternalStore(
+    context.subscribeToSignals,
+    () => context.getSignalsSnapshot()[signalKey],
+    () => context.getSignalsSnapshot()[signalKey],
+  );
+};
+
+export const useVehicleDataSelector = (selector) => {
+  const context = useContext(VehicleDataContext);
+  if (!context) {
+    throw new Error('useVehicleDataSelector must be used within a VehicleDataProvider');
+  }
+
+  return useSyncExternalStore(
+    context.subscribeToSignals,
+    () => selector(context.getSignalsSnapshot()),
+    () => selector(context.getSignalsSnapshot()),
+  );
 };
