@@ -1,146 +1,233 @@
 import React, { useMemo } from 'react';
-import { useSettings } from '../../contexts/SettingsContext';
 import { useVehicleSignal } from '../../contexts/VehicleDataContext';
-import { RpmGauge, SpeedGauge } from './CustomGauges';
-import { ShiftLightsBar, DigitalSpeedGear } from './DashWidgets';
-import { CriticalWarningBanner, TurnSignalsRow, WarningPanel } from './WarningPanel';
-import { AndroidAutoPanel } from './AndroidAutoPanel';
-import { Settings } from 'lucide-react';
 
 /**
- * Dynamic Widget Renderer
- * Maps layout.widgetType to actual React components
+ * RpmGauge - Isolated RPM signal subscription (60Hz safe)
+ * Accepts layout props: visible, faceImage, needleImage, tickImage, etc.
+ * Uses absolute positioning and asset images from SettingsContext layout JSON
  */
-const WidgetRegistry = {
-  RpmGauge,
-  SpeedGauge,
-  ShiftLightsBar,
-  DigitalSpeedGear,
-  CriticalWarningBanner,
-  TurnSignalsRow,
-  WarningPanel,
-  AndroidAutoPanel
-};
+export const RpmGauge = ({
+  visible = true,
+  className = '',
+  size = 320,
+  faceImage = '/assets/gauges/rpm-gauge.png',
+  tickImage = '/assets/gauges/rpm-medium-ticks.png',
+  numbersImage = '/assets/gauges/rpm-numbers.png',
+  needleImage = '/assets/gauges/rpm-needle.png',
+  centerImage = '/assets/gauges/rpm-needle-center.png',
+  vtecStartRpm = 3000,
+  shiftRpm = 7800,
+  maxRpm = 8000,
+  min = 0,
+}) => {
+  // 🎯 Single signal subscription - only updates when RPM changes
+  const rpm = useVehicleSignal('rpm') || 0;
 
-/**
- * Refactored Dashboard.jsx - Master Layout Grid
- * 
- * Architecture:
- * 1. Reads layout array from SettingsContext
- * 2. Iterates through widgets
- * 3. Renders each widget based on type, passing layout props
- * 4. Applies absolute positioning or CSS Grid
- * 5. Respects visibility flag from layout
- * 
- * Performance:
- * - Only subscribed signals trigger re-renders (useSyncExternalStore)
- * - 60Hz telemetry updates don't re-render layout config
- * - Individual components use useVehicleSignal() for targeted updates
- */
-export const Dashboard = ({ onOpenSettings }) => {
-  const { settings } = useSettings();
-  const speed = useVehicleSignal('speed_mph') || 0;
+  if (!visible) return null;
 
-  // Background gradient transitions from gray to red above ~85 mph
-  const redIntensity = Math.min(Math.max((speed - 85) / 35, 0), 1);
+  // Calculate needle rotation: -135° (0 RPM) to +135° (8000 RPM)
+  const minAngle = -135;
+  const maxAngle = 135;
+  const clampedRpm = Math.min(Math.max(rpm, min), maxRpm);
+  const needleAngle = minAngle + (clampedRpm / maxRpm) * (maxAngle - minAngle);
 
-  const getBgGradient = useMemo(() => {
-    if (speed <= 85) {
-      return 'radial-gradient(ellipse 90% 100% at 50% 35%, #2B2B2B 0%, #101010 25%, #000000 100%)';
-    }
-    const r1 = Math.round(43 + (61 - 43) * redIntensity);
-    const g1 = Math.round(43 + (21 - 43) * redIntensity);
-    const b1 = Math.round(43 + (21 - 43) * redIntensity);
-    const r2 = Math.round(16 + (26 - 16) * redIntensity);
-    const g2 = Math.round(16 + (8 - 16) * redIntensity);
-    const b2 = Math.round(16 + (8 - 16) * redIntensity);
-    return `radial-gradient(ellipse 90% 100% at 50% 35%, rgb(${r1},${g1},${b1}) 0%, rgb(${r2},${g2},${b2}) 25%, #000000 100%)`;
-  }, [speed, redIntensity]);
-
-  const getBreathingOverlay = useMemo(() => {
-    if (speed <= 85) {
-      return 'radial-gradient(ellipse 100% 80% at 50% 50%, rgba(60, 60, 60, 0.1) 0%, transparent 70%)';
-    }
-    const opacity = 0.1 + (0.1 * redIntensity);
-    return `radial-gradient(ellipse 100% 80% at 50% 50%, rgba(${80 + 40 * redIntensity}, ${20 - 10 * redIntensity}, ${20 - 10 * redIntensity}, ${opacity}) 0%, transparent 70%)`;
-  }, [speed, redIntensity]);
+  const inVtec = rpm >= vtecStartRpm;
+  const inShift = rpm >= shiftRpm;
 
   return (
-    <div 
-      className="relative w-full h-screen overflow-hidden bg-black"
-      data-testid="dashboard"
-      style={{ background: getBgGradient }}
+    <div
+      className={`relative ${className}`}
+      style={{ width: size, height: size }}
+      data-testid="rpm-gauge"
     >
-      {/* Animated Breathing Background */}
-      <div 
-        className="absolute inset-0"
-        style={{
-          background: getBreathingOverlay,
-          animation: 'breathing 4s ease-in-out infinite'
-        }}
+      {/* Gauge face background */}
+      <img
+        src={faceImage}
+        alt="RPM Gauge Face"
+        className="absolute inset-0 w-full h-full object-contain"
+        style={{ imageRendering: 'crisp-edges' }}
+        draggable={false}
       />
 
-      {/* Widget Container - Absolute Positioning */}
-      <div className="relative w-full h-full">
-        {settings.layout && settings.layout.map((widget) => {
-          if (!widget.visible) return null;
+      {/* Tick marks layer */}
+      <img
+        src={tickImage}
+        alt="RPM Ticks"
+        className="absolute inset-0 w-full h-full object-contain"
+        style={{ imageRendering: 'crisp-edges' }}
+        draggable={false}
+      />
 
-          const Component = WidgetRegistry[widget.type];
-          if (!Component) {
-            console.warn(`Unknown widget type: ${widget.type}`);
-            return null;
-          }
+      {/* Numbers layer */}
+      <img
+        src={numbersImage}
+        alt="RPM Numbers"
+        className="absolute inset-0 w-full h-full object-contain"
+        style={{ imageRendering: 'crisp-edges' }}
+        draggable={false}
+      />
 
-          // Convert percentage positions to pixel values for 1920x1200 screen
-          const pixelX = (widget.x / 100) * 1920;
-          const pixelY = (widget.y / 100) * 1200;
-          const pixelWidth = (widget.width / 100) * 1920;
-          const pixelHeight = (widget.height / 100) * 1200;
+      {/* Shift light indicator (red dot at top) */}
+      <div
+        className={`absolute top-[5%] left-1/2 -translate-x-1/2 w-8 h-8 rounded-full transition-opacity duration-150 ${
+          inShift ? 'animate-pulse' : ''
+        }`}
+        style={{
+          backgroundColor: '#DC2626',
+          opacity: inShift ? 1 : 0,
+          boxShadow: inShift ? '0 0 32px 8px rgba(220, 38, 38, 0.8)' : 'none',
+        }}
+        data-testid="rpm-shift-light"
+      />
 
-          return (
-            <div
-              key={widget.id}
-              className="absolute"
-              style={{
-                left: `${pixelX}px`,
-                top: `${pixelY}px`,
-                width: `${pixelWidth}px`,
-                height: `${pixelHeight}px`,
-                zIndex: widget.zIndex || 10
-              }}
-              data-testid={`widget-${widget.id}`}
-            >
-              <Component 
-                visible={widget.visible}
-                // Spread layout-specific props to component
-                {...widget}
-                // Override className to avoid conflicts
-                className="w-full h-full flex items-center justify-center"
-              />
-            </div>
-          );
-        })}
+      {/* VTEC indicator (optional glow) */}
+      {inVtec && (
+        <div
+          className="absolute inset-0 rounded-full pointer-events-none"
+          style={{
+            boxShadow: 'inset 0 0 20px rgba(220, 38, 38, 0.3)',
+          }}
+        />
+      )}
+
+      {/* Needle with rotation */}
+      <div
+        className="absolute inset-0 flex items-center justify-center"
+        style={{
+          paddingBottom: '23%',
+        }}
+      >
+        <div
+          style={{
+            transform: `rotate(${needleAngle}deg)`,
+            transformOrigin: 'center center',
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingBottom: '23%',
+          }}
+        >
+          <img
+            src={needleImage}
+            alt="RPM Needle"
+            className="w-[40%] object-contain"
+            style={{ imageRendering: 'crisp-edges' }}
+            draggable={false}
+          />
+        </div>
       </div>
 
-      {/* Settings Button (Fixed Position) */}
-      <button
-        onClick={onOpenSettings}
-        className="absolute bottom-4 right-4 p-3 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 transition-colors z-50 flex items-center gap-2"
-        data-testid="settings-button"
-      >
-        <Settings size={20} className="text-zinc-300" />
-        <span className="text-xs uppercase font-orbitron tracking-wider text-zinc-400">Settings</span>
-      </button>
-
-      {/* CSS Animation for breathing effect */}
-      <style>{`
-        @keyframes breathing {
-          0%, 100% { opacity: 0.9; }
-          50% { opacity: 1; }
-        }
-      `}</style>
+      {/* Center cap */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <img
+          src={centerImage}
+          alt="Needle Center"
+          className="w-[12%] object-contain"
+          style={{ imageRendering: 'crisp-edges' }}
+          draggable={false}
+        />
+      </div>
     </div>
   );
 };
 
-export default Dashboard;
+/**
+ * SpeedGauge - Isolated speed_mph signal subscription
+ * Mirror of RpmGauge for vehicle speed display
+ */
+export const SpeedGauge = ({
+  visible = true,
+  className = '',
+  size = 320,
+  faceImage = '/assets/gauges/spd-gauge.png',
+  tickImage = '/assets/gauges/spd-medium-ticks.png',
+  numbersImage = '/assets/gauges/spd-numbers.png',
+  needleImage = '/assets/gauges/rpm-needle.png',
+  centerImage = '/assets/gauges/rpm-needle-center.png',
+  maxSpeed = 170,
+  min = 0,
+}) => {
+  // 🎯 Single signal subscription
+  const speed = useVehicleSignal('speed_mph') || 0;
+
+  if (!visible) return null;
+
+  const minAngle = -135;
+  const maxAngle = 135;
+  const clampedSpeed = Math.min(Math.max(speed, min), maxSpeed);
+  const needleAngle = minAngle + (clampedSpeed / maxSpeed) * (maxAngle - minAngle);
+
+  return (
+    <div
+      className={`relative ${className}`}
+      style={{ width: size, height: size }}
+      data-testid="speed-gauge"
+    >
+      <img
+        src={faceImage}
+        alt="Speed Gauge Face"
+        className="absolute inset-0 w-full h-full object-contain"
+        style={{ imageRendering: 'crisp-edges' }}
+        draggable={false}
+      />
+
+      <img
+        src={tickImage}
+        alt="Speed Ticks"
+        className="absolute inset-0 w-full h-full object-contain"
+        style={{ imageRendering: 'crisp-edges' }}
+        draggable={false}
+      />
+
+      <img
+        src={numbersImage}
+        alt="Speed Numbers"
+        className="absolute inset-0 w-full h-full object-contain"
+        style={{ imageRendering: 'crisp-edges' }}
+        draggable={false}
+      />
+
+      <div
+        className="absolute inset-0 flex items-center justify-center"
+        style={{
+          paddingBottom: '23%',
+        }}
+      >
+        <div
+          style={{
+            transform: `rotate(${needleAngle}deg)`,
+            transformOrigin: 'center center',
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingBottom: '23%',
+          }}
+        >
+          <img
+            src={needleImage}
+            alt="Speed Needle"
+            className="w-[40%] object-contain"
+            style={{ imageRendering: 'crisp-edges' }}
+            draggable={false}
+          />
+        </div>
+      </div>
+
+      <div className="absolute inset-0 flex items-center justify-center">
+        <img
+          src={centerImage}
+          alt="Needle Center"
+          className="w-[12%] object-contain"
+          style={{ imageRendering: 'crisp-edges' }}
+          draggable={false}
+        />
+      </div>
+    </div>
+  );
+};
+
+export default { RpmGauge, SpeedGauge };
