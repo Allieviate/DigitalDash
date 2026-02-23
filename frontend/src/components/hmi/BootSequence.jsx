@@ -49,14 +49,18 @@ export const BootSequence = ({ onComplete }) => {
     if (phase !== 'text') return;
 
     setVisibleSteps([]);
-    const timers = BOOT_STEPS.map((step) =>
+    const timers = BOOT_STEPS.map((step, index) =>
       setTimeout(() => {
         setVisibleSteps((prev) => [...prev, step.text]);
         if (index === BOOT_STEPS.length - 1) {
           setTimeout(() => setPhase('sweep'), 400);
         }
-      }, step.delay);
-    });
+      }, step.delay)
+    );
+
+    return () => {
+      timers.forEach((timer) => clearTimeout(timer));
+    };
   }, [phase]);
 
   useEffect(() => {

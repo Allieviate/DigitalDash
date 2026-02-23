@@ -222,6 +222,14 @@ deactivate
 echo -e "${YELLOW}[5/7] Setting up React frontend...${NC}"
 cd "$PROJECT_DIR/frontend"
 
+# Abort early if merge-conflict markers exist. These cause opaque JSX parse
+# errors (e.g. in BootSequence.jsx) during npm build on Pi.
+if rg -n "^<<<<<<<|^=======|^>>>>>>>" "$PROJECT_DIR/frontend/src" >/dev/null 2>&1; then
+    echo -e "${RED}Merge conflict markers detected in frontend/src. Resolve conflicts before running setup.${NC}"
+    rg -n "^<<<<<<<|^=======|^>>>>>>>" "$PROJECT_DIR/frontend/src" || true
+    exit 1
+fi
+
 # Create .env file if not exists (must exist before build)
 if [ ! -f .env ]; then
     cat > .env << EOF
@@ -469,6 +477,12 @@ echo "  ./scripts/stop.sh"
 echo ""
 echo "To check status:"
 echo "  ./scripts/status.sh"
+
+echo "To check if you need to pull updates:"
+echo "  ./scripts/check_updates.sh"
+echo ""
+echo "Kiosk service helper:"
+echo "  ./scripts/frank-kiosk.service.sh status"
 
 echo "To check if you need to pull updates:"
 echo "  ./scripts/check_updates.sh"
