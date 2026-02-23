@@ -292,31 +292,48 @@ WAYLAND_FLAGS=(
   --enable-features=UseOzonePlatform
 )
 
-export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+# Wait briefly for frontend to be reachable so Chromium doesn't start on a dead URL.
+for _ in $(seq 1 60); do
+  if curl -fsS --max-time 2 "${APP_URL}" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
 
-# Wait for compositor socket on Lite/Wayfire boots.
-if [ -z "${WAYLAND_DISPLAY:-}" ]; then
-  for _ in $(seq 1 20); do
-    if [ -S "$XDG_RUNTIME_DIR/wayland-0" ]; then
-      export WAYLAND_DISPLAY="wayland-0"
-      break
+# Wait up to 2 minutes for a display socket to appear after boot/login.
+for _ in $(seq 1 120); do
+  # Prefer user-specific runtime dir first.
+  if [ -z "${XDG_RUNTIME_DIR:-}" ] && [ -d "/run/user/$(id -u)" ]; then
+    export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+  fi
+
+  # Detect first available Wayland socket (wayland-0, wayland-1, ...).
+  if [ -n "${XDG_RUNTIME_DIR:-}" ]; then
+    wayland_sock="$(find "$XDG_RUNTIME_DIR" -maxdepth 1 -type s -name 'wayland-*' 2>/dev/null | head -n 1 || true)"
+    if [ -n "$wayland_sock" ]; then
+      export WAYLAND_DISPLAY="$(basename "$wayland_sock")"
+      exec "$CHROMIUM_BIN" "${COMMON_FLAGS[@]}" "${WAYLAND_FLAGS[@]}" --app="$APP_URL"
     fi
-    sleep 1
-  done
-fi
+  fi
 
-if [ -n "${WAYLAND_DISPLAY:-}" ] && [ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]; then
-  exec "$CHROMIUM_BIN" "${COMMON_FLAGS[@]}" "${WAYLAND_FLAGS[@]}" --app="$APP_URL"
-fi
+  # X11 fallback when any display socket is present.
+  x11_sock="$(find /tmp/.X11-unix -maxdepth 1 -type s -name 'X*' 2>/dev/null | head -n 1 || true)"
+  if [ -n "$x11_sock" ]; then
+    display_num="${x11_sock##*/X}"
+    export DISPLAY=":${display_num}"
+    if [ -z "${XAUTHORITY:-}" ] && [ -f "$HOME/.Xauthority" ]; then
+      export XAUTHORITY="$HOME/.Xauthority"
+    fi
+    exec "$CHROMIUM_BIN" "${COMMON_FLAGS[@]}" --app="$APP_URL"
+  fi
 
-# Only fall back to X11 when a display socket is actually present.
-if [ -n "${DISPLAY:-}" ] || [ -S /tmp/.X11-unix/X0 ]; then
-  export DISPLAY="${DISPLAY:-:0}"
-  export XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}"
-  exec "$CHROMIUM_BIN" "${COMMON_FLAGS[@]}" --app="$APP_URL"
-fi
+  sleep 1
+done
 
-echo "No Wayland or X11 display socket available yet; kiosk launch deferred."
+echo "No Wayland or X11 display socket available after waiting; kiosk launch deferred."
+ls -la /run/user 2>/dev/null || true
+ls -la "/run/user/$(id -u)" 2>/dev/null || true
+ls -la /tmp/.X11-unix 2>/dev/null || true
 exit 1
 EOF
 chmod +x "$PROJECT_DIR/scripts/launch_kiosk.sh"
@@ -365,17 +382,18 @@ EOF
 sudo tee /etc/systemd/system/frank-kiosk.service > /dev/null << EOF
 [Unit]
 Description=FRANK HMI Kiosk Display
-After=frank-frontend.service
-Wants=frank-frontend.service
+After=frank-frontend.service network-online.target display-manager.service graphical.target
+Wants=frank-frontend.service network-online.target display-manager.service graphical.target
 
 [Service]
 Type=simple
 User=$USER
-Environment=XDG_RUNTIME_DIR=/run/user/$UID
-ExecStartPre=/bin/sleep 5
+Environment=HOME=/home/$USER
+PAMName=login
+ExecStartPre=/bin/sleep 8
 ExecStart=$PROJECT_DIR/scripts/launch_kiosk.sh
 Restart=always
-RestartSec=5
+RestartSec=10
 
 [Install]
 WantedBy=graphical.target
