@@ -1,163 +1,144 @@
-import React from 'react';
-import { useTheme } from '../../contexts/ThemeContext';
-import { useVehicleData } from '../../contexts/VehicleDataContext';
+import React, { useMemo } from 'react';
+import { useSettings } from '../../contexts/SettingsContext';
+import { useVehicleSignal } from '../../contexts/VehicleDataContext';
 import { RpmGauge, SpeedGauge } from './CustomGauges';
 import { ShiftLightsBar, DigitalSpeedGear } from './DashWidgets';
-import { WarningPanel, TurnSignalsRow, CriticalWarningBanner } from './WarningPanel';
+import { CriticalWarningBanner, TurnSignalsRow, WarningPanel } from './WarningPanel';
 import { AndroidAutoPanel } from './AndroidAutoPanel';
-import { Settings, Activity, Smartphone } from 'lucide-react';
+import { Settings } from 'lucide-react';
 
+/**
+ * Dynamic Widget Renderer
+ * Maps layout.widgetType to actual React components
+ */
+const WidgetRegistry = {
+  RpmGauge,
+  SpeedGauge,
+  ShiftLightsBar,
+  DigitalSpeedGear,
+  CriticalWarningBanner,
+  TurnSignalsRow,
+  WarningPanel,
+  AndroidAutoPanel
+};
+
+/**
+ * Refactored Dashboard.jsx - Master Layout Grid
+ * 
+ * Architecture:
+ * 1. Reads layout array from SettingsContext
+ * 2. Iterates through widgets
+ * 3. Renders each widget based on type, passing layout props
+ * 4. Applies absolute positioning or CSS Grid
+ * 5. Respects visibility flag from layout
+ * 
+ * Performance:
+ * - Only subscribed signals trigger re-renders (useSyncExternalStore)
+ * - 60Hz telemetry updates don't re-render layout config
+ * - Individual components use useVehicleSignal() for targeted updates
+ */
 export const Dashboard = ({ onOpenSettings }) => {
-  const { theme, themeId } = useTheme();
-  const { signals, isConnected } = useVehicleData();
-  const [showAndroidAuto, setShowAndroidAuto] = React.useState(false);
-  const [phoneConnected, setPhoneConnected] = React.useState(true); // Simulated for demo
+  const { settings } = useSettings();
+  const speed = useVehicleSignal('speed_mph') || 0;
 
-  // Calculate background color - GRADUAL transition from 86-120 mph
-  const speed = signals.speed_mph;
-  
-  // Calculate red intensity: 0 at 85mph, 1 at 120mph (gradual transition)
+  // Background gradient transitions from gray to red above ~85 mph
   const redIntensity = Math.min(Math.max((speed - 85) / 35, 0), 1);
-  
-  // Interpolate background colors based on speed
-  const getBgGradient = () => {
+
+  const getBgGradient = useMemo(() => {
     if (speed <= 85) {
       return 'radial-gradient(ellipse 90% 100% at 50% 35%, #2B2B2B 0%, #101010 25%, #000000 100%)';
     }
-    
-    // Gradual transition: interpolate between gray and red
-    const r1 = Math.round(43 + (61 - 43) * redIntensity); // #2B to #3D
-    const g1 = Math.round(43 + (21 - 43) * redIntensity); // #2B to #15
-    const b1 = Math.round(43 + (21 - 43) * redIntensity); // #2B to #15
-    
-    const r2 = Math.round(16 + (26 - 16) * redIntensity); // #10 to #1A
-    const g2 = Math.round(16 + (8 - 16) * redIntensity);  // #10 to #08
-    const b2 = Math.round(16 + (8 - 16) * redIntensity);  // #10 to #08
-    
+    const r1 = Math.round(43 + (61 - 43) * redIntensity);
+    const g1 = Math.round(43 + (21 - 43) * redIntensity);
+    const b1 = Math.round(43 + (21 - 43) * redIntensity);
+    const r2 = Math.round(16 + (26 - 16) * redIntensity);
+    const g2 = Math.round(16 + (8 - 16) * redIntensity);
+    const b2 = Math.round(16 + (8 - 16) * redIntensity);
     return `radial-gradient(ellipse 90% 100% at 50% 35%, rgb(${r1},${g1},${b1}) 0%, rgb(${r2},${g2},${b2}) 25%, #000000 100%)`;
-  };
-  
-  // Breathing overlay color also transitions
-  const getBreathingOverlay = () => {
+  }, [speed, redIntensity]);
+
+  const getBreathingOverlay = useMemo(() => {
     if (speed <= 85) {
       return 'radial-gradient(ellipse 100% 80% at 50% 50%, rgba(60, 60, 60, 0.1) 0%, transparent 70%)';
     }
     const opacity = 0.1 + (0.1 * redIntensity);
     return `radial-gradient(ellipse 100% 80% at 50% 50%, rgba(${80 + 40 * redIntensity}, ${20 - 10 * redIntensity}, ${20 - 10 * redIntensity}, ${opacity}) 0%, transparent 70%)`;
-  };
+  }, [speed, redIntensity]);
 
   return (
     <div 
-      className="relative w-full h-screen overflow-hidden"
+      className="relative w-full h-screen overflow-hidden bg-black"
       data-testid="dashboard"
+      style={{ background: getBgGradient }}
     >
-      {/* Animated breathing background with gradual red transition */}
+      {/* Animated Breathing Background */}
       <div 
-        className="absolute inset-0 transition-all duration-1000 ease-out"
-        style={{ background: getBgGradient() }}
-      />
-      
-      {/* PS3 breathing animation overlay */}
-      <div 
-        className={`absolute inset-0 pointer-events-none ${speed > 85 ? 'animate-breathe-red' : 'animate-breathe'}`}
-        style={{ background: getBreathingOverlay() }}
+        className="absolute inset-0"
+        style={{
+          background: getBreathingOverlay,
+          animation: 'breathing 4s ease-in-out infinite'
+        }}
       />
 
-      {/* Critical Warning Banner - Always on top */}
-      <CriticalWarningBanner />
+      {/* Widget Container - Absolute Positioning */}
+      <div className="relative w-full h-full">
+        {settings.layout && settings.layout.map((widget) => {
+          if (!widget.visible) return null;
 
-      {/* Settings button - top right */}
+          const Component = WidgetRegistry[widget.type];
+          if (!Component) {
+            console.warn(`Unknown widget type: ${widget.type}`);
+            return null;
+          }
+
+          // Convert percentage positions to pixel values for 1920x1200 screen
+          const pixelX = (widget.x / 100) * 1920;
+          const pixelY = (widget.y / 100) * 1200;
+          const pixelWidth = (widget.width / 100) * 1920;
+          const pixelHeight = (widget.height / 100) * 1200;
+
+          return (
+            <div
+              key={widget.id}
+              className="absolute"
+              style={{
+                left: `${pixelX}px`,
+                top: `${pixelY}px`,
+                width: `${pixelWidth}px`,
+                height: `${pixelHeight}px`,
+                zIndex: widget.zIndex || 10
+              }}
+              data-testid={`widget-${widget.id}`}
+            >
+              <Component 
+                visible={widget.visible}
+                // Spread layout-specific props to component
+                {...widget}
+                // Override className to avoid conflicts
+                className="w-full h-full flex items-center justify-center"
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Settings Button (Fixed Position) */}
       <button
         onClick={onOpenSettings}
-        className="absolute top-4 right-4 z-20 touch-btn p-3 rounded-lg hover:bg-white/5 transition-colors"
-        data-testid="settings-btn"
+        className="absolute bottom-4 right-4 p-3 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 transition-colors z-50 flex items-center gap-2"
+        data-testid="settings-button"
       >
-        <Settings size={20} className="text-zinc-400 hover:text-white transition-colors" />
+        <Settings size={20} className="text-zinc-300" />
+        <span className="text-xs uppercase font-orbitron tracking-wider text-zinc-400">Settings</span>
       </button>
 
-      {/* Android Auto button - below settings (only when phone connected) */}
-      {phoneConnected && (
-        <button
-          onClick={() => setShowAndroidAuto(!showAndroidAuto)}
-          className={`
-            absolute top-16 right-4 z-20 touch-btn p-3 rounded-lg transition-all
-            ${showAndroidAuto ? 'bg-blue-500/20 border border-blue-500/50' : 'hover:bg-white/5'}
-          `}
-          data-testid="android-auto-btn"
-        >
-          <Smartphone 
-            size={20} 
-            className={`transition-colors ${showAndroidAuto ? 'text-blue-400' : 'text-zinc-400 hover:text-white'}`} 
-          />
-        </button>
-      )}
-
-      {/* Connection status - top right */}
-      <div className="absolute top-5 right-28 z-20 flex items-center gap-2">
-        <Activity 
-          size={14} 
-          className={isConnected ? 'text-green-500' : 'text-red-500'}
-        />
-        <span className="text-xs uppercase tracking-wider text-zinc-500 font-orbitron">
-          {isConnected ? 'LIVE' : 'OFFLINE'}
-        </span>
-      </div>
-
-      {/* Main Layout */}
-      <div className="absolute inset-0">
-        
-        {/* TOP CENTER SECTION */}
-        <div className="absolute top-0 left-0 right-0 z-10 flex flex-col items-center pt-4">
-          
-          {/* Shift Lights Bar */}
-          <ShiftLightsBar className="mb-3" />
-          
-          {/* Digital Speed + Gear (URUS style) */}
-          <DigitalSpeedGear className="mb-3" />
-          
-          {/* Turn Signals */}
-          <TurnSignalsRow className="mb-3" />
-        </div>
-
-        {/* GAUGES ROW */}
-        <div className="absolute inset-0 flex items-end justify-center pb-24 px-8">
-          
-          {/* LEFT: RPM Gauge */}
-          <div className="relative flex items-end justify-center">
-            <RpmGauge 
-              size={640}
-              vtecStartRpm={3000}
-              shiftRpm={7800}
-              maxRpm={8000}
-            />
-          </div>
-
-          {/* CENTER GAP - Android Auto (MOVED UP) */}
-          <div 
-            className="flex flex-col items-center justify-start mx-6 pt-10" 
-            style={{ width: '500px', height: '450px' }}
-          >
-            {showAndroidAuto ? (
-              <AndroidAutoPanel onClose={() => setShowAndroidAuto(false)} />
-            ) : (
-              <div className="w-full h-full" /> 
-            )}
-          </div>
-
-          {/* RIGHT: Speed Gauge */}
-          <div className="relative flex items-end justify-center">
-            <SpeedGauge 
-              size={640}
-              maxSpeed={170}
-            />
-          </div>
-        </div>
-
-        {/* Bottom Warning Strip - MORE SPREAD OUT */}
-        <div className="absolute bottom-0 left-0 right-0 z-10">
-          <WarningPanel className="py-5 px-20" />
-        </div>
-      </div>
+      {/* CSS Animation for breathing effect */}
+      <style>{`
+        @keyframes breathing {
+          0%, 100% { opacity: 0.9; }
+          50% { opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 };
