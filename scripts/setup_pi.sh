@@ -293,7 +293,7 @@ WAYLAND_FLAGS=(
 )
 
 # Wait briefly for frontend to be reachable so Chromium doesn't start on a dead URL.
-for _ in $(seq 1 30); do
+for _ in $(seq 1 60); do
   if curl -fsS --max-time 2 "${APP_URL}" >/dev/null 2>&1; then
     break
   fi
@@ -338,6 +338,33 @@ chmod +x "$PROJECT_DIR/scripts/launch_kiosk.sh"
 
 # Create systemd services
 echo -e "${YELLOW}[6/7] Creating systemd services...${NC}"
+
+# Display bootstrap service for Lite images (starts Xorg + Openbox on tty1)
+sudo tee /etc/systemd/system/frank-display.service > /dev/null << EOF
+[Unit]
+Description=FRANK X11 Display Session
+After=systemd-user-sessions.service network.target
+Wants=systemd-user-sessions.service
+
+[Service]
+Type=simple
+User=$USER
+Environment=HOME=/home/$USER
+PAMName=login
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+ExecStart=/usr/bin/xinit /usr/bin/openbox-session -- :0 -nolisten tcp vt1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
 
 # Backend service
 sudo tee /etc/systemd/system/frank-backend.service > /dev/null << EOF
@@ -399,6 +426,7 @@ EOF
 
 # Enable services
 sudo systemctl daemon-reload
+sudo systemctl enable frank-display.service
 sudo systemctl enable frank-backend.service
 sudo systemctl enable frank-frontend.service
 sudo systemctl enable frank-kiosk.service
