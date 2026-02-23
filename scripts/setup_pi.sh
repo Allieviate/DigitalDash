@@ -117,6 +117,8 @@ start_mongodb_runtime() {
 install_mongodb() {
     echo -e "${YELLOW}Installing MongoDB...${NC}"
 
+    ensure_valid_system_time
+
     # MongoDB does not always publish Release metadata for newest Debian codenames
     # (e.g. trixie) immediately. Fall back to a known-good codename when needed.
     pick_mongodb_repo_codename() {
@@ -164,8 +166,6 @@ install_mongodb() {
 
     # Clean up stale/bad mongodb list files from previous attempts.
     sudo rm -f /etc/apt/sources.list.d/mongodb-org-*.list
-
-    echo "deb [ arch=${ARCH} signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/debian ${REPO_CODENAME}/mongodb-org/7.0 main" |         sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list > /dev/null
 
     echo "deb [ arch=${ARCH} signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/debian ${REPO_CODENAME}/mongodb-org/7.0 main" |         sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list > /dev/null
 
@@ -284,18 +284,32 @@ WAYLAND_FLAGS=(
   --enable-features=UseOzonePlatform
 )
 
-if [ -z "${WAYLAND_DISPLAY:-}" ] && [ -S "/run/user/$(id -u)/wayland-0" ]; then
-  export XDG_RUNTIME_DIR="/run/user/$(id -u)"
-  export WAYLAND_DISPLAY="wayland-0"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+
+# Wait for compositor socket on Lite/Wayfire boots.
+if [ -z "${WAYLAND_DISPLAY:-}" ]; then
+  for _ in $(seq 1 20); do
+    if [ -S "$XDG_RUNTIME_DIR/wayland-0" ]; then
+      export WAYLAND_DISPLAY="wayland-0"
+      break
+    fi
+    sleep 1
+  done
 fi
 
-if [ -n "${WAYLAND_DISPLAY:-}" ]; then
+if [ -n "${WAYLAND_DISPLAY:-}" ] && [ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]; then
   exec "$CHROMIUM_BIN" "${COMMON_FLAGS[@]}" "${WAYLAND_FLAGS[@]}" --app="$APP_URL"
 fi
 
-export DISPLAY="${DISPLAY:-:0}"
-export XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}"
-exec "$CHROMIUM_BIN" "${COMMON_FLAGS[@]}" --app="$APP_URL"
+# Only fall back to X11 when a display socket is actually present.
+if [ -n "${DISPLAY:-}" ] || [ -S /tmp/.X11-unix/X0 ]; then
+  export DISPLAY="${DISPLAY:-:0}"
+  export XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}"
+  exec "$CHROMIUM_BIN" "${COMMON_FLAGS[@]}" --app="$APP_URL"
+fi
+
+echo "No Wayland or X11 display socket available yet; kiosk launch deferred."
+exit 1
 EOF
 chmod +x "$PROJECT_DIR/scripts/launch_kiosk.sh"
 
@@ -349,6 +363,7 @@ Wants=frank-frontend.service
 [Service]
 Type=simple
 User=$USER
+Environment=XDG_RUNTIME_DIR=/run/user/$UID
 ExecStartPre=/bin/sleep 5
 ExecStart=$PROJECT_DIR/scripts/launch_kiosk.sh
 Restart=always
@@ -454,6 +469,12 @@ echo "  ./scripts/stop.sh"
 echo ""
 echo "To check status:"
 echo "  ./scripts/status.sh"
+
+echo "To check if you need to pull updates:"
+echo "  ./scripts/check_updates.sh"
+echo ""
+echo "Kiosk service helper:"
+echo "  ./scripts/frank-kiosk.service.sh status"
 
 echo "To check if you need to pull updates:"
 echo "  ./scripts/check_updates.sh"
