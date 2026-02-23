@@ -292,27 +292,39 @@ WAYLAND_FLAGS=(
   --enable-features=UseOzonePlatform
 )
 
-export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+# Wait briefly for frontend to be reachable so Chromium doesn't start on a dead URL.
+for _ in $(seq 1 30); do
+  if curl -fsS --max-time 2 "${APP_URL}" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
 
-# Wait for compositor socket on Lite/Wayfire boots.
-if [ -z "${WAYLAND_DISPLAY:-}" ]; then
-  for _ in $(seq 1 20); do
-    if [ -S "$XDG_RUNTIME_DIR/wayland-0" ]; then
+# Probe runtime dirs dynamically; boot-time services may not have XDG_RUNTIME_DIR exported yet.
+if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
+  for candidate in "/run/user/$(id -u)" /run/user/*; do
+    if [ -S "$candidate/wayland-0" ]; then
+      export XDG_RUNTIME_DIR="$candidate"
       export WAYLAND_DISPLAY="wayland-0"
       break
     fi
-    sleep 1
   done
 fi
 
-if [ -n "${WAYLAND_DISPLAY:-}" ] && [ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]; then
+if [ -n "${XDG_RUNTIME_DIR:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ] && [ -S "$XDG_RUNTIME_DIR/wayland-0" ]; then
+  export WAYLAND_DISPLAY="wayland-0"
+fi
+
+if [ -n "${WAYLAND_DISPLAY:-}" ] && [ -n "${XDG_RUNTIME_DIR:-}" ] && [ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]; then
   exec "$CHROMIUM_BIN" "${COMMON_FLAGS[@]}" "${WAYLAND_FLAGS[@]}" --app="$APP_URL"
 fi
 
-# Only fall back to X11 when a display socket is actually present.
+# X11 fallback
 if [ -n "${DISPLAY:-}" ] || [ -S /tmp/.X11-unix/X0 ]; then
   export DISPLAY="${DISPLAY:-:0}"
-  export XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}"
+  if [ -z "${XAUTHORITY:-}" ] && [ -f "$HOME/.Xauthority" ]; then
+    export XAUTHORITY="$HOME/.Xauthority"
+  fi
   exec "$CHROMIUM_BIN" "${COMMON_FLAGS[@]}" --app="$APP_URL"
 fi
 
@@ -365,20 +377,21 @@ EOF
 sudo tee /etc/systemd/system/frank-kiosk.service > /dev/null << EOF
 [Unit]
 Description=FRANK HMI Kiosk Display
-After=frank-frontend.service
-Wants=frank-frontend.service
+After=frank-frontend.service network-online.target graphical.target
+Wants=frank-frontend.service network-online.target graphical.target
 
 [Service]
 Type=simple
 User=$USER
-Environment=XDG_RUNTIME_DIR=/run/user/$UID
-ExecStartPre=/bin/sleep 5
+Environment=HOME=/home/$USER
+PAMName=login
+ExecStartPre=/bin/sleep 8
 ExecStart=$PROJECT_DIR/scripts/launch_kiosk.sh
 Restart=always
 RestartSec=5
 
 [Install]
-WantedBy=graphical.target
+WantedBy=multi-user.target
 EOF
 
 # Enable services
