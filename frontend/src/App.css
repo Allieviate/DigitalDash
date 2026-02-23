@@ -1,16 +1,27 @@
 /* Custom App CSS for Accord HMI */
 
-/* Remove default margins */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-/* Full height app */
-html, body, #root {
-  height: 100%;
-  width: 100%;
+/* Lock the viewport to center the app */
+html, body {
+  width: 100vw;
+  height: 100vh;
+  background-color: black;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Force the React root to be exactly your screen resolution */
+#root {
+  width: 1920px;
+  height: 1200px;
+  position: relative;
   overflow: hidden;
 }
 

@@ -1,24 +1,36 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 
 const BOOT_STEPS = [
   { text: 'ECU LINK: OK', delay: 0 },
-  { text: 'SENSORS: ONLINE', delay: 200 },
-  { text: 'VTEC: READY', delay: 400 },
-  { text: 'DISPLAY: READY', delay: 600 },
+  { text: 'SENSORS: ONLINE', delay: 220 },
+  { text: 'VTEC: READY', delay: 440 },
+  { text: 'DISPLAY: READY', delay: 660 },
 ];
 
+const PHASE_PROGRESS = {
+  logo: '20%',
+  name: '45%',
+  text: '70%',
+  sweep: '95%',
+  complete: '100%',
+};
+
+const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
 export const BootSequence = ({ onComplete }) => {
-  const [phase, setPhase] = useState('logo'); // logo, name, text, sweep, complete
+  const [phase, setPhase] = useState('logo');
+  const [showK, setShowK] = useState(false);
   const [visibleSteps, setVisibleSteps] = useState([]);
   const [sweepAngle, setSweepAngle] = useState(-135);
-  const [showK, setShowK] = useState(false);
 
-  // Phase 1: Logo display (2.5s)
+  const progressWidth = useMemo(() => PHASE_PROGRESS[phase] ?? '20%', [phase]);
+
   useEffect(() => {
-    const timer = setTimeout(() => setPhase('name'), 2500);
+    if (phase !== 'logo') return;
+    const timer = setTimeout(() => setPhase('name'), 1800);
     return () => clearTimeout(timer);
-  }, []);
+  }, [phase]);
 
   // Phase 2: Name animation - "Fran" fades, then "K" appears.
   useEffect(() => {
@@ -33,11 +45,11 @@ export const BootSequence = ({ onComplete }) => {
     };
   }, [phase]);
 
-  // Phase 3: System check text
   useEffect(() => {
     if (phase !== 'text') return;
 
-    BOOT_STEPS.forEach((step, index) => {
+    setVisibleSteps([]);
+    const timers = BOOT_STEPS.map((step) =>
       setTimeout(() => {
         setVisibleSteps((prev) => [...prev, step.text]);
         if (index === BOOT_STEPS.length - 1) {
@@ -47,7 +59,6 @@ export const BootSequence = ({ onComplete }) => {
     });
   }, [phase]);
 
-  // Phase 4: Gauge sweep animation
   useEffect(() => {
     if (phase !== 'sweep') return;
 
@@ -73,10 +84,7 @@ export const BootSequence = ({ onComplete }) => {
         raf = requestAnimationFrame(animate);
       } else {
         setSweepAngle(-135);
-        setTimeout(() => {
-          setPhase('complete');
-          onComplete?.();
-        }, 200);
+        setPhase('complete');
       }
     };
 
@@ -98,10 +106,12 @@ export const BootSequence = ({ onComplete }) => {
         >
           {phase === 'logo' && (
             <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
+              key="logo"
+              initial={{ opacity: 0, scale: 0.86, filter: 'brightness(0.65)' }}
+              animate={{ opacity: 1, scale: 1.02, filter: 'brightness(1.12)' }}
+              exit={{ opacity: 0, scale: 1.1 }}
               transition={{ duration: 1.2, ease: 'easeOut' }}
-              className="flex flex-col items-center"
+              className="flex items-center justify-center"
             >
               <motion.img
                 src="/assets/gauges/honda-logo.png"
@@ -119,10 +129,11 @@ export const BootSequence = ({ onComplete }) => {
 
           {phase === 'name' && (
             <motion.div
-              className="flex flex-col items-center"
+              key="name"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.5 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col items-center"
             >
               <motion.img
                 src="/assets/gauges/honda-logo.png"
@@ -172,7 +183,7 @@ export const BootSequence = ({ onComplete }) => {
                 transition={{ delay: 1.5, duration: 0.8 }}
               >
                 Digital Instrument Cluster
-              </motion.div>
+              </motion.p>
             </motion.div>
           )}
 
@@ -188,7 +199,7 @@ export const BootSequence = ({ onComplete }) => {
                   </motion.div>
                 ))}
               </div>
-            </div>
+            </motion.div>
           )}
 
           {phase === 'sweep' && (
@@ -210,6 +221,8 @@ export const BootSequence = ({ onComplete }) => {
                 <div className="absolute inset-0 flex items-center justify-center">
                   <img src="/assets/gauges/rpm-needle-center.png" alt="" className="w-[15%] object-contain" />
                 </div>
+
+                <img src="/assets/gauges/rpm-needle-center.png" alt="RPM center" className="absolute inset-0 w-full h-full object-contain" />
               </div>
 
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs uppercase tracking-widest text-zinc-500 font-orbitron">
@@ -217,6 +230,8 @@ export const BootSequence = ({ onComplete }) => {
               </motion.div>
             </div>
           )}
+        </AnimatePresence>
+      </div>
 
           <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-56">
             <div className="h-1 bg-zinc-900 rounded-full overflow-hidden">
