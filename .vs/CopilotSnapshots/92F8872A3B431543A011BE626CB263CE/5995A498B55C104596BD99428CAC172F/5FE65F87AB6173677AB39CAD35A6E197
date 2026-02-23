@@ -1,9 +1,0 @@
-﻿using System.Windows.Media;
-
-namespace DigitalDash.MicroGauge
-{
-    public static class GaugeBrush
-    {
-        public static Brush Create(Color color) => new SolidColorBrush(color);
-    }
-}
