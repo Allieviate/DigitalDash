@@ -328,7 +328,10 @@ if [ -n "${DISPLAY:-}" ] || [ -S /tmp/.X11-unix/X0 ]; then
   exec "$CHROMIUM_BIN" "${COMMON_FLAGS[@]}" --app="$APP_URL"
 fi
 
-echo "No Wayland or X11 display socket available yet; kiosk launch deferred."
+echo "No Wayland or X11 display socket available after waiting; kiosk launch deferred."
+ls -la /run/user 2>/dev/null || true
+ls -la "/run/user/$(id -u)" 2>/dev/null || true
+ls -la /tmp/.X11-unix 2>/dev/null || true
 exit 1
 EOF
 chmod +x "$PROJECT_DIR/scripts/launch_kiosk.sh"
@@ -388,7 +391,7 @@ PAMName=login
 ExecStartPre=/bin/sleep 8
 ExecStart=$PROJECT_DIR/scripts/launch_kiosk.sh
 Restart=always
-RestartSec=5
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
