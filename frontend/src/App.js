@@ -4,7 +4,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { VehicleDataProvider } from './contexts/VehicleDataContext';
 import { SettingsProvider, useSettings } from './contexts/SettingsContext';
 import { BootSequence } from './components/hmi/BootSequence';
-import { Dashboard } from './components/hmi/Dashboard';
+import Dashboard from './components/hmi/Dashboard';
 import { SettingsPanel } from './components/hmi/SettingsPanel';
 import { Toaster } from './components/ui/sonner';
 import './App.css';
@@ -12,7 +12,7 @@ import './App.css';
 const HMIApp = () => {
   const [isBooting, setIsBooting] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
-  const { settings, isLoading } = useSettings();
+  const { settings } = useSettings();
 
   // Handle boot completion
   const handleBootComplete = () => {
@@ -29,32 +29,20 @@ const HMIApp = () => {
     };
   }, [settings.brightness]);
 
-  // Skip boot sequence if already loaded settings
-  useEffect(() => {
-    if (!isLoading && !isBooting) return;
-    // Could add logic here to skip boot on refresh
-  }, [isLoading, isBooting]);
-
   return (
     <div className="relative w-full h-screen overflow-hidden bg-black">
       {/* Boot Sequence */}
-      {isBooting && (
-        <BootSequence onComplete={handleBootComplete} />
-      )}
+      {isBooting && <BootSequence onComplete={handleBootComplete} />}
 
       {/* Main Dashboard */}
-      {!isBooting && (
-        <Dashboard onOpenSettings={() => setShowSettings(true)} />
-      )}
+      {!isBooting && <Dashboard onOpenSettings={() => setShowSettings(true)} />}
 
       {/* Settings Panel (Modal) */}
-      {showSettings && (
-        <SettingsPanel onClose={() => setShowSettings(false)} />
-      )}
+      {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
 
       {/* Toast notifications */}
-      <Toaster 
-        position="top-center" 
+      <Toaster
+        position="top-center"
         toastOptions={{
           style: {
             background: '#18181b',

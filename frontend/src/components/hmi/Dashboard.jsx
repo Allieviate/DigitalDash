@@ -7,7 +7,7 @@ import { WarningPanel, TurnSignalsRow, CriticalWarningBanner } from './WarningPa
 import { AndroidAutoPanel } from './AndroidAutoPanel';
 import { Settings, Activity, Smartphone } from 'lucide-react';
 
-export const Dashboard = ({ onOpenSettings }) => {
+const Dashboard = ({ onOpenSettings }) => {
   const { theme, themeId } = useTheme();
   const { signals, isConnected } = useVehicleData();
   const [showAndroidAuto, setShowAndroidAuto] = React.useState(false);
