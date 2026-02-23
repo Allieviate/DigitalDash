@@ -1,284 +1,228 @@
-import React from 'react';
-import { useVehicleData } from '../../contexts/VehicleDataContext';
+import React, { useMemo } from 'react';
+import { useVehicleSignal } from '../../contexts/VehicleDataContext';
 
-// RPM Gauge using your custom PNG assets
-export const RpmGauge = ({ 
+/**
+ * RpmGauge - Isolated RPM signal subscription (60Hz safe)
+ * Accepts layout props: visible, faceImage, needleImage, tickImage, etc.
+ * Uses absolute positioning and asset images from SettingsContext layout JSON
+ */
+export const RpmGauge = ({
+  visible = true,
   className = '',
-  size = 600,
+  size = 320,
+  faceImage = '/assets/gauges/rpm-gauge.png',
+  tickImage = '/assets/gauges/rpm-medium-ticks.png',
+  numbersImage = '/assets/gauges/rpm-numbers.png',
+  needleImage = '/assets/gauges/rpm-needle.png',
+  centerImage = '/assets/gauges/rpm-needle-center.png',
   vtecStartRpm = 3000,
   shiftRpm = 7800,
-  maxRpm = 8000
+  maxRpm = 8000,
+  min = 0,
 }) => {
-  const { signals } = useVehicleData();
-  const rpm = signals.rpm;
+  // 🎯 Single signal subscription - only updates when RPM changes
+  const rpm = useVehicleSignal('rpm') || 0;
 
-  // Calculate needle angle: 0 RPM = -135deg, 8000 RPM = +135deg (270 degree sweep)
+  if (!visible) return null;
+
+  // Calculate needle rotation: -135° (0 RPM) to +135° (8000 RPM)
   const minAngle = -135;
   const maxAngle = 135;
-  const clampedRpm = Math.min(Math.max(rpm, 0), maxRpm);
+  const clampedRpm = Math.min(Math.max(rpm, min), maxRpm);
   const needleAngle = minAngle + (clampedRpm / maxRpm) * (maxAngle - minAngle);
 
-  // VTEC engagement (above 3000 RPM) - ORIGINAL CODE
   const inVtec = rpm >= vtecStartRpm;
-  
-  // Shift light (near redline)
   const inShift = rpm >= shiftRpm;
 
   return (
-    <div 
+    <div
       className={`relative ${className}`}
       style={{ width: size, height: size }}
       data-testid="rpm-gauge"
     >
-      {/* Background gauge */}
-      <img 
-        src="/assets/gauges/rpm-gauge.png" 
-        alt="RPM Gauge"
+      {/* Gauge face background */}
+      <img
+        src={faceImage}
+        alt="RPM Gauge Face"
         className="absolute inset-0 w-full h-full object-contain"
-        style={{ imageRendering: 'auto' }}
+        style={{ imageRendering: 'crisp-edges' }}
         draggable={false}
       />
-      
-      {/* Small ticks */}
-      <img 
-        src="/assets/gauges/rpm-small-ticks.png" 
-        alt=""
+
+      {/* Tick marks layer */}
+      <img
+        src={tickImage}
+        alt="RPM Ticks"
         className="absolute inset-0 w-full h-full object-contain"
-        style={{ imageRendering: 'auto' }}
+        style={{ imageRendering: 'crisp-edges' }}
         draggable={false}
       />
-      
-      {/* Medium ticks */}
-      <img 
-        src="/assets/gauges/rpm-medium-ticks.png" 
-        alt=""
+
+      {/* Numbers layer */}
+      <img
+        src={numbersImage}
+        alt="RPM Numbers"
         className="absolute inset-0 w-full h-full object-contain"
-        style={{ imageRendering: 'auto' }}
+        style={{ imageRendering: 'crisp-edges' }}
         draggable={false}
       />
-      
-      {/* Large ticks */}
-      <img 
-        src="/assets/gauges/rpm-large-ticks.png" 
-        alt=""
-        className="absolute inset-0 w-full h-full object-contain"
-        style={{ imageRendering: 'auto' }}
-        draggable={false}
-      />
-      
-      {/* Numbers */}
-      <img 
-        src="/assets/gauges/rpm-numbers.png" 
-        alt=""
-        className="absolute inset-0 w-full h-full object-contain"
-        style={{ imageRendering: 'auto' }}
-        draggable={false}
-      />
-      
-      {/* Shift light at top */}
-      <div 
-        className={`
-          absolute top-[5%] left-1/2 -translate-x-1/2
-          w-9 h-9 rounded-full
-          transition-opacity duration-150
-          ${inShift ? 'animate-pulse' : ''}
-        `}
+
+      {/* Shift light indicator (red dot at top) */}
+      <div
+        className={`absolute top-[5%] left-1/2 -translate-x-1/2 w-8 h-8 rounded-full transition-opacity duration-150 ${
+          inShift ? 'animate-pulse' : ''
+        }`}
         style={{
-          backgroundColor: '#FF0000',
+          backgroundColor: '#DC2626',
           opacity: inShift ? 1 : 0,
-          boxShadow: inShift ? '0 0 40px 10px rgba(255, 0, 0, 0.8)' : 'none'
+          boxShadow: inShift ? '0 0 32px 8px rgba(220, 38, 38, 0.8)' : 'none',
         }}
-        data-testid="shift-light"
+        data-testid="rpm-shift-light"
       />
-      
-      {/* Needle */}
-      <div 
-        className="absolute inset-0 flex items-center justify-center"
-        style={{ paddingBottom: '23%' }}
-      >
-        <img 
-          src="/assets/gauges/rpm-needle.png" 
-          alt="Needle"
-          className="w-[43%] object-contain"
-          style={{
-            transformOrigin: '50% 76.3%',
-            transform: `rotate(${needleAngle}deg)`,
-            transition: 'transform 0.06s linear',
-            willChange: 'transform',
-            backfaceVisibility: 'hidden',
-            imageRendering: 'auto'
-          }}
-          draggable={false}
-        />
-      </div>
-      
-      {/* VTEC Glow center - ORIGINAL CODE RESTORED */}
+
+      {/* VTEC indicator (optional glow) */}
       {inVtec && (
-        <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 5 }}>
-          <img 
-            src="/assets/gauges/rpm-needle-center.png" 
-            alt=""
-            className="w-[20%] object-contain animate-pulse"
-            style={{
-              filter: 'drop-shadow(0 0 34px rgba(255, 0, 0, 1))',
-              zIndex: 5,
-              opacity: 0.8,
-              imageRendering: 'auto'
-            }}
+        <div
+          className="absolute inset-0 rounded-full pointer-events-none"
+          style={{
+            boxShadow: 'inset 0 0 20px rgba(220, 38, 38, 0.3)',
+          }}
+        />
+      )}
+
+      {/* Needle with rotation */}
+      <div
+        className="absolute inset-0 flex items-center justify-center"
+        style={{
+          paddingBottom: '23%',
+        }}
+      >
+        <div
+          style={{
+            transform: `rotate(${needleAngle}deg)`,
+            transformOrigin: 'center center',
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingBottom: '23%',
+          }}
+        >
+          <img
+            src={needleImage}
+            alt="RPM Needle"
+            className="w-[40%] object-contain"
+            style={{ imageRendering: 'crisp-edges' }}
             draggable={false}
           />
         </div>
-      )}
-      
-      {/* Needle center cap - LARGER */}
-      <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 12 }}>
-        <img 
-          src="/assets/gauges/rpm-needle-center.png" 
-          alt=""
-          className="w-[26%] object-contain"
-          style={{ imageRendering: 'auto' }}
+      </div>
+
+      {/* Center cap */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <img
+          src={centerImage}
+          alt="Needle Center"
+          className="w-[12%] object-contain"
+          style={{ imageRendering: 'crisp-edges' }}
           draggable={false}
         />
       </div>
-      
-      {/* RPM Digital Readout - with Orbitron font */}
-      <div 
-        className="absolute inset-0 flex items-center justify-center"
-        style={{ paddingTop: '42%' }}
-      >
-        <span 
-          className="font-orbitron text-3xl font-medium text-white/90"
-          style={{ 
-            textShadow: inVtec ? '0 0 10px rgba(255, 0, 0, 0.5)' : 'none',
-            letterSpacing: '2px'
-          }}
-        >
-          {Math.round(rpm)}
-        </span>
-      </div>
-      
-      {/* x1000 RPM label - BELOW the RPM readout - LARGER */}
-      <div className="absolute inset-0 flex items-center justify-center" style={{ paddingTop: '63%' }}>
-        <img 
-          src="/assets/gauges/x1000-rpm.png" 
-          alt="x1000"
-          className="w-[68%] object-contain"
-          style={{ opacity: 0.9, imageRendering: 'auto' }}
-          draggable={false}
-        />
-      </div>
-      
-      {/* VTEC Light Indicator - shows when in VTEC */}
-      {inVtec && (
-        <div 
-          className="absolute flex items-center justify-center"
-          style={{ 
-            top: '66%', 
-            left: '50%', 
-            transform: 'translateX(-50%)',
-            zIndex: 4
-          }}
-        >
-          <span 
-            className="font-orbitron text-lg font-bold tracking-wider animate-pulse"
-            style={{ 
-              color: '#FF0000',
-              textShadow: '0 0 12px rgba(255, 0, 0, 0.85), 0 0 24px rgba(255, 0, 0, 0.55)'
-            }}
-          >
-            VTEC
-          </span>
-        </div>
-      )}
     </div>
   );
 };
 
-// Speed Gauge using your custom PNG assets
-export const SpeedGauge = ({ 
+/**
+ * SpeedGauge - Isolated speed_mph signal subscription
+ * Mirror of RpmGauge for vehicle speed display
+ */
+export const SpeedGauge = ({
+  visible = true,
   className = '',
-  size = 600,
-  maxSpeed = 170
+  size = 320,
+  faceImage = '/assets/gauges/spd-gauge.png',
+  tickImage = '/assets/gauges/spd-medium-ticks.png',
+  numbersImage = '/assets/gauges/spd-numbers.png',
+  needleImage = '/assets/gauges/rpm-needle.png',
+  centerImage = '/assets/gauges/rpm-needle-center.png',
+  maxSpeed = 170,
+  min = 0,
 }) => {
-  const { signals } = useVehicleData();
-  const speed = signals.speed_mph;
+  // 🎯 Single signal subscription
+  const speed = useVehicleSignal('speed_mph') || 0;
 
-  // Calculate needle angle: 0 MPH = -135deg, 170 MPH = +135deg (270 degree sweep)
+  if (!visible) return null;
+
   const minAngle = -135;
   const maxAngle = 135;
-  const clampedSpeed = Math.min(Math.max(speed, 0), maxSpeed);
+  const clampedSpeed = Math.min(Math.max(speed, min), maxSpeed);
   const needleAngle = minAngle + (clampedSpeed / maxSpeed) * (maxAngle - minAngle);
 
   return (
-    <div 
+    <div
       className={`relative ${className}`}
       style={{ width: size, height: size }}
       data-testid="speed-gauge"
     >
-      {/* Background gauge */}
-      <img 
-        src="/assets/gauges/spd-gauge.png" 
-        alt="Speed Gauge"
+      <img
+        src={faceImage}
+        alt="Speed Gauge Face"
         className="absolute inset-0 w-full h-full object-contain"
-        style={{ imageRendering: 'auto' }}
+        style={{ imageRendering: 'crisp-edges' }}
         draggable={false}
       />
-      
-      {/* Medium ticks */}
-      <img 
-        src="/assets/gauges/spd-medium-ticks.png" 
-        alt=""
+
+      <img
+        src={tickImage}
+        alt="Speed Ticks"
         className="absolute inset-0 w-full h-full object-contain"
-        style={{ imageRendering: 'auto' }}
+        style={{ imageRendering: 'crisp-edges' }}
         draggable={false}
       />
-      
-      {/* Large ticks */}
-      <img 
-        src="/assets/gauges/spd-large-ticks.png" 
-        alt=""
+
+      <img
+        src={numbersImage}
+        alt="Speed Numbers"
         className="absolute inset-0 w-full h-full object-contain"
-        style={{ imageRendering: 'auto' }}
+        style={{ imageRendering: 'crisp-edges' }}
         draggable={false}
       />
-      
-      {/* Numbers */}
-      <img 
-        src="/assets/gauges/spd-numbers.png" 
-        alt=""
-        className="absolute inset-0 w-full h-full object-contain"
-        style={{ imageRendering: 'auto' }}
-        draggable={false}
-      />
-      
-      {/* Needle */}
-      <div 
+
+      <div
         className="absolute inset-0 flex items-center justify-center"
-        style={{ paddingBottom: '23%' }}
+        style={{
+          paddingBottom: '23%',
+        }}
       >
-        <img 
-          src="/assets/gauges/rpm-needle.png" 
-          alt="Needle"
-          className="w-[43%] object-contain"
+        <div
           style={{
-            transformOrigin: '50% 76.4%',
             transform: `rotate(${needleAngle}deg)`,
-            transition: 'transform 0.06s linear',
-            willChange: 'transform',
-            backfaceVisibility: 'hidden',
-            imageRendering: 'auto'
+            transformOrigin: 'center center',
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingBottom: '23%',
           }}
-          draggable={false}
-        />
+        >
+          <img
+            src={needleImage}
+            alt="Speed Needle"
+            className="w-[40%] object-contain"
+            style={{ imageRendering: 'crisp-edges' }}
+            draggable={false}
+          />
+        </div>
       </div>
-      
-      {/* Needle center cap - LARGER */}
-      <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 12 }}>
-        <img 
-          src="/assets/gauges/rpm-needle-center.png" 
-          alt=""
-          className="w-[26%] object-contain"
-          style={{ imageRendering: 'auto', filter: 'drop-shadow(0 0 8px rgba(255, 0, 0, 0.28))' }}
+
+      <div className="absolute inset-0 flex items-center justify-center">
+        <img
+          src={centerImage}
+          alt="Needle Center"
+          className="w-[12%] object-contain"
+          style={{ imageRendering: 'crisp-edges' }}
           draggable={false}
         />
       </div>
@@ -286,4 +230,4 @@ export const SpeedGauge = ({
   );
 };
 
-export default RpmGauge;
+export default { RpmGauge, SpeedGauge };

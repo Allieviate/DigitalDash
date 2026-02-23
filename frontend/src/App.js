@@ -5,7 +5,7 @@ import { VehicleDataProvider } from './contexts/VehicleDataContext';
 import { SettingsProvider, useSettings } from './contexts/SettingsContext';
 import { BootSequence } from './components/hmi/BootSequence';
 import { BulbCheckSequence } from './components/hmi/BulbCheckSequence';
-import Dashboard from './components/hmi/Dashboard';
+import { Dashboard } from './components/hmi/Dashboard';
 import { SettingsPanel } from './components/hmi/SettingsPanel';
 import { Toaster } from './components/ui/sonner';
 import './App.css';

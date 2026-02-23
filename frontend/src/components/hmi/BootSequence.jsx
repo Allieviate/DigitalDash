@@ -1,30 +1,42 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 
 const BOOT_STEPS = [
   { text: 'ECU LINK: OK', delay: 0 },
-  { text: 'SENSORS: ONLINE', delay: 200 },
-  { text: 'VTEC: READY', delay: 400 },
-  { text: 'DISPLAY: READY', delay: 600 },
+  { text: 'SENSORS: ONLINE', delay: 220 },
+  { text: 'VTEC: READY', delay: 440 },
+  { text: 'DISPLAY: READY', delay: 660 },
 ];
 
+const PHASE_PROGRESS = {
+  logo: '20%',
+  name: '45%',
+  text: '70%',
+  sweep: '95%',
+  complete: '100%',
+};
+
+const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
 export const BootSequence = ({ onComplete }) => {
-  const [phase, setPhase] = useState('logo'); // logo, name, text, sweep, complete
+  const [phase, setPhase] = useState('logo');
+  const [showK, setShowK] = useState(false);
   const [visibleSteps, setVisibleSteps] = useState([]);
   const [sweepAngle, setSweepAngle] = useState(-135);
-  const [showK, setShowK] = useState(false);
 
-  // Phase 1: Logo display (2.5s)
+  const progressWidth = useMemo(() => PHASE_PROGRESS[phase] ?? '20%', [phase]);
+
+  // Phase 1: Logo fade in for 1800ms
   useEffect(() => {
-    const timer = setTimeout(() => setPhase('name'), 2500);
+    if (phase !== 'logo') return;
+    const timer = setTimeout(() => setPhase('name'), 1800);
     return () => clearTimeout(timer);
-  }, []);
+  }, [phase]);
 
-  // Phase 2: Name animation - "Fran" fades, then "K" appears.
+  // Phase 2: Name animation - "Fran" fades, then "K" bounces in
   useEffect(() => {
     if (phase !== 'name') return;
 
-    setShowK(false);
     const kTimer = setTimeout(() => setShowK(true), 1200);
     const nextTimer = setTimeout(() => setPhase('text'), 3000);
 
@@ -34,7 +46,7 @@ export const BootSequence = ({ onComplete }) => {
     };
   }, [phase]);
 
-  // Phase 3: System check text
+  // Phase 3: Boot steps text cascade
   useEffect(() => {
     if (phase !== 'text') return;
 
@@ -57,7 +69,7 @@ export const BootSequence = ({ onComplete }) => {
     };
   }, [phase]);
 
-  // Phase 4: Gauge sweep animation
+  // Phase 4: Gauge needle sweep (forward then backward)
   useEffect(() => {
     if (phase !== 'sweep') return;
 
@@ -105,12 +117,11 @@ export const BootSequence = ({ onComplete }) => {
     <AnimatePresence>
       {phase !== 'complete' && (
         <motion.div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center"
-          style={{
-            background: 'radial-gradient(ellipse 90% 100% at 50% 35%, #1a1a1a 0%, #0a0a0a 30%, #000000 100%)',
-          }}
+          className="relative w-full h-screen bg-black flex flex-col items-center justify-center overflow-hidden"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.5 }}
           data-testid="boot-sequence"
         >
           {phase === 'logo' && (
@@ -177,7 +188,7 @@ export const BootSequence = ({ onComplete }) => {
                       transition={{ duration: 0.45, ease: 'easeOut' }}
                     >
                       K
-                    </motion.span>
+                    </motion.div>
                   )}
                 </AnimatePresence>
               </div>
@@ -232,33 +243,60 @@ export const BootSequence = ({ onComplete }) => {
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs uppercase tracking-widest text-zinc-500 font-orbitron">
                 Gauge Sweep Test
               </motion.div>
-            </div>
-          )}
+            )}
+          </AnimatePresence>
 
-          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-56">
-            <div className="h-1 bg-zinc-900 rounded-full overflow-hidden">
+          {/* Phase 4: Gauge sweep */}
+          <AnimatePresence>
+            {phase === 'sweep' && (
               <motion.div
-                className="h-full rounded-full"
-                style={{
-                  background: 'linear-gradient(90deg, #DC2626 0%, #ffffff 100%)',
-                }}
-                initial={{ width: '0%' }}
-                animate={{
-                  width:
-                    phase === 'logo'
-                      ? '20%'
-                      : phase === 'name'
-                      ? '45%'
-                      : phase === 'text'
-                      ? '70%'
-                      : phase === 'sweep'
-                      ? '95%'
-                      : '100%',
-                }}
-                transition={{ duration: 0.6 }}
-              />
-            </div>
-          </div>
+                key="sweep"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                className="relative w-48 h-48"
+              >
+                {/* Gauge face */}
+                <svg
+                  viewBox="0 0 200 200"
+                  className="w-full h-full"
+                  style={{ filter: 'drop-shadow(0 0 20px rgba(220, 38, 38, 0.3))' }}
+                >
+                  {/* Background arc */}
+                  <circle cx="100" cy="100" r="90" fill="none" stroke="#27272a" strokeWidth="2" />
+                  
+                  {/* Tick marks */}
+                  {Array.from({ length: 9 }).map((_, i) => {
+                    const angle = -135 + (i / 8) * 270;
+                    const rad = (angle * Math.PI) / 180;
+                    const x1 = 100 + 75 * Math.cos(rad);
+                    const y1 = 100 + 75 * Math.sin(rad);
+                    const x2 = 100 + 85 * Math.cos(rad);
+                    const y2 = 100 + 85 * Math.sin(rad);
+                    return (
+                      <line
+                        key={i}
+                        x1={x1}
+                        y1={y1}
+                        x2={x2}
+                        y2={y2}
+                        stroke="#3f3f46"
+                        strokeWidth="1"
+                      />
+                    );
+                  })}
+
+                  {/* Needle */}
+                  <g style={{ transform: `rotate(${sweepAngle}deg)`, transformOrigin: '100px 100px' }}>
+                    <line x1="100" y1="100" x2="100" y2="30" stroke="#DC2626" strokeWidth="3" strokeLinecap="round" />
+                  </g>
+
+                  {/* Center cap */}
+                  <circle cx="100" cy="100" r="8" fill="#DC2626" />
+                </svg>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
       )}
     </AnimatePresence>
