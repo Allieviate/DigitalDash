@@ -4,19 +4,29 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { VehicleDataProvider } from './contexts/VehicleDataContext';
 import { SettingsProvider, useSettings } from './contexts/SettingsContext';
 import { BootSequence } from './components/hmi/BootSequence';
+import { BulbCheckSequence } from './components/hmi/BulbCheckSequence';
 import { Dashboard } from './components/hmi/Dashboard';
 import { SettingsPanel } from './components/hmi/SettingsPanel';
 import { Toaster } from './components/ui/sonner';
 import './App.css';
 
+const APP_PHASES = {
+  BOOT_SEQUENCE: 'BOOT_SEQUENCE',
+  BULB_CHECK: 'BULB_CHECK',
+  LIVE_DASHBOARD: 'LIVE_DASHBOARD',
+};
+
 const HMIApp = () => {
-  const [isBooting, setIsBooting] = useState(true);
+  const [appPhase, setAppPhase] = useState(APP_PHASES.BOOT_SEQUENCE);
   const [showSettings, setShowSettings] = useState(false);
   const { settings, isLoading } = useSettings();
 
-  // Handle boot completion
-  const handleBootComplete = () => {
-    setIsBooting(false);
+  const handleBootSequenceComplete = () => {
+    setAppPhase(APP_PHASES.BULB_CHECK);
+  };
+
+  const handleBulbCheckComplete = () => {
+    setAppPhase(APP_PHASES.LIVE_DASHBOARD);
   };
 
   // Apply brightness setting
@@ -29,32 +39,35 @@ const HMIApp = () => {
     };
   }, [settings.brightness]);
 
-  // Skip boot sequence if already loaded settings
+  // Keep boot sequence while settings initialize.
   useEffect(() => {
-    if (!isLoading && !isBooting) return;
-    // Could add logic here to skip boot on refresh
-  }, [isLoading, isBooting]);
+    if (isLoading) {
+      setAppPhase(APP_PHASES.BOOT_SEQUENCE);
+    }
+  }, [isLoading]);
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-black">
-      {/* Boot Sequence */}
-      {isBooting && (
-        <BootSequence onComplete={handleBootComplete} />
+      {appPhase === APP_PHASES.BOOT_SEQUENCE && (
+        <BootSequence onComplete={handleBootSequenceComplete} />
       )}
 
-      {/* Main Dashboard */}
-      {!isBooting && (
+      {appPhase === APP_PHASES.BULB_CHECK && (
+        <BulbCheckSequence onComplete={handleBulbCheckComplete} />
+      )}
+
+      {appPhase === APP_PHASES.LIVE_DASHBOARD && (
         <Dashboard onOpenSettings={() => setShowSettings(true)} />
       )}
 
       {/* Settings Panel (Modal) */}
-      {showSettings && (
+      {showSettings && appPhase === APP_PHASES.LIVE_DASHBOARD && (
         <SettingsPanel onClose={() => setShowSettings(false)} />
       )}
 
       {/* Toast notifications */}
-      <Toaster 
-        position="top-center" 
+      <Toaster
+        position="top-center"
         toastOptions={{
           style: {
             background: '#18181b',
