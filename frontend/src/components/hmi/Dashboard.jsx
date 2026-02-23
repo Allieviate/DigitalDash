@@ -1,0 +1,165 @@
+import React from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useVehicleData } from '../../contexts/VehicleDataContext';
+import { RpmGauge, SpeedGauge } from './CustomGauges';
+import { ShiftLightsBar, DigitalSpeedGear } from './DashWidgets';
+import { WarningPanel, TurnSignalsRow, CriticalWarningBanner } from './WarningPanel';
+import { AndroidAutoPanel } from './AndroidAutoPanel';
+import { Settings, Activity, Smartphone } from 'lucide-react';
+
+export const Dashboard = ({ onOpenSettings }) => {
+  const { theme, themeId } = useTheme();
+  const { signals, isConnected } = useVehicleData();
+  const [showAndroidAuto, setShowAndroidAuto] = React.useState(false);
+  const [phoneConnected, setPhoneConnected] = React.useState(true); // Simulated for demo
+
+  // Calculate background color - GRADUAL transition from 86-120 mph
+  const speed = signals.speed_mph;
+  
+  // Calculate red intensity: 0 at 85mph, 1 at 120mph (gradual transition)
+  const redIntensity = Math.min(Math.max((speed - 85) / 35, 0), 1);
+  
+  // Interpolate background colors based on speed
+  const getBgGradient = () => {
+    if (speed <= 85) {
+      return 'radial-gradient(ellipse 90% 100% at 50% 35%, #2B2B2B 0%, #101010 25%, #000000 100%)';
+    }
+    
+    // Gradual transition: interpolate between gray and red
+    const r1 = Math.round(43 + (61 - 43) * redIntensity); // #2B to #3D
+    const g1 = Math.round(43 + (21 - 43) * redIntensity); // #2B to #15
+    const b1 = Math.round(43 + (21 - 43) * redIntensity); // #2B to #15
+    
+    const r2 = Math.round(16 + (26 - 16) * redIntensity); // #10 to #1A
+    const g2 = Math.round(16 + (8 - 16) * redIntensity);  // #10 to #08
+    const b2 = Math.round(16 + (8 - 16) * redIntensity);  // #10 to #08
+    
+    return `radial-gradient(ellipse 90% 100% at 50% 35%, rgb(${r1},${g1},${b1}) 0%, rgb(${r2},${g2},${b2}) 25%, #000000 100%)`;
+  };
+  
+  // Breathing overlay color also transitions
+  const getBreathingOverlay = () => {
+    if (speed <= 85) {
+      return 'radial-gradient(ellipse 100% 80% at 50% 50%, rgba(60, 60, 60, 0.1) 0%, transparent 70%)';
+    }
+    const opacity = 0.1 + (0.1 * redIntensity);
+    return `radial-gradient(ellipse 100% 80% at 50% 50%, rgba(${80 + 40 * redIntensity}, ${20 - 10 * redIntensity}, ${20 - 10 * redIntensity}, ${opacity}) 0%, transparent 70%)`;
+  };
+
+  return (
+    <div 
+      className="relative w-full h-screen overflow-hidden"
+      data-testid="dashboard"
+    >
+      {/* Animated breathing background with gradual red transition */}
+      <div 
+        className="absolute inset-0 transition-all duration-1000 ease-out"
+        style={{ background: getBgGradient() }}
+      />
+      
+      {/* PS3 breathing animation overlay */}
+      <div 
+        className={`absolute inset-0 pointer-events-none ${speed > 85 ? 'animate-breathe-red' : 'animate-breathe'}`}
+        style={{ background: getBreathingOverlay() }}
+      />
+
+      {/* Critical Warning Banner - Always on top */}
+      <CriticalWarningBanner />
+
+      {/* Settings button - top right */}
+      <button
+        onClick={onOpenSettings}
+        className="absolute top-4 right-4 z-20 touch-btn p-3 rounded-lg hover:bg-white/5 transition-colors"
+        data-testid="settings-btn"
+      >
+        <Settings size={20} className="text-zinc-400 hover:text-white transition-colors" />
+      </button>
+
+      {/* Android Auto button - below settings (only when phone connected) */}
+      {phoneConnected && (
+        <button
+          onClick={() => setShowAndroidAuto(!showAndroidAuto)}
+          className={`
+            absolute top-16 right-4 z-20 touch-btn p-3 rounded-lg transition-all
+            ${showAndroidAuto ? 'bg-blue-500/20 border border-blue-500/50' : 'hover:bg-white/5'}
+          `}
+          data-testid="android-auto-btn"
+        >
+          <Smartphone 
+            size={20} 
+            className={`transition-colors ${showAndroidAuto ? 'text-blue-400' : 'text-zinc-400 hover:text-white'}`} 
+          />
+        </button>
+      )}
+
+      {/* Connection status - top right */}
+      <div className="absolute top-5 right-28 z-20 flex items-center gap-2">
+        <Activity 
+          size={14} 
+          className={isConnected ? 'text-green-500' : 'text-red-500'}
+        />
+        <span className="text-xs uppercase tracking-wider text-zinc-500 font-orbitron">
+          {isConnected ? 'LIVE' : 'OFFLINE'}
+        </span>
+      </div>
+
+      {/* Main Layout */}
+      <div className="absolute inset-0">
+        
+        {/* TOP CENTER SECTION */}
+        <div className="absolute top-0 left-0 right-0 z-10 flex flex-col items-center pt-2">
+          
+          {/* Shift Lights Bar */}
+          <ShiftLightsBar className="mb-2" />
+          
+          {/* Digital Speed + Gear (URUS style) */}
+          <DigitalSpeedGear className="mb-2" />
+          
+          {/* Turn Signals */}
+          <TurnSignalsRow className="mb-2" />
+        </div>
+
+        {/* GAUGES ROW */}
+        <div className="absolute inset-0 flex items-end justify-center pb-20 px-4">
+          
+          {/* LEFT: RPM Gauge */}
+          <div className="relative flex items-end justify-center">
+            <RpmGauge 
+              size={520}
+              vtecStartRpm={3000}
+              shiftRpm={7800}
+              maxRpm={8000}
+            />
+          </div>
+
+          {/* CENTER GAP - Android Auto (MOVED UP) */}
+          <div 
+            className="flex flex-col items-center justify-start mx-4 pt-8" 
+            style={{ width: '420px', height: '380px' }}
+          >
+            {showAndroidAuto ? (
+              <AndroidAutoPanel onClose={() => setShowAndroidAuto(false)} />
+            ) : (
+              <div className="w-full h-full" /> 
+            )}
+          </div>
+
+          {/* RIGHT: Speed Gauge */}
+          <div className="relative flex items-end justify-center">
+            <SpeedGauge 
+              size={520}
+              maxSpeed={170}
+            />
+          </div>
+        </div>
+
+        {/* Bottom Warning Strip - MORE SPREAD OUT */}
+        <div className="absolute bottom-0 left-0 right-0 z-10">
+          <WarningPanel className="py-4 px-16" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
