@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "dgSpecHash": "0gzk+cltspc=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\DigitalDash.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\osmos\\.nuget\\packages\\microgauge\\1.0.1.1\\microgauge.1.0.1.1.nupkg.sha512",
+    "C:\\Users\\osmos\\.nuget\\packages\\microgauge.wpf\\1.0.1.1\\microgauge.wpf.1.0.1.1.nupkg.sha512",
+    "C:\\Users\\osmos\\.nuget\\packages\\microsoft.netcore.platforms\\3.1.9\\microsoft.netcore.platforms.3.1.9.nupkg.sha512",
+    "C:\\Users\\osmos\\.nuget\\packages\\microsoft.win32.systemevents\\4.7.0\\microsoft.win32.systemevents.4.7.0.nupkg.sha512",
+    "C:\\Users\\osmos\\.nuget\\packages\\skiasharp\\2.88.8\\skiasharp.2.88.8.nupkg.sha512",
+    "C:\\Users\\osmos\\.nuget\\packages\\skiasharp.nativeassets.macos\\2.88.8\\skiasharp.nativeassets.macos.2.88.8.nupkg.sha512",
+    "C:\\Users\\osmos\\.nuget\\packages\\skiasharp.nativeassets.win32\\2.88.8\\skiasharp.nativeassets.win32.2.88.8.nupkg.sha512",
+    "C:\\Users\\osmos\\.nuget\\packages\\skiasharp.views.desktop.common\\2.88.8\\skiasharp.views.desktop.common.2.88.8.nupkg.sha512",
+    "C:\\Users\\osmos\\.nuget\\packages\\skiasharp.views.wpf\\2.88.8\\skiasharp.views.wpf.2.88.8.nupkg.sha512",
+    "C:\\Users\\osmos\\.nuget\\packages\\system.drawing.common\\4.7.3\\system.drawing.common.4.7.3.nupkg.sha512"
+  ],
+  "logs": []
+}

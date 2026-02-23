@@ -1,0 +1,253 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|c:\\users\\osmos\\source\\repos\\digitaldash\\digitaldash\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|solutionrelative:digitaldash\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|c:\\users\\osmos\\source\\repos\\digitaldash\\digitaldash\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|solutionrelative:digitaldash\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|c:\\users\\osmos\\source\\repos\\digitaldash\\digitaldash\\app.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|solutionrelative:digitaldash\\app.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|c:\\users\\osmos\\source\\repos\\digitaldash\\digitaldash\\viewmodels\\dashviewmodel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|solutionrelative:digitaldash\\viewmodels\\dashviewmodel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|c:\\users\\osmos\\source\\repos\\digitaldash\\digitaldash\\simsources\\cvtsimsource.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|solutionrelative:digitaldash\\simsources\\cvtsimsource.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|c:\\users\\osmos\\source\\repos\\digitaldash\\digitaldash\\simsources\\isimsource.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|solutionrelative:digitaldash\\simsources\\isimsource.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|c:\\users\\osmos\\source\\repos\\digitaldash\\digitaldash\\viewmodels\\baseviewmodel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|solutionrelative:digitaldash\\viewmodels\\baseviewmodel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|c:\\users\\osmos\\source\\repos\\digitaldash\\digitaldash\\controls\\rpmgauge.xaml.cs||{8B382828-6202-11D1-8870-0000F87579D2}|",
+      "RelativeMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|solutionrelative:digitaldash\\controls\\rpmgauge.xaml.cs||{8B382828-6202-11D1-8870-0000F87579D2}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|c:\\users\\osmos\\source\\repos\\digitaldash\\digitaldash\\controls\\rpmgauge.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|solutionrelative:digitaldash\\controls\\rpmgauge.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|c:\\users\\osmos\\source\\repos\\digitaldash\\digitaldash\\controls\\speedgauge.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|solutionrelative:digitaldash\\controls\\speedgauge.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|c:\\users\\osmos\\source\\repos\\digitaldash\\digitaldash\\controls\\speedgauge.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|solutionrelative:digitaldash\\controls\\speedgauge.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|c:\\users\\osmos\\source\\repos\\digitaldash\\digitaldash\\simsources\\manualsimsource.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|solutionrelative:digitaldash\\simsources\\manualsimsource.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\obj\\Debug\\net8.0-windows\\DigitalDash.AssemblyInfo.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:DigitalDash\\obj\\Debug\\net8.0-windows\\DigitalDash.AssemblyInfo.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|c:\\users\\osmos\\source\\repos\\digitaldash\\digitaldash\\digitaldash.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}",
+      "RelativeMoniker": "D:0:0:{4E44935D-0DDD-491E-B5BC-B1DF1C5AFE8A}|DigitalDash\\DigitalDash.csproj|solutionrelative:digitaldash\\digitaldash.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 14,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:129:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "BaseViewModel.cs",
+              "DocumentMoniker": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\ViewModels\\BaseViewModel.cs",
+              "RelativeDocumentMoniker": "DigitalDash\\ViewModels\\BaseViewModel.cs",
+              "ToolTip": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\ViewModels\\BaseViewModel.cs",
+              "RelativeToolTip": "DigitalDash\\ViewModels\\BaseViewModel.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABcAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-28T02:00:55.651Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "ISimSource.cs",
+              "DocumentMoniker": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\SimSources\\ISimSource.cs",
+              "RelativeDocumentMoniker": "DigitalDash\\SimSources\\ISimSource.cs",
+              "ToolTip": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\SimSources\\ISimSource.cs",
+              "RelativeToolTip": "DigitalDash\\SimSources\\ISimSource.cs",
+              "ViewState": "AgIAAAMAAAAAAAAAAAAUwCQAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-24T16:27:28.168Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "DashViewModel.cs",
+              "DocumentMoniker": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\ViewModels\\DashViewModel.cs",
+              "RelativeDocumentMoniker": "DigitalDash\\ViewModels\\DashViewModel.cs",
+              "ToolTip": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\ViewModels\\DashViewModel.cs",
+              "RelativeToolTip": "DigitalDash\\ViewModels\\DashViewModel.cs",
+              "ViewState": "AgIAAJcBAAAAAAAAAAAiwLkBAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-24T15:48:02.002Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "CvtSimSource.cs",
+              "DocumentMoniker": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\SimSources\\CvtSimSource.cs",
+              "RelativeDocumentMoniker": "DigitalDash\\SimSources\\CvtSimSource.cs",
+              "ToolTip": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\SimSources\\CvtSimSource.cs",
+              "RelativeToolTip": "DigitalDash\\SimSources\\CvtSimSource.cs",
+              "ViewState": "AgIAAJoAAAAAAAAAAAAywLQAAAA7AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-24T15:09:20.798Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "ManualSimSource.cs",
+              "DocumentMoniker": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\SimSources\\ManualSimSource.cs",
+              "RelativeDocumentMoniker": "DigitalDash\\SimSources\\ManualSimSource.cs",
+              "ToolTip": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\SimSources\\ManualSimSource.cs",
+              "RelativeToolTip": "DigitalDash\\SimSources\\ManualSimSource.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAsAAAAmAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-24T15:08:50.758Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "App.xaml",
+              "DocumentMoniker": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\App.xaml",
+              "RelativeDocumentMoniker": "DigitalDash\\App.xaml",
+              "ToolTip": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\App.xaml",
+              "RelativeToolTip": "DigitalDash\\App.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2025-12-02T07:47:13.994Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "SpeedGauge.xaml.cs",
+              "DocumentMoniker": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\Controls\\SpeedGauge.xaml.cs",
+              "RelativeDocumentMoniker": "DigitalDash\\Controls\\SpeedGauge.xaml.cs",
+              "ToolTip": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\Controls\\SpeedGauge.xaml.cs",
+              "RelativeToolTip": "DigitalDash\\Controls\\SpeedGauge.xaml.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAE0AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-01T06:39:04.589Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "SpeedGauge.xaml",
+              "DocumentMoniker": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\Controls\\SpeedGauge.xaml",
+              "RelativeDocumentMoniker": "DigitalDash\\Controls\\SpeedGauge.xaml",
+              "ToolTip": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\Controls\\SpeedGauge.xaml",
+              "RelativeToolTip": "DigitalDash\\Controls\\SpeedGauge.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2025-12-01T05:53:38.323Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "RpmGauge.xaml.cs",
+              "DocumentMoniker": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\Controls\\RpmGauge.xaml.cs",
+              "RelativeDocumentMoniker": "DigitalDash\\Controls\\RpmGauge.xaml.cs",
+              "ToolTip": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\Controls\\RpmGauge.xaml.cs",
+              "RelativeToolTip": "DigitalDash\\Controls\\RpmGauge.xaml.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAQAAAAeAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-25T03:55:27.957Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "RpmGauge.xaml",
+              "DocumentMoniker": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\Controls\\RpmGauge.xaml",
+              "RelativeDocumentMoniker": "DigitalDash\\Controls\\RpmGauge.xaml",
+              "ToolTip": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\Controls\\RpmGauge.xaml",
+              "RelativeToolTip": "DigitalDash\\Controls\\RpmGauge.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2025-11-25T03:55:18.183Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 12,
+              "Title": "DigitalDash.AssemblyInfo.cs",
+              "DocumentMoniker": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\obj\\Debug\\net8.0-windows\\DigitalDash.AssemblyInfo.cs",
+              "RelativeDocumentMoniker": "DigitalDash\\obj\\Debug\\net8.0-windows\\DigitalDash.AssemblyInfo.cs",
+              "ToolTip": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\obj\\Debug\\net8.0-windows\\DigitalDash.AssemblyInfo.cs",
+              "RelativeToolTip": "DigitalDash\\obj\\Debug\\net8.0-windows\\DigitalDash.AssemblyInfo.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABEAAAALAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-24T00:33:51.864Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "MainWindow.xaml.cs",
+              "DocumentMoniker": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\MainWindow.xaml.cs",
+              "RelativeDocumentMoniker": "DigitalDash\\MainWindow.xaml.cs",
+              "ToolTip": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\MainWindow.xaml.cs",
+              "RelativeToolTip": "DigitalDash\\MainWindow.xaml.cs",
+              "ViewState": "AgIAAGkAAAAAAAAAAAAAABAAAAAMAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-23T06:53:14.628Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "MainWindow.xaml",
+              "DocumentMoniker": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\MainWindow.xaml",
+              "RelativeDocumentMoniker": "DigitalDash\\MainWindow.xaml",
+              "ToolTip": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\MainWindow.xaml",
+              "RelativeToolTip": "DigitalDash\\MainWindow.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2025-11-23T06:53:01.983Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 13,
+              "Title": "DigitalDash.csproj",
+              "DocumentMoniker": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\DigitalDash.csproj",
+              "RelativeDocumentMoniker": "DigitalDash\\DigitalDash.csproj",
+              "ToolTip": "C:\\Users\\osmos\\source\\repos\\DigitalDash\\DigitalDash\\DigitalDash.csproj",
+              "RelativeToolTip": "DigitalDash\\DigitalDash.csproj",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABoAAAAqAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2025-11-19T08:09:36.47Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
