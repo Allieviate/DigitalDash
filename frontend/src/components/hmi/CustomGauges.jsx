@@ -1,13 +1,12 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useVehicleSignal } from '../../contexts/VehicleDataContext';
 
 /**
- * RefactoredRpmGauge
- * - Consumes only RPM signal via useVehicleSignal('rpm')
- * - Accepts faceImage, needleImage, centerImage from layout JSON
- * - Supports dynamic sizing and positioning via layout props
+ * RpmGauge - Isolated RPM signal subscription (60Hz safe)
+ * Accepts layout props: visible, faceImage, needleImage, tickImage, etc.
+ * Uses absolute positioning and asset images from SettingsContext layout JSON
  */
-export const RpmGauge = ({ 
+export const RpmGauge = ({
   visible = true,
   className = '',
   size = 320,
@@ -19,14 +18,14 @@ export const RpmGauge = ({
   vtecStartRpm = 3000,
   shiftRpm = 7800,
   maxRpm = 8000,
-  min = 0
+  min = 0,
 }) => {
-  // ✅ Single signal subscription (60Hz safe on Pi)
+  // 🎯 Single signal subscription - only updates when RPM changes
   const rpm = useVehicleSignal('rpm') || 0;
 
   if (!visible) return null;
 
-  // Calculate needle angle: 0 RPM = -135deg, 8000 RPM = +135deg (270° sweep)
+  // Calculate needle rotation: -135° (0 RPM) to +135° (8000 RPM)
   const minAngle = -135;
   const maxAngle = 135;
   const clampedRpm = Math.min(Math.max(rpm, min), maxRpm);
@@ -36,68 +35,95 @@ export const RpmGauge = ({
   const inShift = rpm >= shiftRpm;
 
   return (
-    <div 
+    <div
       className={`relative ${className}`}
       style={{ width: size, height: size }}
       data-testid="rpm-gauge"
     >
-      {/* Background gauge face */}
-      <img 
+      {/* Gauge face background */}
+      <img
         src={faceImage}
-        alt="RPM Gauge"
+        alt="RPM Gauge Face"
         className="absolute inset-0 w-full h-full object-contain"
         style={{ imageRendering: 'crisp-edges' }}
         draggable={false}
       />
-      
-      {/* Tick marks */}
-      <img 
+
+      {/* Tick marks layer */}
+      <img
         src={tickImage}
-        alt=""
+        alt="RPM Ticks"
         className="absolute inset-0 w-full h-full object-contain"
         style={{ imageRendering: 'crisp-edges' }}
         draggable={false}
       />
-      
-      {/* Numbers */}
-      <img 
+
+      {/* Numbers layer */}
+      <img
         src={numbersImage}
-        alt=""
+        alt="RPM Numbers"
         className="absolute inset-0 w-full h-full object-contain"
         style={{ imageRendering: 'crisp-edges' }}
         draggable={false}
       />
-      
-      {/* Shift light (redline indicator) */}
-      <div 
-        className={`absolute top-[5%] left-1/2 -translate-x-1/2 w-8 h-8 rounded-full transition-opacity duration-150 ${inShift ? 'animate-pulse' : ''}`}
+
+      {/* Shift light indicator (red dot at top) */}
+      <div
+        className={`absolute top-[5%] left-1/2 -translate-x-1/2 w-8 h-8 rounded-full transition-opacity duration-150 ${
+          inShift ? 'animate-pulse' : ''
+        }`}
         style={{
-          backgroundColor: '#FF0000',
+          backgroundColor: '#DC2626',
           opacity: inShift ? 1 : 0,
-          boxShadow: inShift ? '0 0 32px 8px rgba(255, 0, 0, 0.8)' : 'none'
+          boxShadow: inShift ? '0 0 32px 8px rgba(220, 38, 38, 0.8)' : 'none',
         }}
         data-testid="rpm-shift-light"
       />
-      
-      {/* Needle with rotation */}
-      <div 
-        className="absolute inset-0 flex items-center justify-center"
-        style={{ paddingBottom: '23%', transform: `rotate(${needleAngle}deg)`, transformOrigin: 'center' }}
-      >
-        <img 
-          src={needleImage}
-          alt="Needle"
-          className="w-[40%] object-contain"
-          style={{ imageRendering: 'crisp-edges' }}
-          draggable={false}
+
+      {/* VTEC indicator (optional glow) */}
+      {inVtec && (
+        <div
+          className="absolute inset-0 rounded-full pointer-events-none"
+          style={{
+            boxShadow: 'inset 0 0 20px rgba(220, 38, 38, 0.3)',
+          }}
         />
+      )}
+
+      {/* Needle with rotation */}
+      <div
+        className="absolute inset-0 flex items-center justify-center"
+        style={{
+          paddingBottom: '23%',
+        }}
+      >
+        <div
+          style={{
+            transform: `rotate(${needleAngle}deg)`,
+            transformOrigin: 'center center',
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingBottom: '23%',
+          }}
+        >
+          <img
+            src={needleImage}
+            alt="RPM Needle"
+            className="w-[40%] object-contain"
+            style={{ imageRendering: 'crisp-edges' }}
+            draggable={false}
+          />
+        </div>
       </div>
-      
+
       {/* Center cap */}
       <div className="absolute inset-0 flex items-center justify-center">
-        <img 
+        <img
           src={centerImage}
-          alt=""
+          alt="Needle Center"
           className="w-[12%] object-contain"
           style={{ imageRendering: 'crisp-edges' }}
           draggable={false}
@@ -108,11 +134,10 @@ export const RpmGauge = ({
 };
 
 /**
- * RefactoredSpeedGauge
- * - Consumes only SPEED signal via useVehicleSignal('speed_mph')
- * - Mirror of RpmGauge but for speed
+ * SpeedGauge - Isolated speed_mph signal subscription
+ * Mirror of RpmGauge for vehicle speed display
  */
-export const SpeedGauge = ({ 
+export const SpeedGauge = ({
   visible = true,
   className = '',
   size = 320,
@@ -122,9 +147,9 @@ export const SpeedGauge = ({
   needleImage = '/assets/gauges/rpm-needle.png',
   centerImage = '/assets/gauges/rpm-needle-center.png',
   maxSpeed = 170,
-  min = 0
+  min = 0,
 }) => {
-  // ✅ Single signal subscription
+  // 🎯 Single signal subscription
   const speed = useVehicleSignal('speed_mph') || 0;
 
   if (!visible) return null;
@@ -135,52 +160,67 @@ export const SpeedGauge = ({
   const needleAngle = minAngle + (clampedSpeed / maxSpeed) * (maxAngle - minAngle);
 
   return (
-    <div 
+    <div
       className={`relative ${className}`}
       style={{ width: size, height: size }}
       data-testid="speed-gauge"
     >
-      <img 
+      <img
         src={faceImage}
-        alt="Speed Gauge"
+        alt="Speed Gauge Face"
         className="absolute inset-0 w-full h-full object-contain"
         style={{ imageRendering: 'crisp-edges' }}
         draggable={false}
       />
-      
-      <img 
+
+      <img
         src={tickImage}
-        alt=""
+        alt="Speed Ticks"
         className="absolute inset-0 w-full h-full object-contain"
         style={{ imageRendering: 'crisp-edges' }}
         draggable={false}
       />
-      
-      <img 
+
+      <img
         src={numbersImage}
-        alt=""
+        alt="Speed Numbers"
         className="absolute inset-0 w-full h-full object-contain"
         style={{ imageRendering: 'crisp-edges' }}
         draggable={false}
       />
-      
-      <div 
+
+      <div
         className="absolute inset-0 flex items-center justify-center"
-        style={{ paddingBottom: '23%', transform: `rotate(${needleAngle}deg)`, transformOrigin: 'center' }}
+        style={{
+          paddingBottom: '23%',
+        }}
       >
-        <img 
-          src={needleImage}
-          alt="Needle"
-          className="w-[40%] object-contain"
-          style={{ imageRendering: 'crisp-edges' }}
-          draggable={false}
-        />
+        <div
+          style={{
+            transform: `rotate(${needleAngle}deg)`,
+            transformOrigin: 'center center',
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingBottom: '23%',
+          }}
+        >
+          <img
+            src={needleImage}
+            alt="Speed Needle"
+            className="w-[40%] object-contain"
+            style={{ imageRendering: 'crisp-edges' }}
+            draggable={false}
+          />
+        </div>
       </div>
-      
+
       <div className="absolute inset-0 flex items-center justify-center">
-        <img 
+        <img
           src={centerImage}
-          alt=""
+          alt="Needle Center"
           className="w-[12%] object-contain"
           style={{ imageRendering: 'crisp-edges' }}
           draggable={false}
