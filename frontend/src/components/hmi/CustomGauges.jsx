@@ -9,14 +9,25 @@ export const RpmGauge = ({
   shiftRpm = 7800,
   maxRpm = 8000
 }) => {
+
+  const mapValueToAngle = (val, minVal, maxVal, minAngle, maxAngle) => {
+  // Clamp the value first so it never exceeds the gauge limits
+  const clampedVal = Math.min(Math.max(val, minVal), maxVal);
+
+  // Avoid divide-by-zero if someone misconfigures min/max
+  if (maxVal === minVal) return minAngle;
+
+  // Map to degrees
+  return minAngle + ((clampedVal - minVal) / (maxVal - minVal)) * (maxAngle - minAngle);
+};
+
   const { signals } = useVehicleData();
   const rpm = signals.rpm;
 
   // Calculate needle angle: 0 RPM = -135deg, 8000 RPM = +135deg (270 degree sweep)
-  const minAngle = -135;
-  const maxAngle = 135;
-  const clampedRpm = Math.min(Math.max(rpm, 0), maxRpm);
-  const needleAngle = minAngle + (clampedRpm / maxRpm) * (maxAngle - minAngle);
+ const minAngle = -135;
+const maxAngle = 135;
+const needleAngle = mapValueToAngle(rpm, min, maxRpm, minAngle, maxAngle);
 
   // VTEC engagement (above 3000 RPM) - ORIGINAL CODE
   const inVtec = rpm >= vtecStartRpm;
@@ -202,8 +213,8 @@ export const SpeedGauge = ({
   // Calculate needle angle: 0 MPH = -135deg, 170 MPH = +135deg (270 degree sweep)
   const minAngle = -135;
   const maxAngle = 135;
-  const clampedSpeed = Math.min(Math.max(speed, 0), maxSpeed);
-  const needleAngle = minAngle + (clampedSpeed / maxSpeed) * (maxAngle - minAngle);
+  const needleAngle = mapValueToAngle(speed, min, maxSpeed, minAngle, maxAngle);
+
 
   return (
     <div 
