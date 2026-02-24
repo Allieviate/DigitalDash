@@ -32,20 +32,20 @@ export const ShiftLightsBar = ({ className = '' }) => {
 
   return (
     <div 
-      className={`flex items-center justify-center gap-2 ${className}`}
+      className={`flex items-center justify-center gap-3 ${className}`}
       style={{ opacity: isRedline ? flashState : 1 }}
       data-testid="shift-lights-bar"
     >
       {[0, 1, 2, 3, 4, 5, 6].map((i) => (
         <div
           key={i}
-          className="w-[22px] h-[22px] rounded-full transition-opacity duration-75"
+          className="w-[28px] h-[28px] rounded-full transition-opacity duration-75"
           style={{
             opacity: getLightOpacity(i),
             // ORANGISH-RED gradient
             background: 'radial-gradient(circle at 30% 30%, #FFCC4040 -20%, #FF6B35 60%, #E83A14 100%)',
             boxShadow: getLightOpacity(i) > 0.5 
-              ? '0 0 12px 4px rgba(255, 107, 53, 0.6)' 
+              ? '0 0 16px 5px rgba(255, 107, 53, 0.6)' 
               : 'none'
           }}
         />
@@ -103,23 +103,23 @@ export const DigitalSpeedGear = ({ className = '' }) => {
       {/* Speed - Orbitron font */}
       <div 
         className="font-orbitron font-medium text-white tracking-tight leading-none"
-        style={{ fontSize: '56px' }}
+        style={{ fontSize: '72px' }}
         data-testid="digital-speed"
       >
         {speed}
       </div>
-      <div className="font-orbitron text-white/70 text-lg tracking-widest -mt-1 mb-3">
+      <div className="font-orbitron text-white/70 text-xl tracking-widest -mt-1 mb-4">
         MPH
       </div>
       
       {/* Gear Row: prev / current / next - URUS LAMBORGHINI STYLE */}
-      <div className="flex items-center justify-center" style={{ gap: '4px' }}>
-        {/* Previous gear - 22px, 45% opacity */}
+      <div className="flex items-center justify-center" style={{ gap: '6px' }}>
+        {/* Previous gear - 28px, 45% opacity */}
         <span 
           className="font-orbitron font-medium text-center"
           style={{ 
-            width: '32px',
-            fontSize: '22px',
+            width: '40px',
+            fontSize: '28px',
             color: 'white',
             opacity: 0.45
           }}
@@ -127,7 +127,7 @@ export const DigitalSpeedGear = ({ className = '' }) => {
           {getPrevGearText(gear)}
         </span>
         
-        {/* Current gear - 42px, with flash animation */}
+        {/* Current gear - 54px, with flash animation */}
         <span 
           className={`
             font-orbitron font-bold text-center transition-all duration-100
@@ -135,8 +135,8 @@ export const DigitalSpeedGear = ({ className = '' }) => {
             ${flashType === 'down' ? 'animate-downshift' : ''}
           `}
           style={{ 
-            width: '48px',
-            fontSize: '42px',
+            width: '60px',
+            fontSize: '54px',
             color: flashType === 'down' ? '#DD4444' : 'white',
           }}
           data-testid="current-gear"
@@ -144,12 +144,12 @@ export const DigitalSpeedGear = ({ className = '' }) => {
           {getGearText(gear)}
         </span>
         
-        {/* Next gear - 22px, 45% opacity */}
+        {/* Next gear - 28px, 45% opacity */}
         <span 
           className="font-orbitron font-medium text-center"
           style={{ 
-            width: '32px',
-            fontSize: '22px',
+            width: '40px',
+            fontSize: '28px',
             color: 'white',
             opacity: 0.45
           }}
@@ -158,7 +158,7 @@ export const DigitalSpeedGear = ({ className = '' }) => {
         </span>
       </div>
       
-      <div className="font-orbitron text-white/70 text-sm tracking-widest mt-1">
+      <div className="font-orbitron text-white/70 text-base tracking-widest mt-2">
         GEAR
       </div>
     </div>
