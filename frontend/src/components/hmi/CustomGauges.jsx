@@ -6,6 +6,7 @@ export const RpmGauge = ({
   className = '',
   size = 600,
   vtecStartRpm = 3000,
+  vtecEndRpm = 8000,
   shiftRpm = 7800,
   maxRpm = 8000
 }) => {
@@ -25,12 +26,18 @@ export const RpmGauge = ({
   const rpm = signals.rpm;
 
   // Calculate needle angle: 0 RPM = -135deg, 8000 RPM = +135deg (270 degree sweep)
- const minAngle = -120;
-const maxAngle = 120;
+ const minAngle = -110;
+const maxAngle = 110;
 const needleAngle = mapValueToAngle(rpm, min, maxRpm, minAngle, maxAngle);
 
   // VTEC engagement (above 3000 RPM) - ORIGINAL CODE
-  const inVtec = rpm >= vtecStartRpm;
+  // VTEC glow band (mirrors the old DashViewModel demo behavior)
+// - Glow ramps in from vtecStartRpm → vtecEndRpm
+// - Past vtecEndRpm we stop the glow so the dash doesn't stay "washed" red
+const inVtec = rpm >= vtecStartRpm && rpm <= vtecEndRpm;
+const vtecProgress = inVtec
+  ? Math.min(1, Math.max(0, (rpm - vtecStartRpm) / Math.max(1, (vtecEndRpm - vtecStartRpm))))
+  : 0;
   
   // Shift light (near redline)
   const inShift = rpm >= shiftRpm;
@@ -129,8 +136,8 @@ const needleAngle = mapValueToAngle(rpm, min, maxRpm, minAngle, maxAngle);
             alt=""
             className="w-[15%] object-contain animate-pulse"
             style={{
-              filter: 'drop-shadow(0 0 28px rgba(255, 0, 0, 1))',
-              opacity: 0.8,
+              filter: `drop-shadow(0 0 ${18 + vtecProgress * 22}px rgba(255, 0, 0, 1))`,
+              opacity: 0.35 + vtecProgress * 0.55,
               imageRendering: 'auto'
             }}
             draggable={false}
@@ -157,7 +164,7 @@ const needleAngle = mapValueToAngle(rpm, min, maxRpm, minAngle, maxAngle);
         <span 
           className="font-orbitron text-3xl font-medium text-white/90"
           style={{ 
-            textShadow: inVtec ? '0 0 10px rgba(255, 0, 0, 0.5)' : 'none',
+            textShadow: inVtec ? `0 0 ${6 + vtecProgress * 10}px rgba(255, 0, 0, 0.55)` : 'none',
             letterSpacing: '2px'
           }}
         >
