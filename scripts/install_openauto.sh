@@ -38,8 +38,7 @@ apt install -y \
     qtconnectivity5-dev \
     pulseaudio \
     librtaudio-dev \
-    libtaglib-cflags \
-    libtaglib-dev \
+    libtaglib0-dev \
     libtag1-dev \
     gstreamer1.0-plugins-base \
     gstreamer1.0-plugins-good \
