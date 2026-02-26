@@ -114,7 +114,7 @@ const vtecProgress = inVtec
       {/* Needle */}
       <div 
         className="absolute inset-0 flex items-center justify-center"
-        style={{ paddingBottom: '23%' }}
+        style={{ paddingBottom: '23%', zIndex: 10 }}
       >
         <img 
           src="/assets/gauges/rpm-needle.png" 
@@ -132,7 +132,7 @@ const vtecProgress = inVtec
       
       {/* VTEC Glow center - ORIGINAL CODE RESTORED */}
       {inVtec && (
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 11 }}>
           <img 
             src="/assets/gauges/rpm-needle-center.png" 
             alt=""
@@ -148,7 +148,7 @@ const vtecProgress = inVtec
       )}
       
       {/* Needle center cap - LARGER */}
-      <div className="absolute inset-0 flex items-center justify-center">
+      <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 12 }}>
         <img 
           src="/assets/gauges/rpm-needle-center.png" 
           alt=""
