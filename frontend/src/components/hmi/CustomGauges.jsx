@@ -226,9 +226,9 @@ export const SpeedGauge = ({
     return minAngle + ((clampedVal - minVal) / (maxVal - minVal)) * (maxAngle - minAngle);
   };
 
-  // Calculate needle angle: 0 MPH = -135deg, 170 MPH = +135deg (270 degree sweep)
-  const minAngle = -135;
-  const maxAngle = 135;
+  // Calculate needle angle: 0 MPH = -120deg, 170 MPH = +120deg (240 degree sweep)
+  const minAngle = -120;
+  const maxAngle = 120;
   const needleAngle = mapValueToAngle(speed, 0, maxSpeed, minAngle, maxAngle);
 
 
