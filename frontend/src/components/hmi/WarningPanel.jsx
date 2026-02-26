@@ -119,7 +119,7 @@ export const WarningPanel = ({ className = '' }) => {
   );
 };
 
-// Turn Signal Arrow SVG Component - Clean automotive style
+// Turn Signal Arrow SVG Component - Clean automotive style with enhanced glow
 const TurnArrow = ({ direction, active }) => {
   const color = active ? '#28D86A' : '#3f3f46';
   const isLeft = direction === 'left';
@@ -131,7 +131,7 @@ const TurnArrow = ({ direction, active }) => {
       viewBox="0 0 48 36"
       style={{ 
         transform: isLeft ? 'scaleX(-1)' : 'none',
-        filter: active ? `drop-shadow(0 0 10px ${color})` : 'none',
+        filter: active ? `drop-shadow(0 0 8px ${color}) drop-shadow(0 0 16px ${color}) drop-shadow(0 0 24px ${color})` : 'none',
         transition: 'all 0.1s ease'
       }}
     >
