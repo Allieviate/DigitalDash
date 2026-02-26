@@ -158,6 +158,28 @@ const vtecProgress = inVtec
         />
       </div>
       
+      {/* VTEC Light Indicator - shows when in VTEC - ABOVE the RPM readout */}
+      {inVtec && (
+        <div 
+          className="absolute flex items-center justify-center"
+          style={{ 
+            top: '32%', 
+            left: '50%', 
+            transform: 'translateX(-50%)'
+          }}
+        >
+          <span 
+            className="font-orbitron text-xl font-bold tracking-wider animate-pulse"
+            style={{ 
+              color: '#FF0000',
+              textShadow: '0 0 15px rgba(255, 0, 0, 0.9), 0 0 30px rgba(255, 0, 0, 0.6)'
+            }}
+          >
+            VTEC
+          </span>
+        </div>
+      )}
+      
       {/* RPM Digital Readout - with Orbitron font */}
       <div 
         className="absolute inset-0 flex items-center justify-center"
@@ -174,38 +196,16 @@ const vtecProgress = inVtec
         </span>
       </div>
       
-      {/* x1000 RPM label - BELOW the RPM readout - LARGER */}
-      <div className="absolute inset-0 flex items-center justify-center" style={{ paddingTop: '58%' }}>
+      {/* x1000 RPM label - BELOW the RPM readout - BIGGER */}
+      <div className="absolute inset-0 flex items-center justify-center" style={{ paddingTop: '62%' }}>
         <img 
           src="/assets/gauges/x1000-rpm.png" 
           alt="x1000"
-          className="w-[55%] object-contain"
+          className="w-[65%] object-contain"
           style={{ opacity: 0.9, imageRendering: 'auto' }}
           draggable={false}
         />
       </div>
-      
-      {/* VTEC Light Indicator - shows when in VTEC */}
-      {inVtec && (
-        <div 
-          className="absolute flex items-center justify-center"
-          style={{ 
-            top: '68%', 
-            left: '50%', 
-            transform: 'translateX(-50%)'
-          }}
-        >
-          <span 
-            className="font-orbitron text-lg font-bold tracking-wider animate-pulse"
-            style={{ 
-              color: '#FF0000',
-              textShadow: '0 0 15px rgba(255, 0, 0, 0.9), 0 0 30px rgba(255, 0, 0, 0.6)'
-            }}
-          >
-            VTEC
-          </span>
-        </div>
-      )}
     </div>
   );
 };
