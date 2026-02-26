@@ -25,10 +25,12 @@ export const RpmGauge = ({
   const { signals } = useVehicleData();
   const rpm = signals.rpm;
 
-  // Calculate needle angle: 0 RPM = -135deg, 8000 RPM = +135deg (270 degree sweep)
- const minAngle = -100;
-const maxAngle = 100;
-const needleAngle = mapValueToAngle(rpm, 0, maxRpm, minAngle, maxAngle);
+  // Calculate needle angle for RPM gauge
+  // Based on gauge face: 0 RPM at ~-135deg (7 o'clock), 8000 RPM at ~+135deg (5 o'clock)
+  // Full 270 degree sweep
+  const minAngle = -135;
+  const maxAngle = 135;
+  const needleAngle = mapValueToAngle(rpm, 0, maxRpm, minAngle, maxAngle);
 
   // VTEC engagement (above 3000 RPM) - ORIGINAL CODE
   // VTEC glow band (mirrors the old DashViewModel demo behavior)
