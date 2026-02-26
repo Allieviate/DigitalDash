@@ -158,14 +158,14 @@ const vtecProgress = inVtec
         />
       </div>
       
-      {/* VTEC Light Indicator - shows when in VTEC - ABOVE the RPM readout */}
+      {/* VTEC Light Indicator - shows when in VTEC - BEHIND the needle (centered) */}
       {inVtec && (
         <div 
           className="absolute flex items-center justify-center"
           style={{ 
-            top: '32%', 
+            top: '42%', 
             left: '50%', 
-            transform: 'translateX(-50%)'
+            transform: 'translate(-50%, -50%)'
           }}
         >
           <span 
@@ -180,10 +180,10 @@ const vtecProgress = inVtec
         </div>
       )}
       
-      {/* RPM Digital Readout - with Orbitron font - positioned in lower gauge area */}
+      {/* RPM Digital Readout - with Orbitron font - aligned with 0 and 8 */}
       <div 
         className="absolute inset-0 flex items-center justify-center"
-        style={{ paddingTop: '14%' }}
+        style={{ paddingTop: '28%' }}
       >
         <span 
           className="font-orbitron text-3xl font-medium text-white/90"
@@ -199,7 +199,7 @@ const vtecProgress = inVtec
       {/* x1000 RPM label - BELOW the RPM readout inside gauge face */}
       <div 
         className="absolute left-0 right-0 flex justify-center"
-        style={{ bottom: '25%' }}
+        style={{ bottom: '18%' }}
       >
         <img 
           src="/assets/gauges/x1000-rpm.png" 
