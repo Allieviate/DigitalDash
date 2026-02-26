@@ -83,7 +83,7 @@ export const DigitalSpeedGear = ({ className = '' }) => {
     return String(g + 1);
   };
   
-  // Detect gear changes - URUS STYLE animations
+  // Detect gear changes - "Instant Pop, Slow Fade" pattern
   useEffect(() => {
     if (gear !== lastGear) {
       if (gear > lastGear) {
@@ -93,10 +93,26 @@ export const DigitalSpeedGear = ({ className = '' }) => {
       }
       setLastGear(gear);
       
-      const timer = setTimeout(() => setFlashType(null), 250);
+      // Hold the pop for 50ms, then trigger the fade out
+      const timer = setTimeout(() => setFlashType(null), 50);
       return () => clearTimeout(timer);
     }
   }, [gear, lastGear]);
+
+  // Build dynamic classes for "Instant Pop, Slow Fade"
+  let gearFlashClass = "";
+  let gearTransitionClass = "";
+  
+  if (flashType === 'up') {
+    gearFlashClass = "text-white scale-125 drop-shadow-[0_0_30px_rgba(255,255,255,1)]";
+    gearTransitionClass = "transition-none"; // 0ms Instant Snap
+  } else if (flashType === 'down') {
+    gearFlashClass = "text-red-500 scale-110 drop-shadow-[0_0_30px_rgba(255,0,0,1)]";
+    gearTransitionClass = "transition-none"; // 0ms Instant Snap
+  } else {
+    gearFlashClass = "text-red-600 scale-100 drop-shadow-none";
+    gearTransitionClass = "transition-all duration-300 ease-out"; // 300ms Fade Out
+  }
 
   return (
     <div className={`flex flex-col items-center ${className}`} data-testid="digital-speed-gear">
