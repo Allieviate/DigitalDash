@@ -107,9 +107,13 @@ EOF
 
 chmod +x /usr/local/bin/openauto-launcher
 
+# Get current user (the one who called sudo)
+CURRENT_USER="${SUDO_USER:-$(whoami)}"
+CURRENT_HOME=$(eval echo ~$CURRENT_USER)
+
 # Create OpenAuto config directory
-mkdir -p /home/mashumxro/.config/openauto
-cat > /home/mashumxro/.config/openauto/openauto.ini << 'EOF'
+mkdir -p "$CURRENT_HOME/.config/openauto"
+cat > "$CURRENT_HOME/.config/openauto/openauto.ini" << 'EOF'
 [General]
 ShowClock=false
 ShowMenu=true
@@ -133,7 +137,7 @@ TouchscreenEnabled=true
 ButtonEventsEnabled=true
 EOF
 
-chown -R mashumxro:mashumxro /home/mashumxro/.config/openauto
+chown -R "$CURRENT_USER:$CURRENT_USER" "$CURRENT_HOME/.config/openauto"
 
 echo ""
 echo "=========================================="
