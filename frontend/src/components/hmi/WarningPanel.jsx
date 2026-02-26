@@ -119,30 +119,46 @@ export const WarningPanel = ({ className = '' }) => {
   );
 };
 
-// Turn Signal Arrow SVG Component - Clean automotive style with enhanced glow
+// Turn Signal Arrow SVG Component - Clean automotive style with bloom glow effect
 const TurnArrow = ({ direction, active }) => {
   const color = active ? '#28D86A' : '#3f3f46';
+  const glowColor = 'rgba(40, 216, 106, 0.6)';
   const isLeft = direction === 'left';
   
   return (
-    <svg 
-      width="60" 
-      height="44" 
-      viewBox="0 0 48 36"
-      style={{ 
-        transform: isLeft ? 'scaleX(-1)' : 'none',
-        filter: active ? `drop-shadow(0 0 8px ${color}) drop-shadow(0 0 16px ${color}) drop-shadow(0 0 24px ${color})` : 'none',
-        transition: 'all 0.1s ease'
+    <div 
+      className="relative flex items-center justify-center"
+      style={{
+        // Radial bloom glow background when active
+        background: active 
+          ? `radial-gradient(ellipse at center, ${glowColor} 0%, rgba(40, 216, 106, 0.3) 40%, transparent 70%)`
+          : 'transparent',
+        padding: active ? '20px 30px' : '0',
+        borderRadius: '50%',
+        transition: 'all 0.15s ease'
       }}
     >
-      {/* Arrow shape - clean automotive style */}
-      <path 
-        d="M4 18 L20 4 L20 12 L44 12 L44 24 L20 24 L20 32 Z"
-        fill={color}
-        stroke={active ? '#3AD87A' : 'transparent'}
-        strokeWidth="1"
-      />
-    </svg>
+      <svg 
+        width="60" 
+        height="44" 
+        viewBox="0 0 48 36"
+        style={{ 
+          transform: isLeft ? 'scaleX(-1)' : 'none',
+          filter: active 
+            ? `drop-shadow(0 0 8px ${color}) drop-shadow(0 0 16px ${color}) drop-shadow(0 0 32px ${color})`
+            : 'none',
+          transition: 'all 0.1s ease'
+        }}
+      >
+        {/* Arrow shape - clean automotive style */}
+        <path 
+          d="M4 18 L20 4 L20 12 L44 12 L44 24 L20 24 L20 32 Z"
+          fill={color}
+          stroke={active ? '#4AE88A' : 'transparent'}
+          strokeWidth="1.5"
+        />
+      </svg>
+    </div>
   );
 };
 
@@ -151,14 +167,14 @@ export const TurnSignalsRow = ({ className = '' }) => {
   const { signals } = useVehicleData();
   
   return (
-    <div className={`flex items-center justify-center gap-16 ${className}`} data-testid="turn-signals">
+    <div className={`flex items-center justify-center gap-8 ${className}`} data-testid="turn-signals">
       <div 
-        className={`transition-opacity duration-100 ${signals.turn_left ? 'opacity-100' : 'opacity-25'}`}
+        className={`transition-all duration-100 ${signals.turn_left ? 'opacity-100' : 'opacity-30'}`}
       >
         <TurnArrow direction="right" active={signals.turn_left} />
       </div>
       <div 
-        className={`transition-opacity duration-100 ${signals.turn_right ? 'opacity-100' : 'opacity-25'}`}
+        className={`transition-all duration-100 ${signals.turn_right ? 'opacity-100' : 'opacity-30'}`}
       >
         <TurnArrow direction="left" active={signals.turn_right} />
       </div>
