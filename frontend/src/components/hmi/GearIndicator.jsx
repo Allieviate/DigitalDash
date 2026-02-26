@@ -60,18 +60,6 @@ export const GearIndicator = ({
 
   if (!visible) return null;
 
-  // Get animation class based on shift state
-  const getAnimationClass = () => {
-    switch (shiftState) {
-      case 'UPSHIFT':
-        return 'animate-upshift';
-      case 'DOWNSHIFT':
-        return 'animate-downshift';
-      default:
-        return '';
-    }
-  };
-
   // Get inline styles for the gear number - URUS STYLE
   const getGearStyle = () => {
     if (shiftState === 'UPSHIFT') {
