@@ -119,23 +119,22 @@ export const WarningPanel = ({ className = '' }) => {
   );
 };
 
-// Turn Signal Arrow SVG Component - Clean automotive style with bloom glow effect
+// Turn Signal Arrow SVG Component - Clean automotive style with strong bloom glow effect
 const TurnArrow = ({ direction, active }) => {
   const color = active ? '#28D86A' : '#3f3f46';
-  const glowColor = 'rgba(40, 216, 106, 0.6)';
   const isLeft = direction === 'left';
   
   return (
     <div 
       className="relative flex items-center justify-center"
       style={{
-        // Radial bloom glow background when active
+        // Strong radial bloom glow background when active
         background: active 
-          ? `radial-gradient(ellipse at center, ${glowColor} 0%, rgba(40, 216, 106, 0.3) 40%, transparent 70%)`
+          ? `radial-gradient(ellipse 100% 100% at center, rgba(40, 216, 106, 0.5) 0%, rgba(40, 216, 106, 0.25) 50%, transparent 80%)`
           : 'transparent',
-        padding: active ? '20px 30px' : '0',
+        padding: '25px 35px',
         borderRadius: '50%',
-        transition: 'all 0.15s ease'
+        transition: 'background 0.1s ease'
       }}
     >
       <svg 
@@ -145,16 +144,16 @@ const TurnArrow = ({ direction, active }) => {
         style={{ 
           transform: isLeft ? 'scaleX(-1)' : 'none',
           filter: active 
-            ? `drop-shadow(0 0 8px ${color}) drop-shadow(0 0 16px ${color}) drop-shadow(0 0 32px ${color})`
+            ? `drop-shadow(0 0 6px ${color}) drop-shadow(0 0 12px ${color}) drop-shadow(0 0 20px ${color}) drop-shadow(0 0 30px rgba(40, 216, 106, 0.8))`
             : 'none',
-          transition: 'all 0.1s ease'
+          transition: 'filter 0.1s ease'
         }}
       >
         {/* Arrow shape - clean automotive style */}
         <path 
           d="M4 18 L20 4 L20 12 L44 12 L44 24 L20 24 L20 32 Z"
           fill={color}
-          stroke={active ? '#4AE88A' : 'transparent'}
+          stroke={active ? '#5AFA9A' : 'transparent'}
           strokeWidth="1.5"
         />
       </svg>
