@@ -137,7 +137,8 @@ export const DigitalSpeedGear = ({ className = '' }) => {
           style={{ 
             width: '60px',
             fontSize: '54px',
-            color: flashType === 'down' ? '#DD4444' : 'white',
+            color: flashType === 'up' ? '#FFFFFF' : flashType === 'down' ? '#DD4444' : '#DC2626',
+            textShadow: flashType ? `0 0 20px ${flashType === 'up' ? '#FFFFFF' : '#DD4444'}` : 'none',
           }}
           data-testid="current-gear"
         >
