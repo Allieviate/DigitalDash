@@ -26,10 +26,10 @@ export const RpmGauge = ({
   const rpm = signals.rpm;
 
   // Calculate needle angle for RPM gauge
-  // Based on gauge face: 0 RPM at ~-135deg (7 o'clock), 8000 RPM at ~+135deg (5 o'clock)
-  // Full 270 degree sweep
-  const minAngle = -135;
-  const maxAngle = 135;
+  // Based on gauge face: 0 RPM at ~-120deg, 8000 RPM at ~+120deg
+  // 240 degree sweep to match gauge markings
+  const minAngle = -120;
+  const maxAngle = 120;
   const needleAngle = mapValueToAngle(rpm, 0, maxRpm, minAngle, maxAngle);
 
   // VTEC engagement (above 3000 RPM) - ORIGINAL CODE
