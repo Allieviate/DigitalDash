@@ -72,23 +72,33 @@ export const GearIndicator = ({
     }
   };
 
-  // Get inline styles for the gear number
+  // Get inline styles for the gear number - URUS STYLE
   const getGearStyle = () => {
-    const baseStyle = {
-      transition: shiftState === 'IDLE' ? 'color 0.15s ease, transform 0.15s ease, filter 0.15s ease' : 'none',
-    };
-
-    // During idle state, return normal color
-    if (shiftState === 'IDLE') {
+    if (shiftState === 'UPSHIFT') {
       return {
-        ...baseStyle,
-        color: isReverse ? '#EF4444' : isNeutral ? '#71717a' : '#DC2626',
-        transform: 'scale(1.0)',
-        filter: 'none',
+        color: '#FFFFFF',
+        transform: 'scale(1.2)',
+        filter: 'drop-shadow(0 0 25px rgba(255,255,255,1)) drop-shadow(0 0 40px rgba(255,255,255,0.8))',
+        transition: 'none',
       };
     }
-
-    return baseStyle;
+    
+    if (shiftState === 'DOWNSHIFT') {
+      return {
+        color: '#FF0000',
+        transform: 'scale(1.1)',
+        filter: 'drop-shadow(0 0 25px rgba(255,0,0,1)) drop-shadow(0 0 40px rgba(255,0,0,0.8))',
+        transition: 'none',
+      };
+    }
+    
+    // IDLE state - normal appearance with transition for fade effect
+    return {
+      color: isReverse ? '#EF4444' : isNeutral ? '#71717a' : '#DC2626',
+      transform: 'scale(1.0)',
+      filter: 'none',
+      transition: 'all 250ms ease-out',
+    };
   };
 
   return (
@@ -124,7 +134,7 @@ export const GearIndicator = ({
         }}
       >
         <span
-          className={`font-mono text-5xl font-black ${getAnimationClass()}`}
+          className="font-mono text-5xl font-black"
           style={getGearStyle()}
           data-testid="gear-value"
           data-shift-state={shiftState}
