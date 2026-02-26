@@ -217,10 +217,17 @@ export const SpeedGauge = ({
   const { signals } = useVehicleData();
   const speed = signals.speed_mph;
 
+  // Helper to map value to angle
+  const mapValueToAngle = (val, minVal, maxVal, minAngle, maxAngle) => {
+    const clampedVal = Math.min(Math.max(val, minVal), maxVal);
+    if (maxVal === minVal) return minAngle;
+    return minAngle + ((clampedVal - minVal) / (maxVal - minVal)) * (maxAngle - minAngle);
+  };
+
   // Calculate needle angle: 0 MPH = -135deg, 170 MPH = +135deg (270 degree sweep)
   const minAngle = -135;
   const maxAngle = 135;
-  const needleAngle = mapValueToAngle(speed, min, maxSpeed, minAngle, maxAngle);
+  const needleAngle = mapValueToAngle(speed, 0, maxSpeed, minAngle, maxAngle);
 
 
   return (
