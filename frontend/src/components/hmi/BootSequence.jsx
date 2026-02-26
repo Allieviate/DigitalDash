@@ -8,17 +8,125 @@ const BOOT_STEPS = [
   { text: 'DISPLAY: READY', delay: 600 },
 ];
 
+// Animated Honda Logo Component - Premium boot animation
+const HondaLogoAnimation = ({ onComplete }) => {
+  const [logoPhase, setLogoPhase] = useState(0);
+  // logoPhase 0: black
+  // logoPhase 1: logo fades + scales in from center
+  // logoPhase 2: glow pulse
+  // logoPhase 3: hold, then complete
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setLogoPhase(1), 600);
+    const t2 = setTimeout(() => setLogoPhase(2), 2000);
+    const t3 = setTimeout(() => setLogoPhase(3), 3000);
+    const t4 = setTimeout(() => {
+      onComplete?.();
+    }, 4000);
+    return () => [t1, t2, t3, t4].forEach(clearTimeout);
+  }, [onComplete]);
+
+  return (
+    <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+      {/* Subtle scanline texture */}
+      <div
+        className="absolute inset-0 pointer-events-none z-10"
+        style={{
+          backgroundImage:
+            'repeating-linear-gradient(to bottom, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 3px)',
+        }}
+      />
+
+      {/* Center glow — blooms when logoPhase >= 2 */}
+      <motion.div
+        className="absolute rounded-full pointer-events-none"
+        initial={{ opacity: 0, scale: 0.3 }}
+        animate={{
+          opacity: logoPhase >= 2 ? [0, 0.18, 0.1] : 0,
+          scale: logoPhase >= 2 ? [0.3, 1.6, 1.2] : 0.3,
+        }}
+        transition={{ duration: 1.4, ease: 'easeOut' }}
+        style={{
+          width: 420,
+          height: 420,
+          background:
+            'radial-gradient(circle, rgba(200,0,0,0.55) 0%, rgba(180,0,0,0.15) 45%, transparent 70%)',
+          filter: 'blur(30px)',
+        }}
+      />
+
+      {/* Persistent soft ambient glow once logo is visible */}
+      <motion.div
+        className="absolute rounded-full pointer-events-none"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: logoPhase >= 3 ? 0.07 : 0 }}
+        transition={{ duration: 1.2 }}
+        style={{
+          width: 600,
+          height: 600,
+          background:
+            'radial-gradient(circle, rgba(210,0,0,0.5) 0%, transparent 65%)',
+          filter: 'blur(60px)',
+        }}
+      />
+
+      {/* Main stack */}
+      <div className="relative z-20 flex flex-col items-center select-none">
+        {/* Honda Logo */}
+        <motion.div
+          className="relative flex items-center justify-center"
+          initial={{ opacity: 0, scale: 0.55 }}
+          animate={{
+            opacity: logoPhase >= 1 ? 1 : 0,
+            scale: logoPhase >= 1 ? 1 : 0.55,
+          }}
+          transition={{
+            duration: 1.5,
+            ease: [0.22, 1, 0.36, 1],
+          }}
+        >
+          {/* Glow placed BEHIND logo as a separate div, not on the image itself */}
+          <motion.div
+            className="absolute pointer-events-none rounded-full"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: logoPhase >= 2 ? 1 : 0 }}
+            transition={{ duration: 1.4 }}
+            style={{
+              width: 260,
+              height: 260,
+              background: 'radial-gradient(circle, rgba(200,0,0,0.35) 0%, rgba(160,0,0,0.12) 50%, transparent 70%)',
+              filter: 'blur(28px)',
+              zIndex: 0,
+            }}
+          />
+
+          <img
+            src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/user_699be97dec012b23d1ab481d/ab8fac882_honda-logo.png"
+            alt="Honda H"
+            style={{
+              width: 220,
+              height: 220,
+              objectFit: 'contain',
+              position: 'relative',
+              zIndex: 1,
+            }}
+          />
+        </motion.div>
+      </div>
+    </div>
+  );
+};
+
 export const BootSequence = ({ onComplete }) => {
   const [phase, setPhase] = useState('logo'); // logo, name, text, sweep, complete
   const [visibleSteps, setVisibleSteps] = useState([]);
-  const [sweepAngle, setSweepAngle] = useState(-135);
+  const [sweepAngle, setSweepAngle] = useState(-120);
   const [showK, setShowK] = useState(false);
 
-  // Phase 1: Logo display (2.5s)
-  useEffect(() => {
-    const timer = setTimeout(() => setPhase('name'), 2500);
-    return () => clearTimeout(timer);
-  }, []);
+  // Handle logo animation complete
+  const handleLogoComplete = () => {
+    setPhase('name');
+  };
 
   // Phase 2: Name animation - "Fran" fades, then "K" slams in
   useEffect(() => {
@@ -64,17 +172,17 @@ export const BootSequence = ({ onComplete }) => {
       if (progress < 0.5) {
         const t = progress * 2;
         const eased = 1 - Math.pow(1 - t, 3);
-        setSweepAngle(-135 + (270 * eased));
+        setSweepAngle(-120 + (240 * eased));
       } else {
         const t = (progress - 0.5) * 2;
         const eased = 1 - Math.pow(1 - t, 3);
-        setSweepAngle(135 - (270 * eased));
+        setSweepAngle(120 - (240 * eased));
       }
 
       if (progress < 1) {
         requestAnimationFrame(animate);
       } else {
-        setSweepAngle(-135);
+        setSweepAngle(-120);
         setTimeout(() => {
           setPhase('complete');
           onComplete?.();
@@ -91,33 +199,15 @@ export const BootSequence = ({ onComplete }) => {
         <motion.div
           className="fixed inset-0 z-50 flex flex-col items-center justify-center"
           style={{
-            background: 'radial-gradient(ellipse 90% 100% at 50% 35%, #1a1a1a 0%, #0a0a0a 30%, #000000 100%)'
+            background: '#080808'
           }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.6 }}
           data-testid="boot-sequence"
         >
-          {/* Logo phase - 10th Gen Honda style */}
+          {/* Logo phase - NEW Animated Honda Logo */}
           {phase === 'logo' && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 1.2, ease: 'easeOut' }}
-              className="flex flex-col items-center"
-            >
-              {/* Honda Frankenstein Logo - BIGGER */}
-              <motion.img 
-                src="/assets/gauges/honda-logo.png"
-                alt="Honda"
-                className="w-72 h-auto mb-8"
-                initial={{ filter: 'brightness(0)' }}
-                animate={{ filter: 'brightness(1)' }}
-                transition={{ duration: 1.5, ease: 'easeOut' }}
-                style={{
-                  filter: 'drop-shadow(0 0 60px rgba(255, 255, 255, 0.2))'
-                }}
-              />
-            </motion.div>
+            <HondaLogoAnimation onComplete={handleLogoComplete} />
           )}
 
           {/* Name phase - "FRAN" fades in, then "K" slams in aggressively */}
@@ -130,14 +220,14 @@ export const BootSequence = ({ onComplete }) => {
             >
               {/* Logo stays visible but smaller */}
               <motion.img 
-                src="/assets/gauges/honda-logo.png"
+                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/user_699be97dec012b23d1ab481d/ab8fac882_honda-logo.png"
                 alt="Honda"
                 className="w-56 h-auto mb-6"
                 initial={{ opacity: 1, y: 0 }}
                 animate={{ opacity: 0.9, y: -10 }}
                 transition={{ duration: 0.8 }}
                 style={{
-                  filter: 'drop-shadow(0 0 40px rgba(255, 255, 255, 0.15))'
+                  filter: 'drop-shadow(0 0 40px rgba(200, 0, 0, 0.4))'
                 }}
               />
               
@@ -210,7 +300,7 @@ export const BootSequence = ({ onComplete }) => {
             <div className="flex flex-col items-center">
               {/* Small logo */}
               <img 
-                src="/assets/gauges/honda-logo.png"
+                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/user_699be97dec012b23d1ab481d/ab8fac882_honda-logo.png"
                 alt="Honda"
                 className="w-32 h-auto mb-6 opacity-60"
               />
@@ -288,9 +378,9 @@ export const BootSequence = ({ onComplete }) => {
                 }}
                 initial={{ width: '0%' }}
                 animate={{ 
-                  width: phase === 'logo' ? '20%' : 
-                         phase === 'name' ? '45%' :
-                         phase === 'text' ? '70%' : 
+                  width: phase === 'logo' ? '25%' : 
+                         phase === 'name' ? '50%' :
+                         phase === 'text' ? '75%' : 
                          phase === 'sweep' ? '95%' : '100%'
                 }}
                 transition={{ duration: 0.6 }}
