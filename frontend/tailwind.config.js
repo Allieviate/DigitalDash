@@ -70,11 +70,37 @@ module.exports = {
   				to: {
   					height: '0'
   				}
+  			},
+  			'upshift': {
+  				'0%': {
+  					color: '#FFFFFF',
+  					transform: 'scale(1.2)',
+  					filter: 'drop-shadow(0 0 25px rgba(255,255,255,1))'
+  				},
+  				'100%': {
+  					color: '#DC2626',
+  					transform: 'scale(1.0)',
+  					filter: 'drop-shadow(0 0 0px rgba(255,255,255,0))'
+  				}
+  			},
+  			'downshift': {
+  				'0%': {
+  					color: '#FF0000',
+  					transform: 'scale(1.1)',
+  					filter: 'drop-shadow(0 0 25px rgba(255,0,0,1))'
+  				},
+  				'100%': {
+  					color: '#DC2626',
+  					transform: 'scale(1.0)',
+  					filter: 'drop-shadow(0 0 0px rgba(255,0,0,0))'
+  				}
   			}
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out'
+  			'accordion-up': 'accordion-up 0.2s ease-out',
+  			'upshift': 'upshift 250ms ease-out forwards',
+  			'downshift': 'downshift 250ms ease-out forwards'
   		}
   	}
   },
