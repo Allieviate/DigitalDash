@@ -196,10 +196,10 @@ const vtecProgress = inVtec
         </span>
       </div>
       
-      {/* x1000 RPM label - BELOW the RPM readout inside gauge face - BIGGER */}
+      {/* x1000 RPM label - BELOW the RPM readout inside gauge face - positioned from bottom */}
       <div 
-        className="absolute inset-0 flex flex-col items-center justify-center"
-        style={{ paddingTop: '32%' }}
+        className="absolute left-0 right-0 flex justify-center"
+        style={{ bottom: '38%' }}
       >
         <img 
           src="/assets/gauges/x1000-rpm.png" 
