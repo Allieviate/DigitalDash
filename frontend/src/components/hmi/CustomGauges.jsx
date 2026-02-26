@@ -158,7 +158,7 @@ const vtecProgress = inVtec
         />
       </div>
       
-      {/* VTEC Light Indicator - shows when in VTEC - BEHIND the needle (centered) */}
+      {/* VTEC Light Indicator - shows when in VTEC - UNDER the needle (needle passes over) */}
       {inVtec && (
         <div 
           className="absolute flex items-center justify-center"
@@ -166,7 +166,7 @@ const vtecProgress = inVtec
             top: '50%', 
             left: '50%', 
             transform: 'translate(-50%, -50%)',
-            zIndex: 5
+            zIndex: 1  /* Low z-index so needle passes over */
           }}
         >
           <span 
