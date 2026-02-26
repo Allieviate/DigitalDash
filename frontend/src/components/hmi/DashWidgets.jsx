@@ -129,16 +129,18 @@ export const DigitalSpeedGear = ({ className = '' }) => {
         
         {/* Current gear - 54px, with flash animation - URUS LAMBORGHINI STYLE */}
         <span 
-          className={`
-            font-orbitron font-bold text-center
-            ${flashType === 'up' ? 'animate-upshift' : ''}
-            ${flashType === 'down' ? 'animate-downshift' : ''}
-          `}
+          className="font-orbitron font-bold text-center"
           style={{ 
             width: '60px',
             fontSize: '54px',
-            // Color is handled by CSS animation, default to red when idle
-            color: !flashType ? '#DC2626' : undefined,
+            color: flashType === 'up' ? '#FFFFFF' : flashType === 'down' ? '#FF0000' : '#DC2626',
+            transform: flashType === 'up' ? 'scale(1.2)' : flashType === 'down' ? 'scale(1.1)' : 'scale(1.0)',
+            filter: flashType === 'up' 
+              ? 'drop-shadow(0 0 25px rgba(255,255,255,1)) drop-shadow(0 0 40px rgba(255,255,255,0.8))'
+              : flashType === 'down'
+              ? 'drop-shadow(0 0 25px rgba(255,0,0,1)) drop-shadow(0 0 40px rgba(255,0,0,0.8))'
+              : 'none',
+            transition: flashType ? 'none' : 'all 250ms ease-out',
           }}
           data-testid="current-gear"
           data-flash-type={flashType || 'idle'}
