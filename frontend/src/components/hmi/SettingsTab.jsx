@@ -41,14 +41,23 @@ const NAV_ITEMS = [
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function Settings() {
+export default function Settings({ onClose }) {
   const [activeTab, setActiveTab] = useState('diagnostics');
   const activeItem = NAV_ITEMS.find(n => n.id === activeTab);
   const ActiveContent = activeItem?.component ?? DiagnosticsTab;
 
+  // Handle close - use prop if provided, otherwise go back
+  const handleClose = () => {
+    if (onClose) {
+      onClose();
+    } else {
+      window.history.back();
+    }
+  };
+
   return (
     <div
-      className="w-full h-screen flex overflow-hidden"
+      className="fixed inset-0 z-50 w-full h-screen flex overflow-hidden"
       style={{ background: '#09090b', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}
     >
       {/* Scanline texture */}
