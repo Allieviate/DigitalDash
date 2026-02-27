@@ -131,39 +131,38 @@ export default function Settings() {
 
         {/* Back to Dash button */}
         <div style={{ padding: '16px 12px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <Link to={createPageUrl('Home')}>
-            <button
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                width: '100%',
-                padding: '11px 14px',
-                borderRadius: 6,
-                border: '1px solid rgba(255,255,255,0.08)',
-                background: 'transparent',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = 'rgba(204,0,0,0.15)';
-                e.currentTarget.style.borderColor = 'rgba(204,0,0,0.5)';
-                e.currentTarget.querySelector('span').style.color = '#fff';
-                e.currentTarget.querySelector('svg').style.color = '#CC0000';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = 'transparent';
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
-                e.currentTarget.querySelector('span').style.color = 'rgba(255,255,255,0.35)';
-                e.currentTarget.querySelector('svg').style.color = 'rgba(255,255,255,0.25)';
-              }}
-            >
-              <X size={14} style={{ color: 'rgba(255,255,255,0.25)', transition: 'color 0.2s' }} />
-              <span style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', fontWeight: 400, transition: 'color 0.2s' }}>
-                Back to Dash
-              </span>
-            </button>
-          </Link>
+          <button
+            onClick={() => window.history.back()}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              width: '100%',
+              padding: '11px 14px',
+              borderRadius: 6,
+              border: '1px solid rgba(255,255,255,0.08)',
+              background: 'transparent',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = 'rgba(204,0,0,0.15)';
+              e.currentTarget.style.borderColor = 'rgba(204,0,0,0.5)';
+              e.currentTarget.querySelector('span').style.color = '#fff';
+              e.currentTarget.querySelector('svg').style.color = '#CC0000';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
+              e.currentTarget.querySelector('span').style.color = 'rgba(255,255,255,0.35)';
+              e.currentTarget.querySelector('svg').style.color = 'rgba(255,255,255,0.25)';
+            }}
+          >
+            <X size={14} style={{ color: 'rgba(255,255,255,0.25)', transition: 'color 0.2s' }} />
+            <span style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', fontWeight: 400, transition: 'color 0.2s' }}>
+              Back to Dash
+            </span>
+          </button>
         </div>
       </aside>
 
