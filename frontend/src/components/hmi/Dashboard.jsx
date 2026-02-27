@@ -66,13 +66,13 @@ export const Dashboard = ({ onOpenSettings }) => {
       {/* Critical Warning Banner - Always on top */}
       <CriticalWarningBanner />
 
-      {/* Settings button - top right */}
+      {/* Settings button - top right - BIGGER for easier tapping */}
       <button
         onClick={onOpenSettings}
-        className="absolute top-4 right-4 z-20 touch-btn p-3 rounded-lg hover:bg-white/5 transition-colors"
+        className="absolute top-4 right-4 z-20 touch-btn p-4 rounded-lg hover:bg-white/5 transition-colors"
         data-testid="settings-btn"
       >
-        <Settings size={20} className="text-zinc-400 hover:text-white transition-colors" />
+        <Settings size={25} className="text-zinc-400 hover:text-white transition-colors" />
       </button>
 
       {/* Android Auto button - below settings (only when phone connected) */}
