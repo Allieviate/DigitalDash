@@ -3,16 +3,17 @@ import { useVehicleSignal } from '../../contexts/VehicleDataContext';
 
 const TurnIndicators = ({ visible = true }) => {
   // 1. Pulling live, high-speed telemetry from your Pub/Sub store
-  // Assuming your backend sends these as 1 (On) or 0 (Off) pulsing at the relay rate
-  const leftTurn = useVehicleSignal('leftTurn'); 
-  const rightTurn = useVehicleSignal('rightTurn');
-  const hazards = useVehicleSignal('hazards');
+  // Using the actual signal names from VehicleDataContext
+  const leftTurn = useVehicleSignal('turn_left'); 
+  const rightTurn = useVehicleSignal('turn_right');
+  // Note: hazards signal may not exist, default to false
+  const hazards = false; // Can be wired up when backend supports it
 
   if (!visible) return null;
 
   // 2. Hazards override individual signals (Both flash)
-  const leftOn = leftTurn === 1 || hazards === 1;
-  const rightOn = rightTurn === 1 || hazards === 1;
+  const leftOn = leftTurn === true || leftTurn === 1 || hazards;
+  const rightOn = rightTurn === true || rightTurn === 1 || hazards;
 
   return (
     <div className="flex items-center justify-between w-full h-full px-8 pointer-events-none">
