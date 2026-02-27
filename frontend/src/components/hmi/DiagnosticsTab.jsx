@@ -22,11 +22,17 @@ function getColor(key, value) {
 
 export default function DiagnosticsTab() {
   // ── Pulling directly from our Pub/Sub ECU Store ──
-  const coolant = useVehicleSignal('coolant') ?? 195;
-  const iat = useVehicleSignal('iat') ?? 95;
-  const battery = useVehicleSignal('battery') ?? 14.2;
-  const oilPressure = useVehicleSignal('oilPressure') ?? 45;
-  const faultCodes = useVehicleSignal('faultCodes') ?? [];
+  // Map to actual signal names from VehicleDataContext
+  const coolantC = useVehicleSignal('coolant_temp_c') ?? 85;
+  const batteryV = useVehicleSignal('battery_voltage') ?? 14.2;
+  
+  // These signals may not exist in context yet - use defaults
+  // Convert Celsius to Fahrenheit for display
+  const coolant = coolantC ? (coolantC * 9/5) + 32 : 195;
+  const iat = 95; // Intake air temp - not in current context
+  const battery = batteryV ?? 14.2;
+  const oilPressure = 45; // Not in current context
+  const faultCodes = []; // Not in current context
 
   // Group them for the map loop below
   const activeSignals = { coolant, iat, battery, oilPressure };
