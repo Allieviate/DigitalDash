@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { createPageUrl } from '@/utils';
 import { Link } from 'react-router-dom';
 import { X, Activity, LayoutGrid, Sliders, Wifi, ChevronRight } from 'lucide-react';
 import DiagnosticsTab from './DiagnosticsTab';
