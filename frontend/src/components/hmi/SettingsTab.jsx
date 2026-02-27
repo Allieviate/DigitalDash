@@ -191,3 +191,6 @@ export default function Settings() {
     </div>
   );
 }
+
+// Named export for compatibility with App.js
+export { Settings as SettingsPanel };
