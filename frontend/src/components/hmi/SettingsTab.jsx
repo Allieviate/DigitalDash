@@ -141,7 +141,7 @@ export default function Settings({ onClose }) {
         {/* Back to Dash button */}
         <div style={{ padding: '16px 12px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           <button
-            onClick={() => window.history.back()}
+            onClick={handleClose}
             style={{
               display: 'flex',
               alignItems: 'center',
