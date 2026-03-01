@@ -45,7 +45,7 @@ fi
 # Update apt with --allow-releaseinfo-change to handle repo changes
 apt-get update --allow-releaseinfo-change -o Acquire::AllowInsecureRepositories=true 2>/dev/null || apt-get update || true
 
-# Install OpenAuto dependencies
+# Install OpenAuto dependencies including Abseil (required by protobuf v30+)
 apt-get install -y \
     cmake \
     build-essential \
@@ -55,6 +55,7 @@ apt-get install -y \
     libssl-dev \
     libprotobuf-dev \
     protobuf-compiler \
+    libabsl-dev \
     libqt5multimedia5 \
     libqt5multimedia5-plugins \
     libqt5multimediawidgets5 \
@@ -83,6 +84,28 @@ apt-get install -y \
     || {
         echo -e "${YELLOW}Some packages may not be available, continuing...${NC}"
     }
+
+# If libabsl-dev is not available, build Abseil from source
+if ! dpkg -s libabsl-dev >/dev/null 2>&1; then
+    echo -e "${YELLOW}libabsl-dev not available, building Abseil from source...${NC}"
+    ABSEIL_DIR="/opt/abseil-cpp"
+    if [ ! -d "$ABSEIL_DIR" ]; then
+        git clone --depth 1 --branch 20240116.2 https://github.com/abseil/abseil-cpp.git "$ABSEIL_DIR"
+    fi
+    cd "$ABSEIL_DIR"
+    mkdir -p build && cd build
+    cmake -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+          -DABSL_BUILD_TESTING=OFF \
+          -DABSL_USE_GOOGLETEST_HEAD=OFF \
+          -DCMAKE_INSTALL_PREFIX=/usr/local \
+          ..
+    make -j$(nproc)
+    make install
+    ldconfig
+    cd /opt/openauto
+    echo -e "${GREEN}Abseil built and installed${NC}"
+fi
 
 # Re-enable MongoDB repo if it was disabled
 for f in /etc/apt/sources.list.d/mongodb*.list.disabled; do
