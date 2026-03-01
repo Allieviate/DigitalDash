@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Activity, LayoutGrid, Sliders, Wifi, ChevronRight } from 'lucide-react';
 import DiagnosticsTab from './DiagnosticsTab';
+import ConnectivityTab from './ConnectivityTab'
 
 const DashBuilderTab = () => (
   <div className="flex flex-col items-center justify-center h-full gap-3" style={{ color: 'rgba(255,255,255,0.15)' }}>
