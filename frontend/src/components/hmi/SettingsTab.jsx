@@ -1,16 +1,8 @@
 import React, { useState } from 'react';
 import { X, Activity, LayoutGrid, Sliders, Wifi, ChevronRight } from 'lucide-react';
 import DiagnosticsTab from './DiagnosticsTab';
-import ConnectivityTab from './ConnectivityTab'
-
-const DashBuilderTab = () => (
-  <div className="flex flex-col items-center justify-center h-full gap-3" style={{ color: 'rgba(255,255,255,0.15)' }}>
-    <LayoutGrid size={40} strokeWidth={1} />
-    <span style={{ fontFamily: 'Helvetica Neue, sans-serif', fontSize: 11, letterSpacing: '0.3em', textTransform: 'uppercase' }}>
-      Dash Builder — Coming Soon
-    </span>
-  </div>
-);
+import ConnectivityTab from './ConnectivityTab';
+import DashBuilderTab from './DashBuilderTab';
 
 // ── Vehicle Parameters Tab with RPM & Shift Light Controls ──
 const VehicleParamsTab = () => {
@@ -108,15 +100,6 @@ const VehicleParamsTab = () => {
     </div>
   );
 };
-
-const ConnectivityTab = () => (
-  <div className="flex flex-col items-center justify-center h-full gap-3" style={{ color: 'rgba(255,255,255,0.15)' }}>
-    <Wifi size={40} strokeWidth={1} />
-    <span style={{ fontFamily: 'Helvetica Neue, sans-serif', fontSize: 11, letterSpacing: '0.3em', textTransform: 'uppercase' }}>
-      Connectivity — Coming Soon
-    </span>
-  </div>
-);
 
 // ── Nav config ───────────────────────────────────────────────────────────────
 
