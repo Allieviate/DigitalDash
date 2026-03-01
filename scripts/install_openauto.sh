@@ -56,6 +56,8 @@ apt-get install -y \
     libprotobuf-dev \
     protobuf-compiler \
     libabsl-dev \
+    libgps-dev \
+    gpsd \
     libqt5multimedia5 \
     libqt5multimedia5-plugins \
     libqt5multimediawidgets5 \
