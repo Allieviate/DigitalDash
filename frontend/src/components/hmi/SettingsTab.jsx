@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { X, Activity, LayoutGrid, Sliders, Wifi, ChevronRight } from 'lucide-react';
 import DiagnosticsTab from './DiagnosticsTab';
 
@@ -12,9 +11,7 @@ const DashBuilderTab = () => (
   </div>
 );
 
-const VehicleParamsTab = () => (
-import React, { useState } from 'react';
-
+// ── Vehicle Parameters Tab with RPM & Shift Light Controls ──
 const VehicleParamsTab = () => {
   // Local state for our shift light parameters (Default K24 values)
   const [yellowShift, setYellowShift] = useState(7000);
@@ -52,7 +49,6 @@ const VehicleParamsTab = () => {
           outline: 'none',
           cursor: 'pointer'
         }}
-        // Adding a touch of inline CSS just to tint the thumb if supported
         className={`slider-${color.replace('#', '')}`}
       />
     </div>
@@ -70,19 +66,19 @@ const VehicleParamsTab = () => {
         <CustomSlider 
           label="Stage 1 (Yellow)" 
           value={yellowShift} min={3000} max={9000} step={100} 
-          onChange={setYellowShift} color="#FBBF24" // Amber
+          onChange={setYellowShift} color="#FBBF24"
         />
         
         <CustomSlider 
           label="Stage 2 (Red)" 
           value={redShift} min={3000} max={9000} step={100} 
-          onChange={setRedShift} color="#EF4444" // Honda Red
+          onChange={setRedShift} color="#EF4444"
         />
         
         <CustomSlider 
           label="Hard Redline" 
           value={redline} min={5000} max={10000} step={100} 
-          onChange={setRedline} color="#DC2626" // Deep Red
+          onChange={setRedline} color="#DC2626"
         />
       </div>
 
@@ -111,8 +107,6 @@ const VehicleParamsTab = () => {
     </div>
   );
 };
-
-export default VehicleParamsTab;
 
 const ConnectivityTab = () => (
   <div className="flex flex-col items-center justify-center h-full gap-3" style={{ color: 'rgba(255,255,255,0.15)' }}>
