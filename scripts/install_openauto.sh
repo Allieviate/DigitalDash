@@ -154,33 +154,25 @@ echo -e "${GREEN}[2/5] Build directory ready${NC}"
 
 # Step 3: Clone and build aasdk (Android Auto SDK)
 echo "[3/5] Building aasdk (Android Auto SDK)..."
-if [ ! -d "aasdk" ]; then
-    git clone --depth 1 https://github.com/opencardev/aasdk.git
-else
-    echo "aasdk already exists, pulling latest..."
-    cd aasdk && git pull || true
-    cd $OPENAUTO_DIR
-fi
+
+# Clean rebuild of aasdk to use new protobuf
+rm -rf /opt/openauto/aasdk 2>/dev/null || true
+rm -rf /usr/local/include/aap_protobuf 2>/dev/null || true
+rm -rf /usr/local/include/f1x 2>/dev/null || true
+rm -f /usr/local/lib/libaasdk*.so* 2>/dev/null || true
+
+cd $OPENAUTO_DIR
+git clone --depth 1 https://github.com/opencardev/aasdk.git
 
 cd aasdk
 mkdir -p build && cd build
 
-# Configure with Abseil path hints
+# Configure with local protobuf and Abseil
 cmake -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_PREFIX_PATH="/usr/local;/usr" \
+      -DCMAKE_PREFIX_PATH="/usr/local" \
+      -DProtobuf_ROOT=/usr/local \
       -Dabsl_DIR=/usr/local/lib/cmake/absl \
       ..
-
-# If cmake fails due to absl, try alternative approach
-if [ $? -ne 0 ]; then
-    echo -e "${YELLOW}Retrying cmake with bundled protobuf disabled...${NC}"
-    cd ..
-    rm -rf build
-    mkdir -p build && cd build
-    cmake -DCMAKE_BUILD_TYPE=Release \
-          -DAASDK_PROTO_SKIP_FETCH=ON \
-          ..
-fi
 
 make -j$(nproc)
 make install
