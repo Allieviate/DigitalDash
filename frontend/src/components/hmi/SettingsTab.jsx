@@ -13,13 +13,106 @@ const DashBuilderTab = () => (
 );
 
 const VehicleParamsTab = () => (
-  <div className="flex flex-col items-center justify-center h-full gap-3" style={{ color: 'rgba(255,255,255,0.15)' }}>
-    <Sliders size={40} strokeWidth={1} />
-    <span style={{ fontFamily: 'Helvetica Neue, sans-serif', fontSize: 11, letterSpacing: '0.3em', textTransform: 'uppercase' }}>
-      Vehicle Parameters — Coming Soon
-    </span>
-  </div>
-);
+import React, { useState } from 'react';
+
+const VehicleParamsTab = () => {
+  // Local state for our shift light parameters (Default K24 values)
+  const [yellowShift, setYellowShift] = useState(7000);
+  const [redShift, setRedShift] = useState(7800);
+  const [redline, setRedline] = useState(8500);
+
+  // Local state for Warning Toggles
+  const [warnCoolant, setWarnCoolant] = useState(true);
+  const [warnOil, setWarnOil] = useState(true);
+
+  // A helper component for our custom sliders
+  const CustomSlider = ({ label, value, min, max, step, onChange, color }) => (
+    <div style={{ marginBottom: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+        <span style={{ fontFamily: 'Helvetica Neue, sans-serif', fontSize: 10, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)' }}>
+          {label}
+        </span>
+        <span style={{ fontFamily: 'monospace', fontSize: 14, fontWeight: 'bold', color: color }}>
+          {value} RPM
+        </span>
+      </div>
+      <input 
+        type="range" 
+        min={min} 
+        max={max} 
+        step={step} 
+        value={value} 
+        onChange={(e) => onChange(Number(e.target.value))}
+        style={{
+          width: '100%',
+          appearance: 'none',
+          height: '4px',
+          background: 'rgba(255,255,255,0.1)',
+          borderRadius: '2px',
+          outline: 'none',
+          cursor: 'pointer'
+        }}
+        // Adding a touch of inline CSS just to tint the thumb if supported
+        className={`slider-${color.replace('#', '')}`}
+      />
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col gap-8 h-full">
+      
+      {/* ── RPM & Shift Lights Section ── */}
+      <div style={{ background: '#18181b', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '24px' }}>
+        <h3 style={{ fontFamily: 'Orbitron, sans-serif', fontSize: 16, color: '#fff', marginBottom: 20, letterSpacing: '0.1em' }}>
+          RPM & SHIFT LIGHTS
+        </h3>
+        
+        <CustomSlider 
+          label="Stage 1 (Yellow)" 
+          value={yellowShift} min={3000} max={9000} step={100} 
+          onChange={setYellowShift} color="#FBBF24" // Amber
+        />
+        
+        <CustomSlider 
+          label="Stage 2 (Red)" 
+          value={redShift} min={3000} max={9000} step={100} 
+          onChange={setRedShift} color="#EF4444" // Honda Red
+        />
+        
+        <CustomSlider 
+          label="Hard Redline" 
+          value={redline} min={5000} max={10000} step={100} 
+          onChange={setRedline} color="#DC2626" // Deep Red
+        />
+      </div>
+
+      {/* ── Warning Thresholds Section ── */}
+      <div style={{ background: '#18181b', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '24px' }}>
+        <h3 style={{ fontFamily: 'Orbitron, sans-serif', fontSize: 16, color: '#fff', marginBottom: 20, letterSpacing: '0.1em' }}>
+          WARNING THRESHOLDS
+        </h3>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+           <span style={{ fontFamily: 'Helvetica Neue, sans-serif', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
+             Flash Screen on High Coolant Temp ({'>'} 215°F)
+           </span>
+           <input type="checkbox" checked={warnCoolant} onChange={(e) => setWarnCoolant(e.target.checked)} style={{ transform: 'scale(1.5)', accentColor: '#EF4444' }}/>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+           <span style={{ fontFamily: 'Helvetica Neue, sans-serif', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
+             Flash Screen on Low Oil Pressure ({'<'} 15 PSI)
+           </span>
+           <input type="checkbox" checked={warnOil} onChange={(e) => setWarnOil(e.target.checked)} style={{ transform: 'scale(1.5)', accentColor: '#EF4444' }}/>
+        </div>
+
+      </div>
+
+    </div>
+  );
+};
+
+export default VehicleParamsTab;
 
 const ConnectivityTab = () => (
   <div className="flex flex-col items-center justify-center h-full gap-3" style={{ color: 'rgba(255,255,255,0.15)' }}>
