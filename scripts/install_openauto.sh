@@ -183,21 +183,23 @@ echo -e "${GREEN}[3/5] aasdk built successfully${NC}"
 
 # Step 4: Clone and build OpenAuto
 echo "[4/5] Building OpenAuto..."
-if [ ! -d "openauto" ]; then
-    git clone --depth 1 https://github.com/opencardev/openauto.git
-else
-    echo "openauto already exists, pulling latest..."
-    cd openauto && git pull || true
-    cd $OPENAUTO_DIR
-fi
+
+# Clean rebuild of openauto
+rm -rf /opt/openauto/openauto 2>/dev/null || true
+
+cd $OPENAUTO_DIR
+git clone --depth 1 https://github.com/opencardev/openauto.git
 
 cd openauto
 mkdir -p build && cd build
 
-# Build flags for Raspberry Pi 5 (ARM64)
+# Build flags for Raspberry Pi 5 (ARM64) with local protobuf
 cmake -DCMAKE_BUILD_TYPE=Release \
       -DRPI3_BUILD=FALSE \
       -DGST_BUILD=TRUE \
+      -DCMAKE_PREFIX_PATH="/usr/local" \
+      -DProtobuf_ROOT=/usr/local \
+      -Dabsl_DIR=/usr/local/lib/cmake/absl \
       -DCMAKE_CXX_FLAGS="-O2" \
       ..
       
