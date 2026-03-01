@@ -242,7 +242,7 @@ TouchscreenHeight=1200
 
 [USB]
 GuidanceAOAP=true
-SERVICE_EOF
+CONFIG_EOF
 
 # Set correct ownership
 chown -R "$CURRENT_USER:$CURRENT_USER" "$CURRENT_HOME/.config/openauto"
