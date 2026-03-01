@@ -4,7 +4,7 @@ import { useVehicleData } from '../../contexts/VehicleDataContext';
 import { RpmGauge, SpeedGauge } from './CustomGauges';
 import { ShiftLightsBar, DigitalSpeedGear } from './DashWidgets';
 import { WarningPanel, TurnSignalsRow, CriticalWarningBanner } from './WarningPanel';
-import { AndroidAutoPanel } from './AndroidAutoPanel';
+import AndroidAutoPanel from './AndroidAutoPanel';
 import { Settings, Activity, Smartphone } from 'lucide-react';
 
 export const Dashboard = ({ onOpenSettings }) => {
@@ -132,14 +132,13 @@ export const Dashboard = ({ onOpenSettings }) => {
             />
           </div>
 
-          {{/* CENTER GAP - Android Auto (MOVED UP) */}
-<div 
-  className="flex flex-col items-center justify-start mx-6 pt-10" 
-  style={{ width: '500px', height: '450px' }}
->
-  {/* The Panel handles its own active/inactive states now */}
-  <AndroidAutoPanel isActive={showAndroidAuto} />
-</div>
+          {/* CENTER GAP - Android Auto */}
+          <div 
+            className="flex flex-col items-center justify-start mx-6 pt-10" 
+            style={{ width: '500px', height: '450px' }}
+          >
+            <AndroidAutoPanel isActive={showAndroidAuto} />
+          </div>
 
           {/* RIGHT: Speed Gauge */}
           <div className="relative flex items-end justify-center">
