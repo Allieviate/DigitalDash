@@ -132,17 +132,14 @@ export const Dashboard = ({ onOpenSettings }) => {
             />
           </div>
 
-          {/* CENTER GAP - Android Auto (MOVED UP) */}
-          <div 
-            className="flex flex-col items-center justify-start mx-6 pt-10" 
-            style={{ width: '500px', height: '450px' }}
-          >
-            {showAndroidAuto ? (
-              <AndroidAutoPanel onClose={() => setShowAndroidAuto(false)} />
-            ) : (
-              <div className="w-full h-full" /> 
-            )}
-          </div>
+          {{/* CENTER GAP - Android Auto (MOVED UP) */}
+<div 
+  className="flex flex-col items-center justify-start mx-6 pt-10" 
+  style={{ width: '500px', height: '450px' }}
+>
+  {/* The Panel handles its own active/inactive states now */}
+  <AndroidAutoPanel isActive={showAndroidAuto} />
+</div>
 
           {/* RIGHT: Speed Gauge */}
           <div className="relative flex items-end justify-center">
