@@ -136,7 +136,24 @@ fi
 
 cd aasdk
 mkdir -p build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
+
+# Configure with Abseil path hints
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_PREFIX_PATH="/usr/local;/usr" \
+      -Dabsl_DIR=/usr/local/lib/cmake/absl \
+      ..
+
+# If cmake fails due to absl, try alternative approach
+if [ $? -ne 0 ]; then
+    echo -e "${YELLOW}Retrying cmake with bundled protobuf disabled...${NC}"
+    cd ..
+    rm -rf build
+    mkdir -p build && cd build
+    cmake -DCMAKE_BUILD_TYPE=Release \
+          -DAASDK_PROTO_SKIP_FETCH=ON \
+          ..
+fi
+
 make -j$(nproc)
 make install
 ldconfig
