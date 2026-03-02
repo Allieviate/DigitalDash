@@ -3,6 +3,8 @@ import { X, Activity, LayoutGrid, Sliders, Wifi, ChevronRight } from 'lucide-rea
 import DiagnosticsTab from './DiagnosticsTab';
 import ConnectivityTab from './ConnectivityTab';
 import DashBuilderTab from './DashBuilderTab';
+import { Settings2 } from 'lucide-react'; 
+import GeneralSettingsTab from './GeneralSettingsTab';
 
 // ── Vehicle Parameters Tab with RPM & Shift Light Controls ──
 const VehicleParamsTab = () => {
@@ -105,6 +107,7 @@ const VehicleParamsTab = () => {
 
 const NAV_ITEMS = [
   { id: 'diagnostics',  label: 'Live Diagnostics',    icon: Activity,    component: DiagnosticsTab },
+  { id: 'general',      label: 'General Settings',    icon: Settings2,   component: GeneralSettingsTab }, // <--- Right here
   { id: 'vehicle',      label: 'Vehicle Parameters',  icon: Sliders,     component: VehicleParamsTab },
   { id: 'connectivity', label: 'Connectivity',         icon: Wifi,        component: ConnectivityTab },
   { id: 'dash-builder', label: 'Dash Builder',         icon: LayoutGrid,  component: DashBuilderTab },
