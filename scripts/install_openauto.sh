@@ -208,13 +208,16 @@ git clone --depth 1 https://github.com/opencardev/openauto.git
 cd openauto
 mkdir -p build && cd build
 
+# Verify protobuf runtime_version.h exists (required by aasdk-generated headers)
+if [ ! -f "/usr/local/include/google/protobuf/runtime_version.h" ]; then
+    echo -e "${RED}ERROR: runtime_version.h not found - protobuf was not installed correctly${NC}"
+    echo "Expected at: /usr/local/include/google/protobuf/runtime_version.h"
+    exit 1
+fi
+
 cmake -DCMAKE_BUILD_TYPE=Release \
-      -DRPI3_BUILD=FALSE \
-      -DGST_BUILD=TRUE \
       -DCMAKE_PREFIX_PATH="/usr/local" \
-      -DProtobuf_ROOT=/usr/local \
-      -Dabsl_DIR=/usr/local/lib/cmake/absl \
-      -DCMAKE_CXX_FLAGS="-O2" \
+      -DCMAKE_CXX_FLAGS="-O2 -I/usr/local/include" \
       ..
 
 make -j$(nproc)
