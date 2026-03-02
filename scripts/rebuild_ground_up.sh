@@ -17,9 +17,13 @@ BACKEND_SERVICE="${SERVICE_PREFIX}-backend.service"
 FRONTEND_SERVICE="${SERVICE_PREFIX}-frontend.service"
 KIOSK_SERVICE="${SERVICE_PREFIX}-kiosk.service"
 
-echo "== FRANK ground-up rebuild =="
+echo "== FRANK ground-up rebuild (v1.1) =="
 echo "Project: $PROJECT_DIR"
 echo "Service prefix: $SERVICE_PREFIX"
+echo ""
+echo "NOTE: This rebuilds frontend/backend only."
+echo "      For Android Auto, run: sudo bash scripts/install_openauto.sh"
+echo ""
 
 # Stop services if present
 for svc in "$KIOSK_SERVICE" "$FRONTEND_SERVICE" "$BACKEND_SERVICE"; do
