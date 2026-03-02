@@ -34,9 +34,26 @@ echo -e "${YELLOW}Installing for user: $CURRENT_USER${NC}"
 echo ""
 
 # ============================================
-# STEP 0: Clean up old installations
+# STEP 0: Clean up ALL previous installations
 # ============================================
-echo "[0/7] Cleaning up old installations..."
+echo "[0/5] Cleaning up ALL previous installations..."
+
+echo -e "${YELLOW}Removing ALL old libraries from /usr/local...${NC}"
+
+# Remove ALL Abseil files (CRITICAL - causes conflict if present)
+rm -rf /usr/local/include/absl 2>/dev/null || true
+rm -rf /usr/local/lib/cmake/absl 2>/dev/null || true
+rm -rf /usr/local/lib/libabsl* 2>/dev/null || true
+rm -rf /usr/local/lib/pkgconfig/absl*.pc 2>/dev/null || true
+
+# Remove ALL Protobuf files (CRITICAL - aasdk uses FetchContent)
+rm -rf /usr/local/include/google/protobuf 2>/dev/null || true
+rm -rf /usr/local/include/google 2>/dev/null || true
+rm -rf /usr/local/lib/cmake/protobuf 2>/dev/null || true
+rm -rf /usr/local/lib/libprotobuf* 2>/dev/null || true
+rm -rf /usr/local/lib/libprotoc* 2>/dev/null || true
+rm -rf /usr/local/lib/pkgconfig/protobuf*.pc 2>/dev/null || true
+rm -f /usr/local/bin/protoc 2>/dev/null || true
 
 # Remove old aasdk and openauto headers/libraries
 rm -rf /usr/local/include/aap_protobuf 2>/dev/null || true
@@ -54,8 +71,9 @@ if [ -f /etc/apt/sources.list.d/mongodb*.list ]; then
     done
 fi
 
+# Refresh library cache after cleanup
 ldconfig
-echo -e "${GREEN}[0/7] Cleanup complete${NC}"
+echo -e "${GREEN}[0/5] Full cleanup complete - removed all old Abseil/Protobuf${NC}"
 
 # ============================================
 # STEP 1: Install system dependencies
