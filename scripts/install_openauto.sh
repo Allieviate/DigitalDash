@@ -156,22 +156,21 @@ git clone --depth 1 https://github.com/opencardev/aasdk.git
 cd aasdk
 mkdir -p build && cd build
 
+# Let aasdk use FetchContent for Abseil and Protobuf
+# Do NOT specify paths to /usr/local since we cleaned them
 cmake -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_PREFIX_PATH="/usr/local" \
-      -DProtobuf_ROOT=/usr/local \
-      -Dabsl_DIR=/usr/local/lib/cmake/absl \
       ..
 
 make -j$(nproc)
 make install
 ldconfig
 
-echo -e "${GREEN}[5/7] aasdk built and installed${NC}"
+echo -e "${GREEN}[3/5] aasdk built and installed${NC}"
 
 # ============================================
-# STEP 6: Build OpenAuto
+# STEP 4: Build OpenAuto
 # ============================================
-echo "[6/7] Building OpenAuto..."
+echo "[4/5] Building OpenAuto..."
 
 cd $OPENAUTO_DIR
 git clone --depth 1 https://github.com/opencardev/openauto.git
