@@ -108,16 +108,16 @@ if ! dpkg -s libabsl-dev >/dev/null 2>&1; then
     echo -e "${GREEN}Abseil built and installed${NC}"
 fi
 
-# Build protobuf from source (v25+ required for runtime_version.h)
-echo -e "${YELLOW}Building protobuf from source for compatibility...${NC}"
+# Build protobuf from source (v27+ required for runtime_version.h)
+echo -e "${YELLOW}Building protobuf v27.0 from source for compatibility...${NC}"
 PROTOBUF_DIR="/opt/protobuf"
 if [ ! -f "/usr/local/include/google/protobuf/runtime_version.h" ]; then
     rm -rf "$PROTOBUF_DIR"
     mkdir -p "$PROTOBUF_DIR"
     cd "$PROTOBUF_DIR"
     
-    # Download protobuf v25.3 (compatible version)
-    git clone --depth 1 --branch v25.3 https://github.com/protocolbuffers/protobuf.git .
+    # Download protobuf v27.0 (has runtime_version.h)
+    git clone --depth 1 --branch v27.0 https://github.com/protocolbuffers/protobuf.git .
     git submodule update --init --recursive
     
     mkdir -p build && cd build
@@ -130,7 +130,7 @@ if [ ! -f "/usr/local/include/google/protobuf/runtime_version.h" ]; then
     make -j$(nproc)
     make install
     ldconfig
-    echo -e "${GREEN}Protobuf v25.3 built and installed${NC}"
+    echo -e "${GREEN}Protobuf v27.0 built and installed${NC}"
 else
     echo -e "${GREEN}Protobuf already installed with runtime_version.h${NC}"
 fi
