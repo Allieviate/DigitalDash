@@ -1,84 +1,83 @@
-# Vehicle HMI Dashboard - PRD
+# FRANK Dashboard - Vehicle HMI Application
 
 ## Original Problem Statement
-Build an OEM+ grade vehicle HMI for 1989 Honda Accord with custom gauge assets, VTEC functionality, Android Auto integration, PS3-style breathing background, and URUS-style gear indicator.
+Build a custom vehicle HMI (Human-Machine Interface) dashboard intended to run on a Raspberry Pi, with animated gauges (RPM, speed, gear), a boot sequence, settings panels, and Android Auto functionality.
 
-## Latest Updates (Jan 7, 2026)
-1. **CRITICAL FIX**: Deployment issue resolved - Reduced polling from 33ms (30fps) to 200ms (5fps)
-2. Implemented WebSocket with HTTP polling fallback for production environments
-3. Fixed "OFFLINE" status race condition bug
-4. Android Auto panel moved UP (no longer blocking warning lights)
-5. x1000 RPM image moved BELOW the RPM digital readout
-6. Turn signals changed to clean automotive arrow SVG design
-7. Image rendering quality improved (reduced pixelation)
-8. Red background now gradually transitions from 86-120 mph (Type R mode)
-9. Real Android Auto DHU integration for Raspberry Pi 5 Linux
+## Core Requirements
+- Functional vehicle dashboard displaying RPM, speed, gear, and other data
+- Accurate gauge needle animations matching gauge face markings
+- Advanced gear shift animations (Lamborghini-style "pop and fade")
+- Animated boot sequence with Honda logo
+- Multi-tab settings panel (Diagnostics, Vehicle Parameters, Connectivity, Layout)
+- Android Auto support via OpenAuto installation script
+
+## User Personas
+- Primary: Car enthusiast installing custom dashboard on Raspberry Pi
+- Use case: Replace OEM dashboard with custom digital HMI
 
 ## Architecture
-- **Backend**: FastAPI + MongoDB + DHU Controller
-- **Frontend**: React with custom gauge components
-- **Data Flow**: WebSocket (preferred) with HTTP polling fallback at 200ms
-- **DHU Integration**: Subprocess management with X11 window control (wmctrl/xdotool)
-
-## What's Been Implemented
-
-### Dashboard Features
-- [x] Custom PNG gauge integration (user's WPF assets)
-- [x] RPM Gauge with VTEC glow and shift light
-- [x] Speed Gauge with needle animation
-- [x] RPM digital readout with x1000 label below
-- [x] Shift lights bar (7 LEDs, orangish-red color)
-- [x] URUS-style gear indicator (42px current, 22px prev/next at 45% opacity)
-- [x] Gear shift flash animations (white upshift, red downshift)
-- [x] PS3 breathing background with GRADUAL red transition (86-120 mph)
-- [x] Warning panel spread out at bottom (40px gaps)
-- [x] Clean automotive arrow SVG turn signals
-- [x] Boot sequence with Honda logo + gauge sweep
-- [x] Improved image rendering quality (GPU acceleration)
-- [x] **WebSocket with HTTP polling fallback (200ms interval)**
-- [x] **LIVE/OFFLINE connection status indicator**
-
-### Android Auto Integration
-- [x] Mock Android Auto panel (Maps, Music, Phone, Home)
-- [x] Panel positioned in center gap (not blocking warnings)
-- [x] DHU Controller for Raspberry Pi 5 Linux
-  - /api/dhu/start - Launch DHU with window config
-  - /api/dhu/stop - Clean termination
-  - /api/dhu/status - Check if running
-- [x] X11 window management (wmctrl/xdotool)
-- [x] Borderless window mode
-- [x] Automatic window positioning
-
-### Fonts
-- Orbitron Medium - Main dash displays (speed, RPM, gear)
-- Eurostar - Labels and headers
-
-## Raspberry Pi 5 Deployment Notes
-```bash
-# Install dependencies
-sudo apt-get install wmctrl xdotool
-
-# Set DHU path in .env
-DHU_PATH=/opt/android-auto/desktop-head-unit
-DHU_CONFIG=/opt/android-auto/dhu.ini
+```
+/app
+├── backend/
+│   └── main.py       # FastAPI server simulating vehicle data via WebSocket
+├── frontend/
+│   ├── src/
+│   │   ├── components/hmi/      # Core HMI components
+│   │   │   ├── settings/        # Settings panel tabs
+│   │   ├── contexts/
+│   │   │   └── VehicleDataContext.jsx
+│   │   └── App.js
+│   └── tailwind.config.js
+└── scripts/
+    ├── install_openauto.sh      # Android Auto installer (v3.0)
+    └── setup_pi.sh
 ```
 
-## Backlog
+## Tech Stack
+- Frontend: React, Tailwind CSS, Framer Motion
+- Backend: FastAPI (Python), WebSocket
+- Target: Raspberry Pi
 
-### P0 - User Will Add
-- [ ] Custom fuel gauge PNG
-- [ ] Custom coolant gauge PNG
+## What's Been Implemented
+- [x] Vehicle dashboard with RPM/Speed gauges
+- [x] Accurate needle sweep angles
+- [x] VTEC light positioning
+- [x] Gear shift "pop and fade" animation
+- [x] Boot sequence with animated Honda logo
+- [x] Settings panel with multiple tabs
+- [x] GeneralSettingsTab integration
+- [x] install_openauto.sh v3.0 (FetchContent approach)
 
-### P1 - Future
-- [ ] Real OBD-II/CAN bus integration
-- [ ] Phone detection via USB/Bluetooth
-- [ ] Actual Android Auto phone pairing
+## Pending Issues
 
-### P2 - Future
-- [ ] Data logging/export
-- [ ] Custom gauge import in settings
-- [ ] Audio warning alerts
+### P0: Android Auto Installation Script (USER VERIFICATION)
+- **Status**: Script updated to v3.0, awaiting user test on Pi
+- **Root Cause**: CMake target conflict - old Abseil/Protobuf in /usr/local conflicted with aasdk's FetchContent
+- **Fix**: v3.0 completely removes all old libraries before letting aasdk fetch its own
 
-## Test Reports
-- `/app/test_reports/iteration_4.json` - Latest (25/25 tests passed)
-- `/app/tests/test_vehicle_hmi_api.py` - Backend API tests
+### P1: Intermittent Turn Signal Glow Bug
+- **Status**: Enhanced CSS applied, may still be intermittent
+- **Next**: If persists, reimplement with SVG filters
+
+## Upcoming Tasks
+- Wire up "LAUNCH ANDROID AUTO / CARPLAY" button to backend
+- Display AndroidAutoPanel.jsx when service starts
+
+## Future/Backlog
+- Persist user settings to LocalStorage
+- Refactor install_openauto.sh into smaller helper scripts
+
+## Key API Endpoints
+- `/ws/vehicle-data` - WebSocket for vehicle data stream
+- `/api/diagnostics` - GET diagnostic values
+
+## Key Files
+- `scripts/install_openauto.sh` - Android Auto installer
+- `frontend/src/components/hmi/settings/SettingsTab.jsx` - Settings container
+- `frontend/src/components/hmi/GearIndicator.jsx` - Gear animation
+- `frontend/src/components/hmi/TurnIndicators.jsx` - Turn signal glow
+
+## Notes for Development
+- User environment is Raspberry Pi - cannot run build scripts here
+- User frequently pushes to GitHub - always pull latest before changes
+- GitHub: https://github.com/Allieviate/DigitalDash (branch: Version-3)
