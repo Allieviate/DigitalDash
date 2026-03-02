@@ -127,70 +127,12 @@ for f in /etc/apt/sources.list.d/mongodb*.list.disabled; do
     fi
 done
 
-echo -e "${GREEN}[1/7] System dependencies installed${NC}"
+echo -e "${GREEN}[1/5] System dependencies installed${NC}"
 
 # ============================================
-# STEP 2: Build Abseil from source
+# STEP 2: Create build directory
 # ============================================
-echo "[2/7] Building Abseil (Google's C++ library)..."
-
-ABSEIL_DIR="/opt/abseil-cpp"
-mkdir -p "$ABSEIL_DIR"
-cd "$ABSEIL_DIR"
-
-git clone --depth 1 --branch 20240116.2 https://github.com/abseil/abseil-cpp.git .
-
-mkdir -p build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-      -DABSL_BUILD_TESTING=OFF \
-      -DABSL_USE_GOOGLETEST_HEAD=OFF \
-      -DCMAKE_INSTALL_PREFIX=/usr/local \
-      ..
-
-make -j$(nproc)
-make install
-ldconfig
-
-echo -e "${GREEN}[2/7] Abseil built and installed${NC}"
-
-# ============================================
-# STEP 3: Build Protobuf v27.0 from source
-# (Required for runtime_version.h)
-# ============================================
-echo "[3/7] Building Protobuf v27.0 (required for aasdk)..."
-
-PROTOBUF_DIR="/opt/protobuf"
-mkdir -p "$PROTOBUF_DIR"
-cd "$PROTOBUF_DIR"
-
-git clone --depth 1 --branch v27.0 https://github.com/protocolbuffers/protobuf.git .
-git submodule update --init --recursive
-
-mkdir -p build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-      -Dprotobuf_BUILD_TESTS=OFF \
-      -Dprotobuf_ABSL_PROVIDER=package \
-      -DCMAKE_INSTALL_PREFIX=/usr/local \
-      ..
-
-make -j$(nproc)
-make install
-ldconfig
-
-# Verify runtime_version.h exists
-if [ -f "/usr/local/include/google/protobuf/runtime_version.h" ]; then
-    echo -e "${GREEN}[3/7] Protobuf v27.0 built and installed (runtime_version.h verified)${NC}"
-else
-    echo -e "${RED}ERROR: runtime_version.h not found after protobuf build${NC}"
-    exit 1
-fi
-
-# ============================================
-# STEP 4: Create build directory
-# ============================================
-echo "[4/7] Setting up OpenAuto build directory..."
+echo "[2/5] Setting up OpenAuto build directory..."
 
 OPENAUTO_DIR="/opt/openauto"
 mkdir -p $OPENAUTO_DIR
