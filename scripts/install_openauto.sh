@@ -138,12 +138,17 @@ OPENAUTO_DIR="/opt/openauto"
 mkdir -p $OPENAUTO_DIR
 cd $OPENAUTO_DIR
 
-echo -e "${GREEN}[4/7] Build directory ready${NC}"
+echo -e "${GREEN}[2/5] Build directory ready${NC}"
 
 # ============================================
-# STEP 5: Build aasdk (Android Auto SDK)
+# STEP 3: Build aasdk (Android Auto SDK)
+# NOTE: aasdk uses FetchContent to download
+# its own Abseil and Protobuf v30.0 - that's
+# why we cleaned /usr/local completely!
 # ============================================
-echo "[5/7] Building aasdk (Android Auto SDK)..."
+echo "[3/5] Building aasdk (Android Auto SDK)..."
+echo -e "${YELLOW}NOTE: This will download Abseil & Protobuf via FetchContent${NC}"
+echo -e "${YELLOW}This step takes 15-30 minutes on a Pi - please be patient${NC}"
 
 cd $OPENAUTO_DIR
 git clone --depth 1 https://github.com/opencardev/aasdk.git
