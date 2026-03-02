@@ -3,12 +3,14 @@
 # ============================================
 # OpenAuto Installation Script for Raspberry Pi 5
 # For FRANK Dashboard - Android Auto Support
+# Version 2.0 - Complete Build from Source
 # ============================================
 
 set -e
 
 echo "=========================================="
 echo "  OpenAuto Installer for FRANK Dashboard"
+echo "  Version 2.0 - Full Build from Source"
 echo "=========================================="
 echo ""
 
@@ -31,10 +33,20 @@ CURRENT_HOME=$(eval echo ~$CURRENT_USER)
 echo -e "${YELLOW}Installing for user: $CURRENT_USER${NC}"
 echo ""
 
-# Step 1: Fix potential MongoDB repo issues and install dependencies
-echo "[1/5] Installing dependencies..."
+# ============================================
+# STEP 0: Clean up old installations
+# ============================================
+echo "[0/7] Cleaning up old installations..."
 
-# Temporarily disable MongoDB repo if it exists (it has SHA1 key issues)
+# Remove old aasdk and openauto headers/libraries
+rm -rf /usr/local/include/aap_protobuf 2>/dev/null || true
+rm -rf /usr/local/include/f1x 2>/dev/null || true
+rm -rf /usr/local/lib/libaasdk* 2>/dev/null || true
+rm -rf /opt/openauto 2>/dev/null || true
+rm -rf /opt/protobuf 2>/dev/null || true
+rm -rf /opt/abseil-cpp 2>/dev/null || true
+
+# Disable MongoDB repo if it exists (has SHA1 key issues on newer systems)
 if [ -f /etc/apt/sources.list.d/mongodb*.list ]; then
     echo -e "${YELLOW}Temporarily disabling MongoDB repo (SHA1 key issue)...${NC}"
     for f in /etc/apt/sources.list.d/mongodb*.list; do
@@ -42,10 +54,16 @@ if [ -f /etc/apt/sources.list.d/mongodb*.list ]; then
     done
 fi
 
-# Update apt with --allow-releaseinfo-change to handle repo changes
+ldconfig
+echo -e "${GREEN}[0/7] Cleanup complete${NC}"
+
+# ============================================
+# STEP 1: Install system dependencies
+# ============================================
+echo "[1/7] Installing system dependencies..."
+
 apt-get update --allow-releaseinfo-change -o Acquire::AllowInsecureRepositories=true 2>/dev/null || apt-get update || true
 
-# Install OpenAuto dependencies including Abseil (required by protobuf v30+)
 apt-get install -y \
     cmake \
     build-essential \
@@ -53,9 +71,6 @@ apt-get install -y \
     libboost-all-dev \
     libusb-1.0-0-dev \
     libssl-dev \
-    libprotobuf-dev \
-    protobuf-compiler \
-    libabsl-dev \
     libgps-dev \
     gpsd \
     libqt5multimedia5 \
@@ -87,54 +102,6 @@ apt-get install -y \
         echo -e "${YELLOW}Some packages may not be available, continuing...${NC}"
     }
 
-# If libabsl-dev is not available, build Abseil from source
-if ! dpkg -s libabsl-dev >/dev/null 2>&1; then
-    echo -e "${YELLOW}libabsl-dev not available, building Abseil from source...${NC}"
-    ABSEIL_DIR="/opt/abseil-cpp"
-    if [ ! -d "$ABSEIL_DIR" ]; then
-        git clone --depth 1 --branch 20240116.2 https://github.com/abseil/abseil-cpp.git "$ABSEIL_DIR"
-    fi
-    cd "$ABSEIL_DIR"
-    mkdir -p build && cd build
-    cmake -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-          -DABSL_BUILD_TESTING=OFF \
-          -DABSL_USE_GOOGLETEST_HEAD=OFF \
-          -DCMAKE_INSTALL_PREFIX=/usr/local \
-          ..
-    make -j$(nproc)
-    make install
-    ldconfig
-    echo -e "${GREEN}Abseil built and installed${NC}"
-fi
-
-# Build protobuf from source (v27+ required for runtime_version.h)
-echo -e "${YELLOW}Building protobuf v27.0 from source for compatibility...${NC}"
-PROTOBUF_DIR="/opt/protobuf"
-if [ ! -f "/usr/local/include/google/protobuf/runtime_version.h" ]; then
-    rm -rf "$PROTOBUF_DIR"
-    mkdir -p "$PROTOBUF_DIR"
-    cd "$PROTOBUF_DIR"
-    
-    # Download protobuf v27.0 (has runtime_version.h)
-    git clone --depth 1 --branch v27.0 https://github.com/protocolbuffers/protobuf.git .
-    git submodule update --init --recursive
-    
-    mkdir -p build && cd build
-    cmake -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-          -Dprotobuf_BUILD_TESTS=OFF \
-          -Dprotobuf_ABSL_PROVIDER=package \
-          -DCMAKE_INSTALL_PREFIX=/usr/local \
-          ..
-    make -j$(nproc)
-    make install
-    ldconfig
-    echo -e "${GREEN}Protobuf v27.0 built and installed${NC}"
-else
-    echo -e "${GREEN}Protobuf already installed with runtime_version.h${NC}"
-fi
-
 # Re-enable MongoDB repo if it was disabled
 for f in /etc/apt/sources.list.d/mongodb*.list.disabled; do
     if [ -f "$f" ]; then
@@ -142,24 +109,81 @@ for f in /etc/apt/sources.list.d/mongodb*.list.disabled; do
     fi
 done
 
-echo -e "${GREEN}[1/5] Dependencies installed${NC}"
+echo -e "${GREEN}[1/7] System dependencies installed${NC}"
 
-# Step 2: Create build directory
-echo "[2/5] Setting up build directory..."
+# ============================================
+# STEP 2: Build Abseil from source
+# ============================================
+echo "[2/7] Building Abseil (Google's C++ library)..."
+
+ABSEIL_DIR="/opt/abseil-cpp"
+mkdir -p "$ABSEIL_DIR"
+cd "$ABSEIL_DIR"
+
+git clone --depth 1 --branch 20240116.2 https://github.com/abseil/abseil-cpp.git .
+
+mkdir -p build && cd build
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+      -DABSL_BUILD_TESTING=OFF \
+      -DABSL_USE_GOOGLETEST_HEAD=OFF \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      ..
+
+make -j$(nproc)
+make install
+ldconfig
+
+echo -e "${GREEN}[2/7] Abseil built and installed${NC}"
+
+# ============================================
+# STEP 3: Build Protobuf v27.0 from source
+# (Required for runtime_version.h)
+# ============================================
+echo "[3/7] Building Protobuf v27.0 (required for aasdk)..."
+
+PROTOBUF_DIR="/opt/protobuf"
+mkdir -p "$PROTOBUF_DIR"
+cd "$PROTOBUF_DIR"
+
+git clone --depth 1 --branch v27.0 https://github.com/protocolbuffers/protobuf.git .
+git submodule update --init --recursive
+
+mkdir -p build && cd build
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+      -Dprotobuf_BUILD_TESTS=OFF \
+      -Dprotobuf_ABSL_PROVIDER=package \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      ..
+
+make -j$(nproc)
+make install
+ldconfig
+
+# Verify runtime_version.h exists
+if [ -f "/usr/local/include/google/protobuf/runtime_version.h" ]; then
+    echo -e "${GREEN}[3/7] Protobuf v27.0 built and installed (runtime_version.h verified)${NC}"
+else
+    echo -e "${RED}ERROR: runtime_version.h not found after protobuf build${NC}"
+    exit 1
+fi
+
+# ============================================
+# STEP 4: Create build directory
+# ============================================
+echo "[4/7] Setting up OpenAuto build directory..."
+
 OPENAUTO_DIR="/opt/openauto"
 mkdir -p $OPENAUTO_DIR
 cd $OPENAUTO_DIR
 
-echo -e "${GREEN}[2/5] Build directory ready${NC}"
+echo -e "${GREEN}[4/7] Build directory ready${NC}"
 
-# Step 3: Clone and build aasdk (Android Auto SDK)
-echo "[3/5] Building aasdk (Android Auto SDK)..."
-
-# Clean rebuild of aasdk to use new protobuf
-rm -rf /opt/openauto/aasdk 2>/dev/null || true
-rm -rf /usr/local/include/aap_protobuf 2>/dev/null || true
-rm -rf /usr/local/include/f1x 2>/dev/null || true
-rm -f /usr/local/lib/libaasdk*.so* 2>/dev/null || true
+# ============================================
+# STEP 5: Build aasdk (Android Auto SDK)
+# ============================================
+echo "[5/7] Building aasdk (Android Auto SDK)..."
 
 cd $OPENAUTO_DIR
 git clone --depth 1 https://github.com/opencardev/aasdk.git
@@ -167,7 +191,6 @@ git clone --depth 1 https://github.com/opencardev/aasdk.git
 cd aasdk
 mkdir -p build && cd build
 
-# Configure with local protobuf and Abseil
 cmake -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_PREFIX_PATH="/usr/local" \
       -DProtobuf_ROOT=/usr/local \
@@ -177,15 +200,13 @@ cmake -DCMAKE_BUILD_TYPE=Release \
 make -j$(nproc)
 make install
 ldconfig
-cd $OPENAUTO_DIR
 
-echo -e "${GREEN}[3/5] aasdk built successfully${NC}"
+echo -e "${GREEN}[5/7] aasdk built and installed${NC}"
 
-# Step 4: Clone and build OpenAuto
-echo "[4/5] Building OpenAuto..."
-
-# Clean rebuild of openauto
-rm -rf /opt/openauto/openauto 2>/dev/null || true
+# ============================================
+# STEP 6: Build OpenAuto
+# ============================================
+echo "[6/7] Building OpenAuto..."
 
 cd $OPENAUTO_DIR
 git clone --depth 1 https://github.com/opencardev/openauto.git
@@ -193,7 +214,6 @@ git clone --depth 1 https://github.com/opencardev/openauto.git
 cd openauto
 mkdir -p build && cd build
 
-# Build flags for Raspberry Pi 5 (ARM64) with local protobuf
 cmake -DCMAKE_BUILD_TYPE=Release \
       -DRPI3_BUILD=FALSE \
       -DGST_BUILD=TRUE \
@@ -202,13 +222,15 @@ cmake -DCMAKE_BUILD_TYPE=Release \
       -Dabsl_DIR=/usr/local/lib/cmake/absl \
       -DCMAKE_CXX_FLAGS="-O2" \
       ..
-      
+
 make -j$(nproc)
 
-echo -e "${GREEN}[4/5] OpenAuto built successfully${NC}"
+echo -e "${GREEN}[6/7] OpenAuto built successfully${NC}"
 
-# Step 5: Create launcher and configuration
-echo "[5/5] Creating launcher and configuration..."
+# ============================================
+# STEP 7: Create launcher and configuration
+# ============================================
+echo "[7/7] Creating launcher and configuration..."
 
 # Create launcher script
 cat > /usr/local/bin/openauto-launcher << 'LAUNCHER_EOF'
@@ -247,7 +269,7 @@ LAUNCHER_EOF
 chmod +x /usr/local/bin/openauto-launcher
 
 # Create systemd service for OpenAuto (optional - can be enabled manually)
-cat > /etc/systemd/system/openauto.service << 'SERVICE_EOF'
+cat > /etc/systemd/system/openauto.service << SERVICE_EOF
 [Unit]
 Description=OpenAuto Android Auto
 After=graphical-session.target pulseaudio.service
@@ -255,7 +277,7 @@ Wants=pulseaudio.service
 
 [Service]
 Type=simple
-User=CURRENT_USER_PLACEHOLDER
+User=$CURRENT_USER
 Environment=DISPLAY=:0
 Environment=QT_QPA_PLATFORM=eglfs
 ExecStart=/usr/local/bin/openauto-launcher
@@ -265,9 +287,6 @@ RestartSec=3
 [Install]
 WantedBy=graphical-session.target
 SERVICE_EOF
-
-# Replace placeholder with actual user
-sed -i "s/CURRENT_USER_PLACEHOLDER/$CURRENT_USER/g" /etc/systemd/system/openauto.service
 
 # Create OpenAuto config directory and config file
 mkdir -p "$CURRENT_HOME/.config/openauto"
@@ -322,6 +341,14 @@ SUBSYSTEM=="usb", ATTR{idVendor}=="1004", MODE="0666", GROUP="plugdev"
 SUBSYSTEM=="usb", ATTR{idVendor}=="0fce", MODE="0666", GROUP="plugdev"
 SUBSYSTEM=="usb", ATTR{idVendor}=="05c6", MODE="0666", GROUP="plugdev"
 SUBSYSTEM=="usb", ATTR{idVendor}=="2a70", MODE="0666", GROUP="plugdev"
+# OnePlus
+SUBSYSTEM=="usb", ATTR{idVendor}=="2a70", MODE="0666", GROUP="plugdev"
+# Xiaomi
+SUBSYSTEM=="usb", ATTR{idVendor}=="2717", MODE="0666", GROUP="plugdev"
+# Huawei
+SUBSYSTEM=="usb", ATTR{idVendor}=="12d1", MODE="0666", GROUP="plugdev"
+# Pixel/Google
+SUBSYSTEM=="usb", ATTR{idVendor}=="18d1", MODE="0666", GROUP="plugdev"
 UDEV_EOF
 
 # Reload udev rules
@@ -331,15 +358,21 @@ udevadm trigger
 # Add user to required groups
 usermod -a -G plugdev,audio,video "$CURRENT_USER" 2>/dev/null || true
 
-echo -e "${GREEN}[5/5] Configuration complete${NC}"
-
 # Reload systemd
 systemctl daemon-reload
+
+echo -e "${GREEN}[7/7] Configuration complete${NC}"
 
 echo ""
 echo -e "${GREEN}==========================================${NC}"
 echo -e "${GREEN}  OpenAuto Installation Complete!${NC}"
 echo -e "${GREEN}==========================================${NC}"
+echo ""
+echo "Build Summary:"
+echo "  - Abseil: v20240116.2"
+echo "  - Protobuf: v27.0"
+echo "  - aasdk: latest"
+echo "  - OpenAuto: latest"
 echo ""
 echo "To test manually, run:"
 echo -e "  ${YELLOW}openauto-launcher${NC}"
@@ -354,4 +387,6 @@ echo -e "${YELLOW}IMPORTANT:${NC}"
 echo "1. Connect your Android phone via USB"
 echo "2. Enable 'Android Auto' in your phone's Developer Options"
 echo "3. Accept the connection prompt on your phone"
+echo ""
+echo -e "${GREEN}Installation took approximately $(($SECONDS / 60)) minutes${NC}"
 echo ""
