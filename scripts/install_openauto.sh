@@ -3,7 +3,18 @@
 # ============================================
 # OpenAuto Installation Script for Raspberry Pi 5
 # For FRANK Dashboard - Android Auto Support
-# Version 2.0 - Complete Build from Source
+# Version 3.0 - Let aasdk handle dependencies
+# ============================================
+#
+# KEY FIX (v3.0): The aasdk project uses CMake FetchContent
+# to download and build its own Abseil and Protobuf (v30.0).
+# Previous versions tried to pre-install these, which caused
+# CMake conflicts ("targets already defined").
+#
+# This version:
+# 1. Completely removes any old Abseil/Protobuf from /usr/local
+# 2. Lets aasdk download and build everything via FetchContent
+# 3. Builds OpenAuto against the aasdk-provided libraries
 # ============================================
 
 set -e
