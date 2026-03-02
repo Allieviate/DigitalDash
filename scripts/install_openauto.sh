@@ -78,7 +78,7 @@ echo -e "${GREEN}[0/5] Full cleanup complete - removed all old Abseil/Protobuf${
 # ============================================
 # STEP 1: Install system dependencies
 # ============================================
-echo "[1/7] Installing system dependencies..."
+echo "[1/5] Installing system dependencies..."
 
 apt-get update --allow-releaseinfo-change -o Acquire::AllowInsecureRepositories=true 2>/dev/null || apt-get update || true
 
@@ -189,12 +189,12 @@ cmake -DCMAKE_BUILD_TYPE=Release \
 
 make -j$(nproc)
 
-echo -e "${GREEN}[6/7] OpenAuto built successfully${NC}"
+echo -e "${GREEN}[4/5] OpenAuto built successfully${NC}"
 
 # ============================================
-# STEP 7: Create launcher and configuration
+# STEP 5: Create launcher and configuration
 # ============================================
-echo "[7/7] Creating launcher and configuration..."
+echo "[5/5] Creating launcher and configuration..."
 
 # Create launcher script
 cat > /usr/local/bin/openauto-launcher << 'LAUNCHER_EOF'
@@ -325,7 +325,7 @@ usermod -a -G plugdev,audio,video "$CURRENT_USER" 2>/dev/null || true
 # Reload systemd
 systemctl daemon-reload
 
-echo -e "${GREEN}[7/7] Configuration complete${NC}"
+echo -e "${GREEN}[5/5] Configuration complete${NC}"
 
 echo ""
 echo -e "${GREEN}==========================================${NC}"
