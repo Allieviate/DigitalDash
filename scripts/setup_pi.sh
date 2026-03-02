@@ -379,6 +379,7 @@ Type=simple
 User=$USER
 WorkingDirectory=$PROJECT_DIR/backend
 Environment="PATH=$PROJECT_DIR/backend/venv/bin"
+EnvironmentFile=$PROJECT_DIR/backend/.env
 ExecStart=$PROJECT_DIR/backend/venv/bin/uvicorn server:app --host 0.0.0.0 --port 8001
 Restart=always
 RestartSec=3
