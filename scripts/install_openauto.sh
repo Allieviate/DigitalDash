@@ -176,6 +176,25 @@ make -j$(nproc)
 make install
 ldconfig
 
+# CRITICAL: Install the FetchContent-built protobuf so OpenAuto can find it
+echo -e "${YELLOW}Installing protobuf from aasdk FetchContent build...${NC}"
+if [ -d "/opt/openauto/aasdk/build/_deps/protobuf-build" ]; then
+    cd /opt/openauto/aasdk/build/_deps/protobuf-build
+    make install
+    ldconfig
+    echo -e "${GREEN}Protobuf installed from FetchContent build${NC}"
+else
+    echo -e "${RED}Warning: Could not find protobuf build directory${NC}"
+fi
+
+# Also install abseil if it was built
+if [ -d "/opt/openauto/aasdk/build/_deps/abseil-cpp-build" ]; then
+    cd /opt/openauto/aasdk/build/_deps/abseil-cpp-build
+    make install
+    ldconfig
+    echo -e "${GREEN}Abseil installed from FetchContent build${NC}"
+fi
+
 echo -e "${GREEN}[3/5] aasdk built and installed${NC}"
 
 # ============================================
