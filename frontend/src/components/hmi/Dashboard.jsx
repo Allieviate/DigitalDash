@@ -96,12 +96,20 @@ export const Dashboard = ({ onOpenSettings }) => {
       <div className="absolute top-5 right-28 z-20 flex items-center gap-2">
         <Activity 
           size={14} 
-          className={isConnected ? 'text-green-500' : 'text-red-500'}
+          className={isConnected ? 'text-green-500 animate-pulse' : 'text-red-500'}
         />
-        <span className="text-xs uppercase tracking-wider text-zinc-500 font-orbitron">
+        <span className={`text-xs uppercase tracking-wider font-orbitron ${isConnected ? 'text-zinc-500' : 'text-red-400'}`}>
           {isConnected ? 'LIVE' : 'OFFLINE'}
         </span>
       </div>
+
+      {/* Offline warning banner */}
+      {!isConnected && (
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-30 bg-red-900/80 border border-red-500/50 rounded-lg px-4 py-2 backdrop-blur-sm">
+          <p className="text-red-200 text-sm font-medium">Backend Offline</p>
+          <p className="text-red-300/70 text-xs">Check: sudo systemctl status frank-backend</p>
+        </div>
+      )}
 
       {/* Main Layout */}
       <div className="absolute inset-0">
