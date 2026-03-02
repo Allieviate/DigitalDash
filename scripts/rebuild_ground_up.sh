@@ -1,4 +1,12 @@
 #!/bin/bash
+# ============================================
+# FRANK Dashboard - Ground-Up Rebuild Script
+# Version 1.1 - Uses yarn for frontend
+# ============================================
+# Rebuilds backend venv and frontend from scratch.
+# Does NOT touch OpenAuto - use install_openauto.sh for that.
+# ============================================
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
