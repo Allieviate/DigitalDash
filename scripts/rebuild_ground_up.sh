@@ -45,8 +45,8 @@ cat > .env <<'ENVEOF'
 REACT_APP_BACKEND_URL=http://localhost:8001
 ENVEOF
 
-npm install --legacy-peer-deps
-npm run build
+yarn install
+yarn build
 
 # Restart services if present
 for svc in "$BACKEND_SERVICE" "$FRONTEND_SERVICE" "$KIOSK_SERVICE"; do
