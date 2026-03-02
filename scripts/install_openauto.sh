@@ -3,7 +3,7 @@
 # ============================================
 # OpenAuto Installation Script for Raspberry Pi 5
 # For FRANK Dashboard - Android Auto Support
-# Version 3.0 - Let aasdk handle dependencies
+# Version 3.1 - Install FetchContent deps
 # ============================================
 #
 # KEY FIX (v3.0): The aasdk project uses CMake FetchContent
@@ -21,7 +21,7 @@ set -e
 
 echo "=========================================="
 echo "  OpenAuto Installer for FRANK Dashboard"
-echo "  Version 3.0 - FetchContent Build"
+echo "  Version 3.1 - FetchContent Build"
 echo "=========================================="
 echo ""
 
