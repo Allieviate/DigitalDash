@@ -21,7 +21,7 @@ set -e
 
 echo "=========================================="
 echo "  OpenAuto Installer for FRANK Dashboard"
-echo "  Version 2.0 - Full Build from Source"
+echo "  Version 3.0 - FetchContent Build"
 echo "=========================================="
 echo ""
 
