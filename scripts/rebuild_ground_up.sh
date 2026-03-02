@@ -57,6 +57,12 @@ cat > .env <<'ENVEOF'
 REACT_APP_BACKEND_URL=http://localhost:8001
 ENVEOF
 
+# Ensure yarn is available
+if ! command -v yarn &> /dev/null; then
+    echo "Installing yarn..."
+    sudo npm install -g yarn
+fi
+
 yarn install
 yarn build
 
