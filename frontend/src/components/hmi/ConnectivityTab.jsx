@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { Wifi, Bluetooth, Volume2, Smartphone } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Wifi, Bluetooth, Volume2, Smartphone, Loader2 } from 'lucide-react';
+
+const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
 // ── Shared style constants ────────────────────────────────────────────────────
 
@@ -193,6 +195,69 @@ export default function ConnectivityTab() {
   const [bluetoothEnabled, setBluetoothEnabled] = useState(true);
   const [volume, setVolume]                     = useState(72);
   const [projectionLaunched, setProjectionLaunched] = useState(false);
+  const [projectionLoading, setProjectionLoading] = useState(false);
+  const [projectionError, setProjectionError] = useState(null);
+
+  // Check OpenAuto status on mount
+  useEffect(() => {
+    checkDHUStatus();
+  }, []);
+
+  const checkDHUStatus = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/dhu/status`);
+      const data = await response.json();
+      setProjectionLaunched(data.status === 'running');
+    } catch (err) {
+      console.error('Failed to check DHU status:', err);
+    }
+  };
+
+  const handleProjectionToggle = async () => {
+    setProjectionLoading(true);
+    setProjectionError(null);
+
+    try {
+      if (projectionLaunched) {
+        // Stop OpenAuto
+        const response = await fetch(`${API_URL}/api/dhu/stop`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        
+        if (data.status === 'stopped' || data.status === 'error') {
+          setProjectionLaunched(false);
+        }
+      } else {
+        // Start OpenAuto - centered position for overlay
+        const response = await fetch(`${API_URL}/api/dhu/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            x: 640,      // Centered for 1920 width display
+            y: 160,      // Below top bar
+            width: 640,
+            height: 480,
+            borderless: true,
+            alwaysOnTop: true
+          })
+        });
+        const data = await response.json();
+        
+        if (data.status === 'running') {
+          setProjectionLaunched(true);
+        } else if (data.status === 'error') {
+          setProjectionError(data.message);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to toggle projection:', err);
+      setProjectionError('Failed to connect to backend');
+    } finally {
+      setProjectionLoading(false);
+    }
+  };
 
   return (
     <div style={{ maxWidth: 600 }}>
@@ -228,7 +293,9 @@ export default function ConnectivityTab() {
 
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 20, marginTop: 4 }}>
           <button
-            onClick={() => setProjectionLaunched(v => !v)}
+            onClick={handleProjectionToggle}
+            disabled={projectionLoading}
+            data-testid="projection-toggle-btn"
             style={{
               width: '100%',
               padding: '14px 24px',
@@ -239,22 +306,27 @@ export default function ConnectivityTab() {
               background: projectionLaunched
                 ? 'rgba(37,99,235,0.25)'
                 : 'rgba(37,99,235,0.08)',
-              cursor: 'pointer',
+              cursor: projectionLoading ? 'wait' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: 12,
               transition: 'all 0.2s ease',
               boxShadow: projectionLaunched ? '0 0 20px rgba(37,99,235,0.35)' : 'none',
+              opacity: projectionLoading ? 0.7 : 1,
             }}
             onMouseEnter={e => {
-              if (!projectionLaunched) e.currentTarget.style.background = 'rgba(37,99,235,0.15)';
+              if (!projectionLaunched && !projectionLoading) e.currentTarget.style.background = 'rgba(37,99,235,0.15)';
             }}
             onMouseLeave={e => {
-              if (!projectionLaunched) e.currentTarget.style.background = 'rgba(37,99,235,0.08)';
+              if (!projectionLaunched && !projectionLoading) e.currentTarget.style.background = 'rgba(37,99,235,0.08)';
             }}
           >
-            <Smartphone size={16} style={{ color: projectionLaunched ? '#60A5FA' : '#2563EB' }} />
+            {projectionLoading ? (
+              <Loader2 size={16} style={{ color: '#2563EB', animation: 'spin 1s linear infinite' }} />
+            ) : (
+              <Smartphone size={16} style={{ color: projectionLaunched ? '#60A5FA' : '#2563EB' }} />
+            )}
             <span style={{
               fontFamily: 'Helvetica Neue, sans-serif',
               fontSize: 11,
@@ -264,9 +336,28 @@ export default function ConnectivityTab() {
               color: projectionLaunched ? '#93C5FD' : '#2563EB',
               transition: 'color 0.2s',
             }}>
-              {projectionLaunched ? 'Projection Active — Tap to Disconnect' : 'Launch Android Auto / CarPlay'}
+              {projectionLoading 
+                ? (projectionLaunched ? 'Stopping...' : 'Launching...') 
+                : (projectionLaunched ? 'Projection Active — Tap to Disconnect' : 'Launch Android Auto / CarPlay')}
             </span>
           </button>
+          
+          {/* Error message */}
+          {projectionError && (
+            <div style={{
+              marginTop: 12,
+              padding: '10px 14px',
+              background: 'rgba(220, 38, 38, 0.15)',
+              border: '1px solid rgba(220, 38, 38, 0.3)',
+              borderRadius: 6,
+              color: '#FCA5A5',
+              fontSize: 11,
+              fontFamily: 'Helvetica Neue, sans-serif',
+              letterSpacing: '0.03em',
+            }}>
+              {projectionError}
+            </div>
+          )}
         </div>
       </div>
 
@@ -282,9 +373,17 @@ export default function ConnectivityTab() {
           borderRadius: 3,
           padding: '4px 10px',
         }}>
-          Values saved locally — SettingsContext sync coming in Step 5
+          OpenAuto launches as overlay — use wmctrl for window control
         </span>
       </div>
+      
+      {/* Spinner animation */}
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
