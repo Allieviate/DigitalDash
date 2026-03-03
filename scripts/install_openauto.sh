@@ -63,6 +63,14 @@ rm -rf /usr/local/include/aap_protobuf 2>/dev/null || true
 rm -rf /usr/local/lib/libaasdk* 2>/dev/null || true
 rm -rf /usr/local/lib/libaap_protobuf* 2>/dev/null || true
 
+# Disable MongoDB repo if it exists (SHA1 key issue)
+if ls /etc/apt/sources.list.d/mongodb*.list 1>/dev/null 2>&1; then
+    echo -e "${YELLOW}Disabling MongoDB repo (SHA1 key expired)...${NC}"
+    for f in /etc/apt/sources.list.d/mongodb*.list; do
+        mv "$f" "$f.disabled" 2>/dev/null || true
+    done
+fi
+
 # Refresh library cache
 ldconfig
 
