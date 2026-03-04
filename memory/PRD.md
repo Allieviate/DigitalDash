@@ -3,13 +3,19 @@
 ## Original Problem Statement
 Build a custom vehicle HMI (Human-Machine Interface) dashboard intended to run on a Raspberry Pi 5, with animated gauges (RPM, speed, gear), a boot sequence, settings panels, and Android Auto functionality.
 
-## Core Requirements
-- Functional vehicle dashboard displaying RPM, speed, gear, and other data
-- Accurate gauge needle animations matching gauge face markings
-- Advanced gear shift animations (Lamborghini-style "pop and fade")
-- Animated boot sequence with Honda logo
-- Multi-tab settings panel (Diagnostics, Vehicle Parameters, Connectivity, Layout)
-- Android Auto support via OpenAuto
+## What Was Working Before (Version 2)
+Based on the recovered zip file, Android Auto **was working** using:
+- `opencardev/aasdk` and `opencardev/openauto` repos
+- System protobuf (`apt install libprotobuf-dev`) - NOT FetchContent
+- Build flags: `-DRPI3_BUILD=FALSE -DGST_BUILD=TRUE`
+- Simple approach without complex protobuf source builds
+
+## Current Solution (Version 8.0)
+The `install_openauto.sh` script now uses the **original working method**:
+1. Uses system protobuf from apt
+2. Tries opencardev repos first, openDsh as fallback
+3. Uses `-DRPI3_BUILD=FALSE -DGST_BUILD=TRUE` for Pi 5
+4. Creates unified launchers: `openauto-launcher`, `android-auto`, `openauto`
 
 ## Architecture
 ```
@@ -17,64 +23,14 @@ Build a custom vehicle HMI (Human-Machine Interface) dashboard intended to run o
 ├── backend/
 │   └── server.py       # FastAPI + WebSocket + DHU Controller
 ├── frontend/
-│   ├── src/
-│   │   ├── components/hmi/      # Core HMI components
-│   │   │   ├── settings/        # Settings panel tabs
-│   │   │   ├── ConnectivityTab.jsx  # Android Auto launch button
-│   │   ├── contexts/
-│   │   │   └── VehicleDataContext.js
-│   │   └── App.js
-│   └── tailwind.config.js
+│   └── src/components/hmi/
+│       └── ConnectivityTab.jsx  # Android Auto launch button
 └── scripts/
-    ├── install_openauto.sh      # v5.0 - openDsh fork
+    ├── install_openauto.sh      # v8.0 - Original working method
     ├── rebuild_ground_up.sh     # Frontend/Backend rebuild
     ├── diagnose.sh              # Troubleshooting helper
-    └── setup_pi.sh
+    └── setup_pi.sh              # Full Pi setup
 ```
-
-## Tech Stack
-- Frontend: React, Tailwind CSS, Framer Motion
-- Backend: FastAPI (Python), WebSocket
-- Target: Raspberry Pi 5
-
-## What's Been Implemented
-- [x] Vehicle dashboard with RPM/Speed gauges
-- [x] Accurate needle sweep angles
-- [x] VTEC light positioning
-- [x] Gear shift "pop and fade" animation
-- [x] Boot sequence with animated Honda logo
-- [x] Settings panel with multiple tabs
-- [x] GeneralSettingsTab integration
-- [x] ConnectivityTab with working OpenAuto launch button
-- [x] Backend DHU Controller API (/api/dhu/start, /api/dhu/stop, /api/dhu/status)
-- [x] install_openauto.sh v5.0 using openDsh fork
-
-## Current Status
-
-### OpenAuto Installation (USER VERIFICATION NEEDED)
-- **Script**: `scripts/install_openauto.sh` v5.0
-- **Approach**: Uses openDsh/aasdk + openDsh/openauto forks
-- **Key difference**: Uses system protobuf (apt install) instead of FetchContent
-- **Status**: Ready for testing on Pi
-
-### Android Auto Integration
-- **Backend API**: 
-  - POST `/api/dhu/start` - Launch OpenAuto with window positioning
-  - POST `/api/dhu/stop` - Stop OpenAuto
-  - GET `/api/dhu/status` - Check if running
-- **Frontend**: ConnectivityTab button wired to API
-- **Binary path**: `/opt/openauto/openauto/build/bin/autoapp`
-
-## Pending Issues
-
-### P1: Intermittent Turn Signal Glow Bug
-- **Status**: CSS enhanced, may still be intermittent
-- **Next**: If persists, reimplement with SVG filters
-
-## Upcoming Tasks
-1. Test install_openauto.sh v5.0 on Pi 5
-2. If openDsh fork fails, consider aa-proxy-rs as alternative
-3. Test Android Auto launch button on Pi
 
 ## Key API Endpoints
 - `/ws/vehicle-data` - WebSocket for vehicle data stream
@@ -83,18 +39,20 @@ Build a custom vehicle HMI (Human-Machine Interface) dashboard intended to run o
 - `/api/dhu/stop` - POST to stop OpenAuto
 - `/api/dhu/status` - GET OpenAuto status
 
-## Key Files
-- `scripts/install_openauto.sh` - v5.0 using openDsh fork
-- `frontend/src/components/hmi/ConnectivityTab.jsx` - Launch button
-- `backend/server.py` - DHU Controller class
+## Android Auto Integration
+- **Backend**: DHUController in server.py manages OpenAuto subprocess
+- **Frontend**: ConnectivityTab button calls `/api/dhu/start` and `/api/dhu/stop`
+- **Binary path**: `/opt/openauto/openauto/build/bin/autoapp`
+- **Launchers**: `openauto-launcher`, `android-auto`, `openauto`
 
-## Alternative Approaches Considered
-- **opencardev/openauto**: FetchContent protobuf hell on Pi 5
-- **aa-proxy-rs**: Rust-based proxy, pre-built images available
-- **OpenAuto Pro**: Commercial solution
+## Pending Issues
+- **P1**: Intermittent turn signal glow bug
 
-## Notes for Development
-- User environment is Raspberry Pi 5 (4GB)
+## Future Tasks
+- Embed Android Auto window inside FRANK Dashboard (using wmctrl/xdotool)
+- Persist user settings to LocalStorage
+
+## Notes
+- User environment: Raspberry Pi 5 (4GB)
 - GitHub: https://github.com/Allieviate/DigitalDash (branch: Version-3)
-- OpenAuto worked before as standalone - integration caused issues
-- openDsh fork uses system protobuf = simpler build
+- The key insight was that Version 2 used system protobuf, not FetchContent
