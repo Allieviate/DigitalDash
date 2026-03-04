@@ -297,45 +297,74 @@ async def websocket_vehicle_data(websocket: WebSocket):
         pass
 
 # ============ ANDROID AUTO DHU CONTROLLER ============
-# For Raspberry Pi 5 Linux - manages OpenAuto subprocess with window control
+# For Raspberry Pi 5 Linux - manages OpenAuto or WebAuto subprocess
 
 import subprocess
 import signal
 
 class DHUController:
     """
-    OpenAuto Controller for Raspberry Pi
-    Manages OpenAuto as a subprocess with window positioning
+    Android Auto Controller for Raspberry Pi
+    Supports both OpenAuto (C++) and WebAuto (Node.js)
     """
     def __init__(self):
         self.process = None
-        # OpenAuto launcher path
-        self.openauto_launcher = os.environ.get('OPENAUTO_PATH', '/usr/local/bin/openauto-launcher')
-        self.openauto_bin = '/opt/openauto/openauto/build/bin/autoapp'
         self.window_id = None
+        
+        # Supported Android Auto implementations (in order of preference)
+        self.implementations = [
+            {
+                "name": "web-auto-electron",
+                "bin": "/usr/local/bin/web-auto-electron",
+                "check": "/opt/web-auto/package.json",
+                "process_name": "electron"
+            },
+            {
+                "name": "openauto",
+                "bin": "/opt/openauto/openauto/build/bin/autoapp",
+                "check": "/opt/openauto/openauto/build/bin/autoapp",
+                "process_name": "autoapp"
+            },
+            {
+                "name": "openauto-launcher",
+                "bin": "/usr/local/bin/openauto",
+                "check": "/usr/local/bin/openauto",
+                "process_name": "autoapp"
+            }
+        ]
+        
+    def get_available_implementation(self):
+        """Find first available Android Auto implementation"""
+        for impl in self.implementations:
+            if os.path.exists(impl["check"]):
+                return impl
+        return None
         
     def is_running(self):
         if self.process is not None and self.process.poll() is None:
             return True
-        # Also check if autoapp is running independently
-        try:
-            result = subprocess.run(['pgrep', '-f', 'autoapp'], capture_output=True, text=True)
-            return result.returncode == 0
-        except:
-            return False
+        # Check if any known process is running
+        for impl in self.implementations:
+            try:
+                result = subprocess.run(['pgrep', '-f', impl["process_name"]], capture_output=True, text=True)
+                if result.returncode == 0:
+                    return True
+            except:
+                pass
+        return False
     
     async def start(self, x=640, y=200, width=640, height=480, borderless=True):
-        """Launch OpenAuto and configure window"""
+        """Launch Android Auto and configure window"""
         if self.is_running():
-            return {"status": "running", "message": "OpenAuto already running"}
+            return {"status": "running", "message": "Android Auto already running"}
         
-        # Check if OpenAuto is installed
-        openauto_exists = os.path.exists(self.openauto_bin) or os.path.exists(self.openauto_launcher)
+        # Find available implementation
+        impl = self.get_available_implementation()
         
-        if not openauto_exists:
+        if not impl:
             return {
                 "status": "error", 
-                "message": "OpenAuto not installed. Run: sudo bash ~/projects/DigitalDash/scripts/install_openauto.sh"
+                "message": "Android Auto not installed. Run: sudo bash ~/projects/DigitalDash/scripts/install_android_auto.sh"
             }
         
         try:
@@ -343,18 +372,13 @@ class DHUController:
             env = os.environ.copy()
             env['DISPLAY'] = ':0'
             
-            # Determine which binary to use
-            if os.path.exists(self.openauto_launcher):
-                cmd = [self.openauto_launcher]
-            else:
-                cmd = [self.openauto_bin]
-            
-            # Launch OpenAuto subprocess
+            # Launch subprocess
             self.process = subprocess.Popen(
-                cmd,
+                [impl["bin"]],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 env=env,
+                shell=impl["name"] == "web-auto-electron",  # web-auto needs shell
                 preexec_fn=os.setsid  # Create new process group for clean termination
             )
             
