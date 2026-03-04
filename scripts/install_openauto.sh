@@ -48,6 +48,42 @@ if ls /etc/apt/sources.list.d/mongodb*.list 1>/dev/null 2>&1; then
     done
 fi
 
+# ============================================
+# CRITICAL: Clean up ALL old failed builds
+# Remove everything we installed to /usr/local
+# ============================================
+echo -e "${YELLOW}Cleaning up old failed installations from /usr/local...${NC}"
+
+# Remove protobuf (we'll use system one from apt)
+rm -rf /usr/local/include/google/protobuf 2>/dev/null || true
+rm -rf /usr/local/include/google 2>/dev/null || true
+rm -f /usr/local/lib/libprotobuf* 2>/dev/null || true
+rm -f /usr/local/lib/libprotoc* 2>/dev/null || true
+rm -rf /usr/local/lib/cmake/protobuf 2>/dev/null || true
+rm -f /usr/local/lib/pkgconfig/protobuf*.pc 2>/dev/null || true
+rm -f /usr/local/bin/protoc 2>/dev/null || true
+
+# Remove abseil (not needed with system protobuf)
+rm -rf /usr/local/include/absl 2>/dev/null || true
+rm -f /usr/local/lib/libabsl* 2>/dev/null || true
+rm -rf /usr/local/lib/cmake/absl 2>/dev/null || true
+rm -f /usr/local/lib/pkgconfig/absl*.pc 2>/dev/null || true
+
+# Remove old aasdk/openauto headers (will be reinstalled fresh)
+rm -rf /usr/local/include/aasdk 2>/dev/null || true
+rm -rf /usr/local/include/aap_protobuf 2>/dev/null || true
+rm -rf /usr/local/include/f1x 2>/dev/null || true
+rm -f /usr/local/lib/libaasdk* 2>/dev/null || true
+rm -f /usr/local/lib/libaap_protobuf* 2>/dev/null || true
+
+# Remove web-auto if it exists
+rm -rf /opt/web-auto 2>/dev/null || true
+
+# Refresh library cache
+ldconfig
+
+echo -e "${GREEN}Old installations cleaned up${NC}"
+
 # Clean up old failed builds but preserve working ones
 if [ -d "/opt/openauto" ]; then
     echo -e "${YELLOW}Found existing /opt/openauto - checking if it works...${NC}"
