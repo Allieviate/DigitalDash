@@ -49,6 +49,42 @@ if ls /etc/apt/sources.list.d/mongodb*.list 1>/dev/null 2>&1; then
 fi
 
 # ============================================
+# CRITICAL: Increase swap size to prevent OOM
+# Protobuf compilation needs lots of RAM
+# ============================================
+echo -e "${YELLOW}Increasing swap size to prevent out-of-memory errors...${NC}"
+
+ORIGINAL_SWAP_SIZE=$(grep "CONF_SWAPSIZE" /etc/dphys-swapfile 2>/dev/null | cut -d= -f2 || echo "100")
+if [ -f /etc/dphys-swapfile ]; then
+    # Backup original swap config
+    cp /etc/dphys-swapfile /etc/dphys-swapfile.backup
+    
+    # Set swap to 2GB
+    sed -i 's/CONF_SWAPSIZE=.*/CONF_SWAPSIZE=2048/' /etc/dphys-swapfile
+    
+    # Restart swap service
+    dphys-swapfile swapoff 2>/dev/null || true
+    dphys-swapfile setup 2>/dev/null || true
+    dphys-swapfile swapon 2>/dev/null || true
+    
+    echo -e "${GREEN}Swap increased from ${ORIGINAL_SWAP_SIZE}MB to 2048MB${NC}"
+else
+    echo -e "${YELLOW}dphys-swapfile not found, creating swap file manually...${NC}"
+    # Create a 2GB swap file if dphys-swapfile doesn't exist
+    if [ ! -f /swapfile_openauto ]; then
+        fallocate -l 2G /swapfile_openauto 2>/dev/null || dd if=/dev/zero of=/swapfile_openauto bs=1M count=2048
+        chmod 600 /swapfile_openauto
+        mkswap /swapfile_openauto
+    fi
+    swapon /swapfile_openauto 2>/dev/null || true
+    echo -e "${GREEN}Created 2GB swap file${NC}"
+fi
+
+# Show current memory status
+echo -e "${YELLOW}Current memory status:${NC}"
+free -h
+
+# ============================================
 # CRITICAL: Clean up ALL old failed builds
 # Remove everything we installed to /usr/local
 # ============================================
@@ -184,7 +220,11 @@ if [ "$SKIP_BUILD" != "true" ]; then
     cd aasdk
     mkdir -p build && cd build
     cmake -DCMAKE_BUILD_TYPE=Release ..
-    make -j$(nproc)
+    
+    # Use only 2 cores to prevent OOM (Pi 5 has 4GB but protobuf is huge)
+    echo -e "${YELLOW}Building with 2 cores to prevent out-of-memory...${NC}"
+    make -j2
+    
     make install
     ldconfig
 
@@ -213,7 +253,9 @@ if [ "$SKIP_BUILD" != "true" ]; then
           -DRPI3_BUILD=FALSE \
           -DGST_BUILD=TRUE ..
 
-    make -j$(nproc)
+    # Use only 2 cores to prevent OOM
+    echo -e "${YELLOW}Building with 2 cores to prevent out-of-memory...${NC}"
+    make -j2
 
     echo -e "${GREEN}[4/6] OpenAuto built${NC}"
 else
@@ -321,6 +363,23 @@ EOF
 systemctl daemon-reload
 
 echo -e "${GREEN}[6/6] Configuration complete${NC}"
+
+# ============================================
+# Restore original swap size
+# ============================================
+echo -e "${YELLOW}Restoring original swap size...${NC}"
+if [ -f /etc/dphys-swapfile.backup ]; then
+    mv /etc/dphys-swapfile.backup /etc/dphys-swapfile
+    dphys-swapfile swapoff 2>/dev/null || true
+    dphys-swapfile setup 2>/dev/null || true
+    dphys-swapfile swapon 2>/dev/null || true
+    echo -e "${GREEN}Swap restored to original size${NC}"
+fi
+if [ -f /swapfile_openauto ]; then
+    swapoff /swapfile_openauto 2>/dev/null || true
+    rm -f /swapfile_openauto
+    echo -e "${GREEN}Temporary swap file removed${NC}"
+fi
 
 # ============================================
 # Verify installation
