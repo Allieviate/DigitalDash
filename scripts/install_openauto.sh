@@ -2,15 +2,15 @@
 # ============================================
 # OpenAuto Installation Script for Raspberry Pi 5
 # For FRANK Dashboard - Android Auto Support
-# Version 8.2 - Resumable with Retry Logic
+# Version 8.3 - Enhanced Pre-Flight Cleanup
 # ============================================
 #
-# This script can RESUME from where it left off:
-# - Checks if aasdk is already built before rebuilding
-# - Checks if openauto is already built before rebuilding
-# - Retries git clone up to 3 times on network failure
-# - Uses C++14 for modern protobuf compatibility
-# - Uses make -j2 to prevent OOM on Pi 5
+# DEFENSIVE ENGINEERING:
+# 1. Pre-flight cleanup removes ALL rogue protobuf files
+# 2. Reinstalls system protobuf fresh from apt
+# 3. Patches C++11 -> C++14 for modern protobuf compatibility
+# 4. Uses make -j2 to prevent OOM crashes
+# 5. Resume support - picks up where it left off
 # ============================================
 
 set -e
@@ -23,7 +23,7 @@ NC='\033[0m'
 
 echo "=========================================="
 echo "  OpenAuto Installer for FRANK Dashboard"
-echo "  Version 8.2 - Resumable with Retry"
+echo "  Version 8.3 - Enhanced Pre-Flight Cleanup"
 echo "=========================================="
 echo ""
 
@@ -124,37 +124,62 @@ free -h
 # CRITICAL: Clean up ALL old failed builds
 # Remove everything we installed to /usr/local
 # ============================================
-echo -e "${YELLOW}Cleaning up old failed installations from /usr/local...${NC}"
+echo -e "${YELLOW}======================================${NC}"
+echo -e "${YELLOW}PRE-FLIGHT CLEANUP - Removing Conflicts${NC}"
+echo -e "${YELLOW}======================================${NC}"
 
-# Remove protobuf (we'll use system one from apt)
+# Remove rogue protoc binary that conflicts with system package
+echo -e "${YELLOW}Removing rogue protoc compiler...${NC}"
+rm -f /usr/local/bin/protoc 2>/dev/null || true
+
+# Remove ALL protobuf files from /usr/local (we'll use system one from apt)
+echo -e "${YELLOW}Removing old protobuf installations...${NC}"
 rm -rf /usr/local/include/google/protobuf 2>/dev/null || true
 rm -rf /usr/local/include/google 2>/dev/null || true
 rm -f /usr/local/lib/libprotobuf* 2>/dev/null || true
 rm -f /usr/local/lib/libprotoc* 2>/dev/null || true
 rm -rf /usr/local/lib/cmake/protobuf 2>/dev/null || true
 rm -f /usr/local/lib/pkgconfig/protobuf*.pc 2>/dev/null || true
-rm -f /usr/local/bin/protoc 2>/dev/null || true
 
 # Remove abseil (not needed with system protobuf)
+echo -e "${YELLOW}Removing old abseil installations...${NC}"
 rm -rf /usr/local/include/absl 2>/dev/null || true
 rm -f /usr/local/lib/libabsl* 2>/dev/null || true
 rm -rf /usr/local/lib/cmake/absl 2>/dev/null || true
 rm -f /usr/local/lib/pkgconfig/absl*.pc 2>/dev/null || true
 
-# Remove old aasdk/openauto headers (will be reinstalled fresh)
+# Remove old aasdk/openauto files that may conflict
+echo -e "${YELLOW}Removing old aasdk/openauto files...${NC}"
 rm -rf /usr/local/include/aasdk 2>/dev/null || true
 rm -rf /usr/local/include/aap_protobuf 2>/dev/null || true
 rm -rf /usr/local/include/f1x 2>/dev/null || true
 rm -f /usr/local/lib/libaasdk* 2>/dev/null || true
 rm -f /usr/local/lib/libaap_protobuf* 2>/dev/null || true
 
-# Remove web-auto if it exists
+# Remove old build directories
+echo -e "${YELLOW}Removing old build directories...${NC}"
+rm -rf /opt/openauto/build 2>/dev/null || true
 rm -rf /opt/web-auto 2>/dev/null || true
 
 # Refresh library cache
 ldconfig
 
-echo -e "${GREEN}Old installations cleaned up${NC}"
+echo -e "${GREEN}Pre-flight cleanup complete!${NC}"
+
+# ============================================
+# CRITICAL: Reinstall system protobuf fresh
+# This ensures we have a clean, working protobuf
+# ============================================
+echo -e "${YELLOW}Reinstalling system protobuf packages...${NC}"
+apt-get update
+apt-get install --reinstall -y protobuf-compiler libprotobuf-dev
+
+# Verify protoc is the system version
+echo -e "${YELLOW}Verifying protoc installation...${NC}"
+which protoc
+protoc --version
+
+echo -e "${GREEN}System protobuf reinstalled successfully${NC}"
 
 # Clean up old failed builds but preserve working ones
 if [ -d "/opt/openauto" ]; then
