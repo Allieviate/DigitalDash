@@ -2,13 +2,14 @@
 # ============================================
 # OpenAuto Installation Script for Raspberry Pi 5
 # For FRANK Dashboard - Android Auto Support
-# Version 8.0 - Based on Original Working Build
+# Version 8.1 - C++14 Compatibility Fix
 # ============================================
 #
 # This is the ORIGINAL working approach that:
 # - Uses system protobuf (apt install libprotobuf-dev)
 # - Uses opencardev repos with -DRPI3_BUILD=FALSE
-# - No FetchContent, no complex protobuf builds
+# - Patches CMAKE_CXX_STANDARD 11 -> 14 for modern protobuf
+# - Uses make -j2 to prevent OOM on Pi 5
 # ============================================
 
 set -e
@@ -21,7 +22,7 @@ NC='\033[0m'
 
 echo "=========================================="
 echo "  OpenAuto Installer for FRANK Dashboard"
-echo "  Version 8.0 - Original Working Method"
+echo "  Version 8.1 - C++14 Compatibility Fix"
 echo "=========================================="
 echo ""
 
@@ -218,6 +219,11 @@ if [ "$SKIP_BUILD" != "true" ]; then
     fi
 
     cd aasdk
+    
+    # CRITICAL: Patch CMakeLists.txt for C++14 (required by modern Protobuf)
+    echo -e "${YELLOW}Patching aasdk for C++14 compatibility...${NC}"
+    sed -i 's/CMAKE_CXX_STANDARD 11/CMAKE_CXX_STANDARD 14/g' CMakeLists.txt
+    
     mkdir -p build && cd build
     cmake -DCMAKE_BUILD_TYPE=Release ..
     
@@ -246,6 +252,11 @@ if [ "$SKIP_BUILD" != "true" ]; then
     fi
 
     cd openauto
+    
+    # CRITICAL: Patch CMakeLists.txt for C++14 (required by modern Protobuf)
+    echo -e "${YELLOW}Patching OpenAuto for C++14 compatibility...${NC}"
+    sed -i 's/CMAKE_CXX_STANDARD 11/CMAKE_CXX_STANDARD 14/g' CMakeLists.txt
+    
     mkdir -p build && cd build
 
     # Build for Pi 5 (no RPI3 OMX, use GStreamer)
