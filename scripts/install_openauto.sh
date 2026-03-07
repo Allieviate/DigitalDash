@@ -2,7 +2,7 @@
 # ============================================
 # OpenAuto Installation Script for Raspberry Pi 5
 # For FRANK Dashboard - Android Auto Support
-# Version 8.4 - Fixed Resume Logic
+# Version 8.5 - Force System Protobuf
 # ============================================
 #
 # DEFENSIVE ENGINEERING:
@@ -10,7 +10,9 @@
 # 2. Reinstalls system protobuf fresh from apt
 # 3. Patches C++11 -> C++14 for modern protobuf compatibility
 # 4. Uses make -j2 to prevent OOM crashes
-# 5. TRUE resume support - preserves /opt/openauto and aasdk libs
+# 5. Forces CMake to use /usr/bin/protoc (bypasses Anaconda)
+# 6. Clears CMakeCache.txt before each cmake run
+# 7. TRUE resume support - preserves /opt/openauto and aasdk libs
 # ============================================
 
 set -e
@@ -23,7 +25,7 @@ NC='\033[0m'
 
 echo "=========================================="
 echo "  OpenAuto Installer for FRANK Dashboard"
-echo "  Version 8.4 - Fixed Resume Logic"
+echo "  Version 8.5 - Force System Protobuf"
 echo "=========================================="
 echo ""
 
@@ -292,7 +294,16 @@ if [ "$SKIP_BUILD" != "true" ]; then
         sed -i 's/CMAKE_CXX_STANDARD 11/CMAKE_CXX_STANDARD 14/g' CMakeLists.txt
         
         mkdir -p build && cd build
-        cmake -DCMAKE_BUILD_TYPE=Release ..
+        
+        # CRITICAL: Remove CMakeCache.txt to flush any cached Anaconda/virtualenv paths
+        rm -f CMakeCache.txt
+        
+        # Force CMake to use system Protobuf (bypass Anaconda/virtualenv conflicts)
+        echo -e "${YELLOW}Configuring aasdk with system Protobuf...${NC}"
+        cmake -DCMAKE_BUILD_TYPE=Release \
+              -DProtobuf_PROTOC_EXECUTABLE=/usr/bin/protoc \
+              -DProtobuf_INCLUDE_DIR=/usr/include \
+              ..
         
         # Use only 2 cores to prevent OOM (Pi 5 has 4GB but protobuf is huge)
         echo -e "${YELLOW}Building with 2 cores to prevent out-of-memory...${NC}"
@@ -345,10 +356,22 @@ if [ "$SKIP_BUILD" != "true" ]; then
         
         mkdir -p build && cd build
 
+        # CRITICAL: Remove CMakeCache.txt to flush any cached Anaconda/virtualenv paths
+        rm -f CMakeCache.txt
+
         # Build for Pi 5 (no RPI3 OMX, use GStreamer)
+        # Force CMake to use system Protobuf (bypass Anaconda/virtualenv conflicts)
+        echo -e "${YELLOW}Configuring OpenAuto with system Protobuf...${NC}"
         cmake -DCMAKE_BUILD_TYPE=Release \
               -DRPI3_BUILD=FALSE \
-              -DGST_BUILD=TRUE ..
+              -DGST_BUILD=TRUE \
+              -DAASDK_INCLUDE_DIRS="/usr/local/include/aasdk" \
+              -DAASDK_LIBRARIES="/usr/local/lib/libaasdk.so" \
+              -DAASDK_PROTO_INCLUDE_DIRS="/usr/local/include/aap_protobuf" \
+              -DAASDK_PROTO_LIBRARIES="/usr/local/lib/libaap_protobuf.so" \
+              -DProtobuf_PROTOC_EXECUTABLE=/usr/bin/protoc \
+              -DProtobuf_INCLUDE_DIR=/usr/include \
+              ..
 
         # Use only 2 cores to prevent OOM
         echo -e "${YELLOW}Building with 2 cores to prevent out-of-memory...${NC}"
