@@ -2,15 +2,15 @@
 # ============================================
 # OpenAuto Installation Script for Raspberry Pi 5
 # For FRANK Dashboard - Android Auto Support
-# Version 8.3 - Enhanced Pre-Flight Cleanup
+# Version 8.4 - Fixed Resume Logic
 # ============================================
 #
 # DEFENSIVE ENGINEERING:
-# 1. Pre-flight cleanup removes ALL rogue protobuf files
+# 1. Pre-flight cleanup removes ONLY rogue protobuf/abseil files
 # 2. Reinstalls system protobuf fresh from apt
 # 3. Patches C++11 -> C++14 for modern protobuf compatibility
 # 4. Uses make -j2 to prevent OOM crashes
-# 5. Resume support - picks up where it left off
+# 5. TRUE resume support - preserves /opt/openauto and aasdk libs
 # ============================================
 
 set -e
@@ -23,7 +23,7 @@ NC='\033[0m'
 
 echo "=========================================="
 echo "  OpenAuto Installer for FRANK Dashboard"
-echo "  Version 8.3 - Enhanced Pre-Flight Cleanup"
+echo "  Version 8.4 - Fixed Resume Logic"
 echo "=========================================="
 echo ""
 
@@ -148,18 +148,9 @@ rm -f /usr/local/lib/libabsl* 2>/dev/null || true
 rm -rf /usr/local/lib/cmake/absl 2>/dev/null || true
 rm -f /usr/local/lib/pkgconfig/absl*.pc 2>/dev/null || true
 
-# Remove old aasdk/openauto files that may conflict
-echo -e "${YELLOW}Removing old aasdk/openauto files...${NC}"
-rm -rf /usr/local/include/aasdk 2>/dev/null || true
-rm -rf /usr/local/include/aap_protobuf 2>/dev/null || true
-rm -rf /usr/local/include/f1x 2>/dev/null || true
-rm -f /usr/local/lib/libaasdk* 2>/dev/null || true
-rm -f /usr/local/lib/libaap_protobuf* 2>/dev/null || true
-
-# Remove old build directories
-echo -e "${YELLOW}Removing old build directories...${NC}"
-rm -rf /opt/openauto/build 2>/dev/null || true
-rm -rf /opt/web-auto 2>/dev/null || true
+# NOTE: We intentionally do NOT delete aasdk/openauto files here
+# to preserve resume capability. The libraries in /usr/local/lib 
+# and headers in /usr/local/include are needed for resuming builds.
 
 # Refresh library cache
 ldconfig
@@ -181,9 +172,9 @@ protoc --version
 
 echo -e "${GREEN}System protobuf reinstalled successfully${NC}"
 
-# Clean up old failed builds but preserve working ones
+# Check for existing working installation (resume support)
 if [ -d "/opt/openauto" ]; then
-    echo -e "${YELLOW}Found existing /opt/openauto - checking if it works...${NC}"
+    echo -e "${YELLOW}Found existing /opt/openauto directory${NC}"
     if [ -f "/opt/openauto/openauto/build/bin/autoapp" ]; then
         echo -e "${GREEN}Existing autoapp binary found! Testing...${NC}"
         # Test if it runs (just check if it can start)
@@ -197,12 +188,11 @@ if [ -d "/opt/openauto" ]; then
                 # Skip to launcher creation
                 SKIP_BUILD=true
             fi
+        else
+            echo -e "${YELLOW}Existing binary doesn't run, will attempt to resume build...${NC}"
         fi
-    fi
-    
-    if [ "$SKIP_BUILD" != "true" ]; then
-        echo -e "${YELLOW}Removing old /opt/openauto...${NC}"
-        rm -rf /opt/openauto
+    else
+        echo -e "${YELLOW}No autoapp binary yet, will resume/continue build...${NC}"
     fi
 fi
 
