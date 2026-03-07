@@ -2,13 +2,14 @@
 # ============================================
 # OpenAuto Installation Script for Raspberry Pi 5
 # For FRANK Dashboard - Android Auto Support
-# Version 8.1 - C++14 Compatibility Fix
+# Version 8.2 - Resumable with Retry Logic
 # ============================================
 #
-# This is the ORIGINAL working approach that:
-# - Uses system protobuf (apt install libprotobuf-dev)
-# - Uses opencardev repos with -DRPI3_BUILD=FALSE
-# - Patches CMAKE_CXX_STANDARD 11 -> 14 for modern protobuf
+# This script can RESUME from where it left off:
+# - Checks if aasdk is already built before rebuilding
+# - Checks if openauto is already built before rebuilding
+# - Retries git clone up to 3 times on network failure
+# - Uses C++14 for modern protobuf compatibility
 # - Uses make -j2 to prevent OOM on Pi 5
 # ============================================
 
@@ -22,7 +23,7 @@ NC='\033[0m'
 
 echo "=========================================="
 echo "  OpenAuto Installer for FRANK Dashboard"
-echo "  Version 8.1 - C++14 Compatibility Fix"
+echo "  Version 8.2 - Resumable with Retry"
 echo "=========================================="
 echo ""
 
@@ -35,6 +36,40 @@ fi
 SECONDS=0
 ACTUAL_USER=${SUDO_USER:-$USER}
 USER_HOME=$(eval echo ~$ACTUAL_USER)
+
+# ============================================
+# Helper function: Git clone with retry
+# ============================================
+git_clone_retry() {
+    local url="$1"
+    local dir="$2"
+    local branch="$3"
+    local max_attempts=3
+    local attempt=1
+    
+    while [ $attempt -le $max_attempts ]; do
+        echo -e "${YELLOW}Attempt $attempt/$max_attempts: Cloning $url...${NC}"
+        
+        if [ -n "$branch" ]; then
+            if git clone --depth 1 -b "$branch" "$url" "$dir" 2>/dev/null; then
+                echo -e "${GREEN}Clone successful!${NC}"
+                return 0
+            fi
+        else
+            if git clone --depth 1 "$url" "$dir" 2>/dev/null; then
+                echo -e "${GREEN}Clone successful!${NC}"
+                return 0
+            fi
+        fi
+        
+        echo -e "${YELLOW}Clone failed. Waiting 5 seconds before retry...${NC}"
+        sleep 5
+        attempt=$((attempt + 1))
+    done
+    
+    echo -e "${RED}Failed to clone after $max_attempts attempts${NC}"
+    return 1
+}
 
 # ============================================
 # STEP 0: Disable problematic repos & cleanup
@@ -208,67 +243,104 @@ if [ "$SKIP_BUILD" != "true" ]; then
     # STEP 3: Clone and build aasdk
     # ============================================
     echo "[3/6] Building aasdk (Android Auto SDK)..."
-    echo -e "${YELLOW}This may take 10-20 minutes on Pi 5...${NC}"
-
-    if [ ! -d "aasdk" ]; then
-        # Try opencardev first (original), then openDsh as fallback
-        if ! git clone --depth 1 https://github.com/opencardev/aasdk.git 2>/dev/null; then
-            echo -e "${YELLOW}opencardev/aasdk failed, trying openDsh fork...${NC}"
-            git clone --depth 1 https://github.com/openDsh/aasdk.git
-        fi
+    
+    # Check if aasdk is already built (resume support)
+    if [ -f "/usr/local/lib/libaasdk.so" ] || [ -f "/usr/local/lib/libaasdk_proto.so" ]; then
+        echo -e "${GREEN}aasdk already installed, skipping build...${NC}"
+        AASDK_DONE=true
+    else
+        echo -e "${YELLOW}This may take 15-30 minutes on Pi 5...${NC}"
+        AASDK_DONE=false
     fi
+    
+    if [ "$AASDK_DONE" != "true" ]; then
+        # Clone if not already cloned
+        if [ ! -d "aasdk" ]; then
+            # Try opencardev first (original), then openDsh as fallback
+            if ! git_clone_retry "https://github.com/opencardev/aasdk.git" "aasdk" ""; then
+                echo -e "${YELLOW}opencardev/aasdk failed, trying openDsh fork...${NC}"
+                if ! git_clone_retry "https://github.com/openDsh/aasdk.git" "aasdk" ""; then
+                    echo -e "${RED}ERROR: Could not clone aasdk from any source${NC}"
+                    echo -e "${YELLOW}Check your internet connection and try again.${NC}"
+                    echo -e "${YELLOW}The script will resume from this point next time.${NC}"
+                    exit 1
+                fi
+            fi
+        else
+            echo -e "${GREEN}aasdk directory exists, using existing clone${NC}"
+        fi
 
-    cd aasdk
+        cd aasdk
+        
+        # CRITICAL: Patch CMakeLists.txt for C++14 (required by modern Protobuf)
+        echo -e "${YELLOW}Patching aasdk for C++14 compatibility...${NC}"
+        sed -i 's/CMAKE_CXX_STANDARD 11/CMAKE_CXX_STANDARD 14/g' CMakeLists.txt
+        
+        mkdir -p build && cd build
+        cmake -DCMAKE_BUILD_TYPE=Release ..
+        
+        # Use only 2 cores to prevent OOM (Pi 5 has 4GB but protobuf is huge)
+        echo -e "${YELLOW}Building with 2 cores to prevent out-of-memory...${NC}"
+        make -j2
+        
+        make install
+        ldconfig
+        
+        cd $OPENAUTO_DIR
+    fi
     
-    # CRITICAL: Patch CMakeLists.txt for C++14 (required by modern Protobuf)
-    echo -e "${YELLOW}Patching aasdk for C++14 compatibility...${NC}"
-    sed -i 's/CMAKE_CXX_STANDARD 11/CMAKE_CXX_STANDARD 14/g' CMakeLists.txt
-    
-    mkdir -p build && cd build
-    cmake -DCMAKE_BUILD_TYPE=Release ..
-    
-    # Use only 2 cores to prevent OOM (Pi 5 has 4GB but protobuf is huge)
-    echo -e "${YELLOW}Building with 2 cores to prevent out-of-memory...${NC}"
-    make -j2
-    
-    make install
-    ldconfig
-
-    cd $OPENAUTO_DIR
-    echo -e "${GREEN}[3/6] aasdk built and installed${NC}"
+    echo -e "${GREEN}[3/6] aasdk ready${NC}"
 
     # ============================================
     # STEP 4: Clone and build OpenAuto
     # ============================================
     echo "[4/6] Building OpenAuto..."
-    echo -e "${YELLOW}This may take 10-20 minutes on Pi 5...${NC}"
-
-    if [ ! -d "openauto" ]; then
-        # Try opencardev first, then openDsh as fallback
-        if ! git clone --depth 1 https://github.com/opencardev/openauto.git 2>/dev/null; then
-            echo -e "${YELLOW}opencardev/openauto failed, trying openDsh fork...${NC}"
-            git clone --depth 1 -b develop https://github.com/openDsh/openauto.git
+    
+    # Check if OpenAuto is already built (resume support)
+    if [ -f "/opt/openauto/openauto/build/bin/autoapp" ]; then
+        echo -e "${GREEN}OpenAuto already built, skipping...${NC}"
+        OPENAUTO_DONE=true
+    else
+        echo -e "${YELLOW}This may take 15-30 minutes on Pi 5...${NC}"
+        OPENAUTO_DONE=false
+    fi
+    
+    if [ "$OPENAUTO_DONE" != "true" ]; then
+        # Clone if not already cloned
+        if [ ! -d "openauto" ]; then
+            # Try opencardev first, then openDsh as fallback
+            if ! git_clone_retry "https://github.com/opencardev/openauto.git" "openauto" ""; then
+                echo -e "${YELLOW}opencardev/openauto failed, trying openDsh fork...${NC}"
+                if ! git_clone_retry "https://github.com/openDsh/openauto.git" "openauto" "develop"; then
+                    echo -e "${RED}ERROR: Could not clone openauto from any source${NC}"
+                    echo -e "${YELLOW}Check your internet connection and try again.${NC}"
+                    echo -e "${YELLOW}The script will resume from this point next time.${NC}"
+                    exit 1
+                fi
+            fi
+        else
+            echo -e "${GREEN}openauto directory exists, using existing clone${NC}"
         fi
+
+        cd openauto
+        
+        # CRITICAL: Patch CMakeLists.txt for C++14 (required by modern Protobuf)
+        echo -e "${YELLOW}Patching OpenAuto for C++14 compatibility...${NC}"
+        sed -i 's/CMAKE_CXX_STANDARD 11/CMAKE_CXX_STANDARD 14/g' CMakeLists.txt
+        
+        mkdir -p build && cd build
+
+        # Build for Pi 5 (no RPI3 OMX, use GStreamer)
+        cmake -DCMAKE_BUILD_TYPE=Release \
+              -DRPI3_BUILD=FALSE \
+              -DGST_BUILD=TRUE ..
+
+        # Use only 2 cores to prevent OOM
+        echo -e "${YELLOW}Building with 2 cores to prevent out-of-memory...${NC}"
+        make -j2
     fi
 
-    cd openauto
-    
-    # CRITICAL: Patch CMakeLists.txt for C++14 (required by modern Protobuf)
-    echo -e "${YELLOW}Patching OpenAuto for C++14 compatibility...${NC}"
-    sed -i 's/CMAKE_CXX_STANDARD 11/CMAKE_CXX_STANDARD 14/g' CMakeLists.txt
-    
-    mkdir -p build && cd build
-
-    # Build for Pi 5 (no RPI3 OMX, use GStreamer)
-    cmake -DCMAKE_BUILD_TYPE=Release \
-          -DRPI3_BUILD=FALSE \
-          -DGST_BUILD=TRUE ..
-
-    # Use only 2 cores to prevent OOM
-    echo -e "${YELLOW}Building with 2 cores to prevent out-of-memory...${NC}"
-    make -j2
-
-    echo -e "${GREEN}[4/6] OpenAuto built${NC}"
+    echo -e "${GREEN}[4/6] OpenAuto ready${NC}"
 else
     echo "[1/6] Skipping dependencies (using existing build)"
     echo "[2/6] Skipping directory setup (using existing build)"
