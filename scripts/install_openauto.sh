@@ -64,15 +64,19 @@ git_clone_retry() {
 # ============================================
 echo "[0/5] Cleaning poisoned headers..."
 
-echo -e "${YELLOW}Moving aap_protobuf out of include path (this fixes runtime_version.h error)${NC}"
+echo -e "${YELLOW}Moving aap_protobuf HEADERS out of include path (fixes runtime_version.h)${NC}"
+# Only move the HEADERS, not the libraries - OpenAuto needs libaap_protobuf.so
 mv /usr/local/include/aap_protobuf /usr/local/include/aap_protobuf__DISABLED 2>/dev/null || true
 
-# Also clean any other potential conflicts
+# Clean other potential conflicts (but NOT aasdk libs)
 rm -f /usr/local/bin/protoc 2>/dev/null || true
 rm -rf /usr/local/include/google/protobuf 2>/dev/null || true
 rm -f /usr/local/lib/libprotobuf* 2>/dev/null || true
 rm -rf /usr/local/include/absl 2>/dev/null || true
 rm -f /usr/local/lib/libabsl* 2>/dev/null || true
+
+# NOTE: We do NOT remove /usr/local/lib/libaap_protobuf* or /usr/local/lib/libaasdk*
+# because OpenAuto NEEDS these libraries from the aasdk build
 
 # Disable MongoDB repo if exists
 if ls /etc/apt/sources.list.d/mongodb*.list 1>/dev/null 2>&1; then
@@ -141,10 +145,12 @@ echo -e "${GREEN}[1/5] Dependencies installed${NC}"
 # ============================================
 echo "[2/5] Building AASDK..."
 
-# Check if already built (resume support)
-if [ -f "/usr/local/lib/libaasdk.so" ]; then
-    echo -e "${GREEN}AASDK already installed, skipping...${NC}"
+# Check if already built AND libraries exist (resume support)
+if [ -f "/usr/local/lib/libaasdk.so" ] && [ -f "/usr/local/lib/libaap_protobuf.so" ] && [ -d "/usr/local/include/aasdk" ]; then
+    echo -e "${GREEN}AASDK already installed with all libraries, skipping...${NC}"
 else
+    echo -e "${YELLOW}AASDK libraries missing or incomplete, building...${NC}"
+    
     mkdir -p $OPENAUTO_DIR
     cd $OPENAUTO_DIR
     
@@ -172,10 +178,18 @@ else
     make install
     ldconfig
     
+    # Verify installation
+    if [ ! -f "/usr/local/lib/libaap_protobuf.so" ]; then
+        echo -e "${RED}ERROR: libaap_protobuf.so was not created!${NC}"
+        exit 1
+    fi
+    
     cd $OPENAUTO_DIR
 fi
 
 echo -e "${GREEN}[2/5] AASDK ready${NC}"
+echo -e "${GREEN}  - libaasdk.so: $(ls -la /usr/local/lib/libaasdk.so 2>/dev/null | awk '{print $NF}')${NC}"
+echo -e "${GREEN}  - libaap_protobuf.so: $(ls -la /usr/local/lib/libaap_protobuf.so 2>/dev/null | awk '{print $NF}')${NC}"
 
 # ============================================
 # STEP 3: Build OpenAuto (from opencardev)
