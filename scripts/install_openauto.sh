@@ -2,19 +2,18 @@
 # ============================================
 # OpenAuto Installation Script for Raspberry Pi 5
 # For FRANK Dashboard - Android Auto Support
-# Version 10.0 - Original Working Recipe
+# Version 11.0 - Complete Working Build
 # ============================================
 #
-# Based on the EXACT setup that worked before:
-# - Uses opencardev/aasdk and opencardev/openauto
-# - Installs to /opt/openauto/
-# - Creates /usr/local/bin/openauto-launcher
-# - Removes poisoned aap_protobuf headers first
+# Tested and working on Raspberry Pi 5 with:
+# - OpenSSL 3.x compatibility patches
+# - RtAudio 6.x compatibility patches
+# - GStreamer video (no OMX)
+# - C++17 support
 # ============================================
 
 set -e
 
-# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -22,18 +21,16 @@ NC='\033[0m'
 
 echo "=========================================="
 echo "  OpenAuto Installer for FRANK Dashboard"
-echo "  Version 10.0 - Original Working Recipe"
+echo "  Version 11.0 - Pi 5 Complete Build"
 echo "=========================================="
 echo ""
 
-# Check if running as root
 if [ "$EUID" -ne 0 ]; then
     echo -e "${RED}Please run as root: sudo bash install_openauto.sh${NC}"
     exit 1
 fi
 
 SECONDS=0
-ACTUAL_USER=${SUDO_USER:-$USER}
 OPENAUTO_DIR="/opt/openauto"
 
 # ============================================
@@ -42,16 +39,21 @@ OPENAUTO_DIR="/opt/openauto"
 git_clone_retry() {
     local url="$1"
     local dir="$2"
+    local branch="$3"
     local max_attempts=3
     local attempt=1
     
     while [ $attempt -le $max_attempts ]; do
         echo -e "${YELLOW}Attempt $attempt/$max_attempts: Cloning $url...${NC}"
-        if git clone --depth 1 "$url" "$dir" 2>&1; then
-            echo -e "${GREEN}Clone successful!${NC}"
-            return 0
+        if [ -n "$branch" ]; then
+            if git clone --depth 1 -b "$branch" "$url" "$dir" 2>&1; then
+                return 0
+            fi
+        else
+            if git clone --depth 1 "$url" "$dir" 2>&1; then
+                return 0
+            fi
         fi
-        echo -e "${YELLOW}Failed. Retrying in 5 seconds...${NC}"
         sleep 5
         attempt=$((attempt + 1))
     done
@@ -59,39 +61,43 @@ git_clone_retry() {
 }
 
 # ============================================
-# STEP 0: Clean Poisoned Headers
-# This is THE FIX for runtime_version.h error
+# STEP 0: System Preparation
 # ============================================
-echo "[0/5] Cleaning poisoned headers..."
+echo "[0/7] Preparing system..."
 
-echo -e "${YELLOW}Moving aap_protobuf HEADERS out of include path (fixes runtime_version.h)${NC}"
-# Only move the HEADERS, not the libraries - OpenAuto needs libaap_protobuf.so
-mv /usr/local/include/aap_protobuf /usr/local/include/aap_protobuf__DISABLED 2>/dev/null || true
-
-# Clean other potential conflicts (but NOT aasdk libs)
-rm -f /usr/local/bin/protoc 2>/dev/null || true
-rm -rf /usr/local/include/google/protobuf 2>/dev/null || true
-rm -f /usr/local/lib/libprotobuf* 2>/dev/null || true
-rm -rf /usr/local/include/absl 2>/dev/null || true
-rm -f /usr/local/lib/libabsl* 2>/dev/null || true
-
-# NOTE: We do NOT remove /usr/local/lib/libaap_protobuf* or /usr/local/lib/libaasdk*
-# because OpenAuto NEEDS these libraries from the aasdk build
-
-# Disable MongoDB repo if exists
+# Disable MongoDB repo if exists (SHA1 key issue)
 if ls /etc/apt/sources.list.d/mongodb*.list 1>/dev/null 2>&1; then
     for f in /etc/apt/sources.list.d/mongodb*.list; do
         mv "$f" "$f.disabled" 2>/dev/null || true
     done
 fi
 
+# Clean ALL conflicting libraries from /usr/local
+echo -e "${YELLOW}Cleaning conflicting libraries...${NC}"
+rm -rf /usr/local/include/google 2>/dev/null || true
+rm -rf /usr/local/include/absl 2>/dev/null || true
+rm -rf /usr/local/include/aap_protobuf 2>/dev/null || true
+rm -rf /usr/local/lib/cmake/protobuf 2>/dev/null || true
+rm -rf /usr/local/lib/cmake/absl 2>/dev/null || true
+rm -f /usr/local/lib/libprotobuf* 2>/dev/null || true
+rm -f /usr/local/lib/libabsl* 2>/dev/null || true
+rm -f /usr/local/bin/protoc 2>/dev/null || true
 ldconfig
-echo -e "${GREEN}[0/5] Poisoned headers cleaned${NC}"
+
+# Increase swap for compilation
+if [ -f /etc/dphys-swapfile ]; then
+    sed -i 's/CONF_SWAPSIZE=.*/CONF_SWAPSIZE=2048/' /etc/dphys-swapfile
+    dphys-swapfile swapoff 2>/dev/null || true
+    dphys-swapfile setup 2>/dev/null || true
+    dphys-swapfile swapon 2>/dev/null || true
+fi
+
+echo -e "${GREEN}[0/7] System prepared${NC}"
 
 # ============================================
 # STEP 1: Install Dependencies
 # ============================================
-echo "[1/5] Installing dependencies..."
+echo "[1/7] Installing dependencies..."
 
 apt-get update
 apt-get install -y \
@@ -101,13 +107,15 @@ apt-get install -y \
     libboost-all-dev \
     libusb-1.0-0-dev \
     libssl-dev \
-    libprotobuf-dev \
-    protobuf-compiler \
     libqt5multimedia5 \
     libqt5multimedia5-plugins \
     libqt5multimediawidgets5 \
     qtmultimedia5-dev \
     qtbase5-dev \
+    qtdeclarative5-dev \
+    qml-module-qtquick2 \
+    qml-module-qtquick-controls2 \
+    qml-module-qtmultimedia \
     libqt5bluetooth5 \
     libqt5bluetooth5-bin \
     qtconnectivity5-dev \
@@ -127,172 +135,189 @@ apt-get install -y \
     libgstreamer-plugins-base1.0-dev \
     libudev-dev \
     libevdev-dev \
+    adb \
     wmctrl \
     xdotool
 
-# Increase swap for compilation
-if [ -f /etc/dphys-swapfile ]; then
-    sed -i 's/CONF_SWAPSIZE=.*/CONF_SWAPSIZE=2048/' /etc/dphys-swapfile
-    dphys-swapfile swapoff 2>/dev/null || true
-    dphys-swapfile setup 2>/dev/null || true
-    dphys-swapfile swapon 2>/dev/null || true
-fi
-
-echo -e "${GREEN}[1/5] Dependencies installed${NC}"
+echo -e "${GREEN}[1/7] Dependencies installed${NC}"
 
 # ============================================
-# STEP 2: Build AASDK (from opencardev)
+# STEP 2: Build h264bitstream
 # ============================================
-echo "[2/5] Building AASDK..."
+echo "[2/7] Building h264bitstream..."
 
-# Check if already built AND libraries exist (resume support)
-if [ -f "/usr/local/lib/libaasdk.so" ] && [ -f "/usr/local/lib/libaap_protobuf.so" ] && [ -d "/usr/local/include/aasdk" ]; then
-    echo -e "${GREEN}AASDK already installed with all libraries, skipping...${NC}"
+if [ -f /usr/local/lib/libh264bitstream.a ]; then
+    echo -e "${GREEN}h264bitstream already installed, skipping...${NC}"
 else
-    echo -e "${YELLOW}AASDK libraries missing or incomplete, building...${NC}"
-    
     mkdir -p $OPENAUTO_DIR
     cd $OPENAUTO_DIR
     
-    # Clone if not exists
+    if [ ! -d "h264bitstream" ]; then
+        git_clone_retry "https://github.com/aizvorski/h264bitstream.git" "h264bitstream"
+    fi
+    
+    cd h264bitstream
+    gcc -c h264_stream.c -o h264_stream.o
+    gcc -c h264_nal.c -o h264_nal.o
+    gcc -c h264_sei.c -o h264_sei.o
+    ar rcs libh264bitstream.a h264_stream.o h264_nal.o h264_sei.o
+    
+    cp libh264bitstream.a /usr/local/lib/
+    cp *.h /usr/local/include/
+    ldconfig
+fi
+
+echo -e "${GREEN}[2/7] h264bitstream ready${NC}"
+
+# ============================================
+# STEP 3: Clone openDsh aasdk
+# ============================================
+echo "[3/7] Building aasdk (openDsh)..."
+
+mkdir -p $OPENAUTO_DIR
+cd $OPENAUTO_DIR
+
+if [ -f "/usr/local/lib/libaasdk.so" ]; then
+    echo -e "${GREEN}aasdk already installed, skipping...${NC}"
+else
     if [ ! -d "aasdk" ]; then
-        if ! git_clone_retry "https://github.com/opencardev/aasdk.git" "aasdk"; then
-            echo -e "${RED}Failed to clone aasdk. Check internet connection.${NC}"
-            exit 1
-        fi
+        git_clone_retry "https://github.com/openDsh/aasdk.git" "aasdk"
     fi
     
     cd aasdk
     
-    # Clean any previous failed build
+    # Patch for OpenSSL 3.x compatibility
+    echo -e "${YELLOW}Patching for OpenSSL 3.x...${NC}"
+    sed -i 's/FIPS_mode_set(0);/\/\/ FIPS_mode_set(0); \/\/ Removed for OpenSSL 3.x/' src/Transport/SSLWrapper.cpp 2>/dev/null || true
+    sed -i 's/ERR_load_BIO_strings();/\/\/ ERR_load_BIO_strings(); \/\/ Deprecated/' src/Transport/SSLWrapper.cpp 2>/dev/null || true
+    sed -i 's/SSL_load_error_strings();/\/\/ SSL_load_error_strings(); \/\/ Deprecated/' src/Transport/SSLWrapper.cpp 2>/dev/null || true
+    sed -i 's/SSL_library_init();/OPENSSL_init_ssl(0, NULL);/' src/Transport/SSLWrapper.cpp 2>/dev/null || true
+    
     rm -rf build 2>/dev/null || true
     mkdir -p build && cd build
     
-    echo -e "${YELLOW}Configuring AASDK...${NC}"
-    cmake .. -DCMAKE_BUILD_TYPE=Release
-    
-    echo -e "${YELLOW}Building AASDK (this takes 15-30 minutes)...${NC}"
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17
     make -j2
-    
-    echo -e "${YELLOW}Installing AASDK...${NC}"
     make install
     ldconfig
     
-    # Verify installation
-    if [ ! -f "/usr/local/lib/libaap_protobuf.so" ]; then
-        echo -e "${RED}ERROR: libaap_protobuf.so was not created!${NC}"
-        exit 1
+    # Copy protobuf headers from FetchContent
+    if [ -d "/opt/openauto/aasdk/build/_deps/protobuf-src/src/google" ]; then
+        cp -r /opt/openauto/aasdk/build/_deps/protobuf-src/src/google /usr/local/include/
     fi
-    
-    cd $OPENAUTO_DIR
 fi
 
-echo -e "${GREEN}[2/5] AASDK ready${NC}"
-echo -e "${GREEN}  - libaasdk.so: $(ls -la /usr/local/lib/libaasdk.so 2>/dev/null | awk '{print $NF}')${NC}"
-echo -e "${GREEN}  - libaap_protobuf.so: $(ls -la /usr/local/lib/libaap_protobuf.so 2>/dev/null | awk '{print $NF}')${NC}"
+echo -e "${GREEN}[3/7] aasdk ready${NC}"
 
 # ============================================
-# STEP 3: Build OpenAuto (from opencardev)
+# STEP 4: Clone openDsh openauto
 # ============================================
-echo "[3/5] Building OpenAuto..."
+echo "[4/7] Building OpenAuto (openDsh)..."
 
-# Check if already built (resume support)
-if [ -f "$OPENAUTO_DIR/openauto/build/bin/autoapp" ]; then
+cd $OPENAUTO_DIR
+
+if [ -f "$OPENAUTO_DIR/openauto/bin/autoapp" ]; then
     echo -e "${GREEN}OpenAuto already built, skipping...${NC}"
 else
-    cd $OPENAUTO_DIR
-    
-    # Clone if not exists
     if [ ! -d "openauto" ]; then
-        if ! git_clone_retry "https://github.com/opencardev/openauto.git" "openauto"; then
-            echo -e "${RED}Failed to clone openauto. Check internet connection.${NC}"
-            exit 1
-        fi
+        git_clone_retry "https://github.com/openDsh/openauto.git" "openauto" "develop"
     fi
     
     cd openauto
     
-    # Clean any previous failed build
+    # Patch for RtAudio 6.x compatibility
+    echo -e "${YELLOW}Patching for RtAudio 6.x...${NC}"
+    sed -i 's/RtAudioError/std::exception/g' openauto/Projection/RtAudioOutput.cpp 2>/dev/null || true
+    
+    # Disable OMX for Pi 5
+    echo -e "${YELLOW}Disabling OMX for Pi 5...${NC}"
+    sed -i 's/add_definitions(-DUSE_OMX/#add_definitions(-DUSE_OMX/' CMakeLists.txt 2>/dev/null || true
+    sed -i 's/set(BCM_HOST_LIBRARIES/#set(BCM_HOST_LIBRARIES/' CMakeLists.txt 2>/dev/null || true
+    sed -i 's/set(BCM_HOST_INCLUDE_DIRS/#set(BCM_HOST_INCLUDE_DIRS/' CMakeLists.txt 2>/dev/null || true
+    sed -i 's/set(ILCLIENT_INCLUDE_DIRS/#set(ILCLIENT_INCLUDE_DIRS/' CMakeLists.txt 2>/dev/null || true
+    sed -i 's/set(ILCLIENT_LIBRARIES/#set(ILCLIENT_LIBRARIES/' CMakeLists.txt 2>/dev/null || true
+    
     rm -rf build 2>/dev/null || true
     mkdir -p build && cd build
     
-    echo -e "${YELLOW}Configuring OpenAuto...${NC}"
-    cmake .. -DCMAKE_BUILD_TYPE=Release
-    
-    echo -e "${YELLOW}Building OpenAuto (this takes 15-30 minutes)...${NC}"
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DNOPI=ON -DCMAKE_CXX_STANDARD=17
     make -j2
 fi
 
-echo -e "${GREEN}[3/5] OpenAuto ready${NC}"
+echo -e "${GREEN}[4/7] OpenAuto ready${NC}"
 
 # ============================================
-# STEP 4: Create Launcher
+# STEP 5: Create Launcher
 # ============================================
-echo "[4/5] Creating launcher..."
+echo "[5/7] Creating launcher..."
 
 cat > /usr/local/bin/openauto-launcher << 'EOF'
 #!/bin/bash
-# OpenAuto Launcher for FRANK Dashboard
-
-OPENAUTO_BIN="/opt/openauto/openauto/build/bin/autoapp"
-
-# Kill any existing instance
-pkill -f autoapp 2>/dev/null || true
-sleep 0.5
-
-# Set display environment
 export DISPLAY=:0
 export QT_QPA_PLATFORM=xcb
+export LD_LIBRARY_PATH=/opt/openauto/openauto/lib:/usr/local/lib:$LD_LIBRARY_PATH
 export PULSE_SERVER=unix:/run/user/$(id -u)/pulse/native
 
-# Check binary exists
-if [ ! -f "$OPENAUTO_BIN" ]; then
-    echo "Error: OpenAuto not found at $OPENAUTO_BIN"
-    exit 1
-fi
+pkill autoapp 2>/dev/null || true
+sleep 0.5
 
-# Launch OpenAuto
-cd /opt/openauto/openauto/build/bin
+cd /opt/openauto/openauto/bin
 exec ./autoapp "$@"
 EOF
 
 chmod +x /usr/local/bin/openauto-launcher
-
-# Create symlinks
 ln -sf /usr/local/bin/openauto-launcher /usr/local/bin/android-auto
 ln -sf /usr/local/bin/openauto-launcher /usr/local/bin/openauto
 
-echo -e "${GREEN}[4/5] Launcher created${NC}"
+echo -e "${GREEN}[5/7] Launcher created${NC}"
 
 # ============================================
-# STEP 5: Verify Installation
+# STEP 6: Setup USB Permissions
 # ============================================
-echo "[5/5] Verifying installation..."
+echo "[6/7] Setting up USB permissions..."
 
-echo ""
-if [ -f "$OPENAUTO_DIR/openauto/build/bin/autoapp" ]; then
+cat > /etc/udev/rules.d/51-android.rules << 'EOF'
+# Android Auto USB permissions
+SUBSYSTEM=="usb", ATTR{idVendor}=="*", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="18d1", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="04e8", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="2a70", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="2717", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="12d1", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="22b8", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0fce", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0bb4", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1004", MODE="0666", GROUP="plugdev"
+EOF
+
+udevadm control --reload-rules
+udevadm trigger
+
+echo -e "${GREEN}[6/7] USB permissions configured${NC}"
+
+# ============================================
+# STEP 7: Verify Installation
+# ============================================
+echo "[7/7] Verifying installation..."
+
+if [ -f "$OPENAUTO_DIR/openauto/bin/autoapp" ]; then
+    echo ""
     echo "=========================================="
     echo -e "${GREEN}  OpenAuto Installation Complete!${NC}"
     echo "=========================================="
     echo ""
-    echo "Installation paths:"
-    echo "  AASDK:    /opt/openauto/aasdk"
-    echo "  OpenAuto: /opt/openauto/openauto"
-    echo "  Binary:   /opt/openauto/openauto/build/bin/autoapp"
-    echo "  Launcher: /usr/local/bin/openauto-launcher"
+    echo "Binary: $OPENAUTO_DIR/openauto/bin/autoapp"
     echo ""
-    echo "To launch Android Auto:"
-    echo "  android-auto"
-    echo "  # or"
-    echo "  openauto-launcher"
-    echo ""
-    echo "From FRANK Dashboard:"
-    echo "  Use the Connectivity tab button"
+    echo "To launch: android-auto"
     echo ""
     echo "Build time: $(($SECONDS / 60)) minutes"
+    echo ""
+    echo -e "${YELLOW}Usage:${NC}"
+    echo "  1. Connect phone via USB"
+    echo "  2. Enable USB debugging on phone"
+    echo "  3. Run: android-auto"
+    echo "  4. Accept USB debugging prompt on phone"
 else
-    echo -e "${RED}Installation FAILED${NC}"
-    echo "autoapp binary not found at $OPENAUTO_DIR/openauto/build/bin/autoapp"
+    echo -e "${RED}Installation FAILED - autoapp not found${NC}"
     exit 1
 fi
-echo ""
