@@ -355,15 +355,16 @@ else
     mkdir -p build && cd build
     
     # Build flags for Pi 5:
-    # -DRPI3_BUILD=OFF    : Explicitly disable Raspberry Pi 3 OMX/VideoCore paths
-    # -DNOPI=ON           : Disable Pi-specific OMX hardware acceleration
-    # -DGST_BUILD=TRUE    : Enable GStreamer for video decoding (REQUIRED for Pi 5)
+    # -DNOPI=ON              : Disable Pi-specific OMX/VideoCore hardware acceleration
     # -DCMAKE_CXX_STANDARD=17 : Required for modern protobuf compatibility
+    #
+    # NOTE: Do NOT use -DGST_BUILD=TRUE — it requires QGlib (qt-gstreamer)
+    # which was removed from Debian Bookworm. Qt Multimedia uses GStreamer
+    # automatically under the hood via its GStreamer backend plugin, so
+    # video decoding still works through GStreamer without the QGlib wrapper.
     cmake .. \
         -DCMAKE_BUILD_TYPE=Release \
-        -DRPI3_BUILD=OFF \
         -DNOPI=ON \
-        -DGST_BUILD=TRUE \
         -DCMAKE_CXX_STANDARD=17
     
     # Use -j2 NOT -j4 to prevent OOM on Pi 5 4GB
