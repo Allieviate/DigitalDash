@@ -417,39 +417,128 @@ ln -sf /usr/local/bin/openauto-launcher /usr/local/bin/openauto
 echo -e "${GREEN}[5/8] Launcher created (android-auto, openauto, openauto-launcher)${NC}"
 
 # ============================================
-# STEP 6: Setup USB Permissions (udev rules)
+# STEP 6: Setup USB Auto-Detect + Permissions
 # ============================================
-step_header "6/8" "Setting up USB permissions..."
+step_header "6/8" "Setting up USB auto-detect and permissions..."
 
+# Detect the project directory (where FRANK dashboard is installed)
+FRANK_PROJECT_DIR=""
+if [ -d "/home/${SUDO_USER:-pi}/DigitalDash/scripts" ]; then
+    FRANK_PROJECT_DIR="/home/${SUDO_USER:-pi}/DigitalDash"
+elif [ -d "/opt/frank/scripts" ]; then
+    FRANK_PROJECT_DIR="/opt/frank"
+fi
+
+# Install the USB phone monitor script
+MONITOR_SCRIPT="/usr/local/bin/frank-usb-monitor"
+cat > "$MONITOR_SCRIPT" << 'MONITOR_EOF'
+#!/bin/bash
+# FRANK Dashboard - USB Phone Auto-Detect Monitor
+# Triggered by udev when Android phone connects/disconnects
+
+ACTION="${1:-connected}"
+VENDOR_ID="${ID_VENDOR_ID:-}"
+PRODUCT_ID="${ID_MODEL_ID:-}"
+API_URL="http://localhost:8001/api"
+LOG="/tmp/frank-usb-monitor.log"
+
+log() { echo "$(date '+%Y-%m-%d %H:%M:%S') [USB] $*" >> "$LOG"; }
+log "Event: action=$ACTION vendor=$VENDOR_ID product=$PRODUCT_ID"
+
+if [ "$ACTION" = "connected" ]; then
+    sleep 2
+    SERIAL="" DEVICE_NAME="Android Device"
+    if command -v adb >/dev/null 2>&1; then
+        adb kill-server 2>/dev/null; sleep 1; adb start-server 2>/dev/null; sleep 2
+        SERIAL=$(adb devices -l 2>/dev/null | grep -v "^List" | grep "device " | head -1 | awk '{print $1}')
+        if [ -n "$SERIAL" ]; then
+            DEVICE_NAME=$(adb -s "$SERIAL" shell getprop ro.product.model 2>/dev/null | tr -d '\r\n')
+            [ -z "$DEVICE_NAME" ] && DEVICE_NAME="Android Device"
+            log "Detected: serial=$SERIAL name=$DEVICE_NAME"
+        else
+            log "No ADB device found"; exit 0
+        fi
+    else
+        log "ADB not installed"; exit 0
+    fi
+    curl -s -X POST "$API_URL/dhu/device-event" \
+        -H "Content-Type: application/json" \
+        -d "{\"action\":\"connected\",\"serial\":\"$SERIAL\",\"name\":\"$DEVICE_NAME\",\"vendor_id\":\"$VENDOR_ID\",\"product_id\":\"$PRODUCT_ID\"}" >> "$LOG" 2>&1
+elif [ "$ACTION" = "disconnected" ]; then
+    curl -s -X POST "$API_URL/dhu/device-event" \
+        -H "Content-Type: application/json" \
+        -d "{\"action\":\"disconnected\",\"serial\":\"\",\"name\":\"\"}" >> "$LOG" 2>&1
+fi
+MONITOR_EOF
+
+chmod +x "$MONITOR_SCRIPT"
+
+# Create udev rules with both permissions AND auto-detect triggers
 cat > /etc/udev/rules.d/51-android.rules << 'EOF'
-# Android Auto USB permissions - Comprehensive vendor list
-# These rules ensure Android phones are accessible for ADB and Android Auto
+# FRANK Dashboard - Android Auto USB rules
+# Permissions + auto-detect for phone connection/disconnection
 
 # Google (Pixel)
 SUBSYSTEM=="usb", ATTR{idVendor}=="18d1", MODE="0666", GROUP="plugdev"
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="18d1", RUN+="/usr/local/bin/frank-usb-monitor connected"
+ACTION=="remove", SUBSYSTEM=="usb", ENV{ID_VENDOR_ID}=="18d1", RUN+="/usr/local/bin/frank-usb-monitor disconnected"
+
 # Samsung
 SUBSYSTEM=="usb", ATTR{idVendor}=="04e8", MODE="0666", GROUP="plugdev"
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="04e8", RUN+="/usr/local/bin/frank-usb-monitor connected"
+ACTION=="remove", SUBSYSTEM=="usb", ENV{ID_VENDOR_ID}=="04e8", RUN+="/usr/local/bin/frank-usb-monitor disconnected"
+
 # OnePlus
 SUBSYSTEM=="usb", ATTR{idVendor}=="2a70", MODE="0666", GROUP="plugdev"
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="2a70", RUN+="/usr/local/bin/frank-usb-monitor connected"
+ACTION=="remove", SUBSYSTEM=="usb", ENV{ID_VENDOR_ID}=="2a70", RUN+="/usr/local/bin/frank-usb-monitor disconnected"
+
 # Xiaomi
 SUBSYSTEM=="usb", ATTR{idVendor}=="2717", MODE="0666", GROUP="plugdev"
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="2717", RUN+="/usr/local/bin/frank-usb-monitor connected"
+ACTION=="remove", SUBSYSTEM=="usb", ENV{ID_VENDOR_ID}=="2717", RUN+="/usr/local/bin/frank-usb-monitor disconnected"
+
 # Huawei
 SUBSYSTEM=="usb", ATTR{idVendor}=="12d1", MODE="0666", GROUP="plugdev"
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="12d1", RUN+="/usr/local/bin/frank-usb-monitor connected"
+ACTION=="remove", SUBSYSTEM=="usb", ENV{ID_VENDOR_ID}=="12d1", RUN+="/usr/local/bin/frank-usb-monitor disconnected"
+
 # Motorola
 SUBSYSTEM=="usb", ATTR{idVendor}=="22b8", MODE="0666", GROUP="plugdev"
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="22b8", RUN+="/usr/local/bin/frank-usb-monitor connected"
+ACTION=="remove", SUBSYSTEM=="usb", ENV{ID_VENDOR_ID}=="22b8", RUN+="/usr/local/bin/frank-usb-monitor disconnected"
+
 # Sony
 SUBSYSTEM=="usb", ATTR{idVendor}=="0fce", MODE="0666", GROUP="plugdev"
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="0fce", RUN+="/usr/local/bin/frank-usb-monitor connected"
+ACTION=="remove", SUBSYSTEM=="usb", ENV{ID_VENDOR_ID}=="0fce", RUN+="/usr/local/bin/frank-usb-monitor disconnected"
+
 # HTC
 SUBSYSTEM=="usb", ATTR{idVendor}=="0bb4", MODE="0666", GROUP="plugdev"
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="0bb4", RUN+="/usr/local/bin/frank-usb-monitor connected"
+ACTION=="remove", SUBSYSTEM=="usb", ENV{ID_VENDOR_ID}=="0bb4", RUN+="/usr/local/bin/frank-usb-monitor disconnected"
+
 # LG
 SUBSYSTEM=="usb", ATTR{idVendor}=="1004", MODE="0666", GROUP="plugdev"
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="1004", RUN+="/usr/local/bin/frank-usb-monitor connected"
+ACTION=="remove", SUBSYSTEM=="usb", ENV{ID_VENDOR_ID}=="1004", RUN+="/usr/local/bin/frank-usb-monitor disconnected"
+
 # OPPO / Realme
 SUBSYSTEM=="usb", ATTR{idVendor}=="22d9", MODE="0666", GROUP="plugdev"
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="22d9", RUN+="/usr/local/bin/frank-usb-monitor connected"
+ACTION=="remove", SUBSYSTEM=="usb", ENV{ID_VENDOR_ID}=="22d9", RUN+="/usr/local/bin/frank-usb-monitor disconnected"
+
 # Nokia
 SUBSYSTEM=="usb", ATTR{idVendor}=="0421", MODE="0666", GROUP="plugdev"
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="0421", RUN+="/usr/local/bin/frank-usb-monitor connected"
+ACTION=="remove", SUBSYSTEM=="usb", ENV{ID_VENDOR_ID}=="0421", RUN+="/usr/local/bin/frank-usb-monitor disconnected"
+
 # Nothing Phone
 SUBSYSTEM=="usb", ATTR{idVendor}=="2970", MODE="0666", GROUP="plugdev"
-# Catch-all fallback for any USB device
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="2970", RUN+="/usr/local/bin/frank-usb-monitor connected"
+ACTION=="remove", SUBSYSTEM=="usb", ENV{ID_VENDOR_ID}=="2970", RUN+="/usr/local/bin/frank-usb-monitor disconnected"
+
+# Catch-all fallback
 SUBSYSTEM=="usb", MODE="0666", GROUP="plugdev"
 EOF
 
@@ -460,7 +549,7 @@ udevadm trigger
 REAL_USER="${SUDO_USER:-$(logname 2>/dev/null || echo pi)}"
 usermod -aG plugdev "$REAL_USER" 2>/dev/null || true
 
-echo -e "${GREEN}[6/8] USB permissions configured for user: $REAL_USER${NC}"
+echo -e "${GREEN}[6/8] USB auto-detect + permissions configured for user: $REAL_USER${NC}"
 
 # ============================================
 # STEP 7: Restore Swap to Normal

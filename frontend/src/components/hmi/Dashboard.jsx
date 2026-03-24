@@ -1,18 +1,24 @@
 import React from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useVehicleData } from '../../contexts/VehicleDataContext';
+import { useSettings } from '../../contexts/SettingsContext';
 import { RpmGauge, SpeedGauge } from './CustomGauges';
 import { ShiftLightsBar, DigitalSpeedGear } from './DashWidgets';
 import { WarningPanel, TurnSignalsRow, CriticalWarningBanner } from './WarningPanel';
 import AndroidAutoPanel from './AndroidAutoPanel';
+import DevicePromptModal from './DevicePromptModal';
 import { Settings, Activity, Smartphone } from 'lucide-react';
+
+const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
 export const Dashboard = ({ onOpenSettings }) => {
   const { theme, themeId } = useTheme();
   const { signals, isConnected } = useVehicleData();
+  const { settings, updateSetting } = useSettings();
   const [showAndroidAuto, setShowAndroidAuto] = React.useState(false);
-  const [aaActiveMode, setAaActiveMode] = React.useState(null); // null | 'embedded' | 'fullscreen'
+  const [aaActiveMode, setAaActiveMode] = React.useState(null);
   const [phoneConnected, setPhoneConnected] = React.useState(true);
+  const [pendingDevice, setPendingDevice] = React.useState(null);
 
   const isFullscreenAA = aaActiveMode === 'fullscreen';
 
@@ -20,7 +26,58 @@ export const Dashboard = ({ onOpenSettings }) => {
     setAaActiveMode(mode);
     if (mode) setShowAndroidAuto(true);
     else setShowAndroidAuto(false);
-  }, []); // Simulated for demo
+  }, []);
+
+  // Poll DHU status for device events (auto-detect from udev)
+  React.useEffect(() => {
+    const pollDeviceEvents = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/dhu/status`);
+        const data = await res.json();
+
+        if (data.device_event) {
+          const evt = data.device_event;
+          if (evt.type === 'prompt_needed') {
+            setPendingDevice({ serial: evt.serial, name: evt.name });
+          } else if (evt.type === 'auto_launched') {
+            setShowAndroidAuto(true);
+            setAaActiveMode(evt.mode);
+          } else if (evt.type === 'disconnected') {
+            setShowAndroidAuto(false);
+            setAaActiveMode(null);
+            setPendingDevice(null);
+          }
+        }
+      } catch {
+        // Backend unreachable
+      }
+    };
+
+    const interval = setInterval(pollDeviceEvents, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleDeviceConfirm = React.useCallback(async ({ connectionType, mode }) => {
+    setPendingDevice(null);
+    updateSetting('aa_mode', mode);
+
+    // Launch OpenAuto with chosen preferences
+    try {
+      await fetch(`${API_URL}/api/dhu/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, borderless: true, alwaysOnTop: true }),
+      });
+      setShowAndroidAuto(true);
+      setAaActiveMode(mode);
+    } catch {
+      // Launch failed
+    }
+  }, [updateSetting]);
+
+  const handleDeviceDismiss = React.useCallback(() => {
+    setPendingDevice(null);
+  }, []);
 
   // Calculate background color - GRADUAL transition from 86-120 mph
   const speed = signals.speed_mph;
@@ -74,6 +131,15 @@ export const Dashboard = ({ onOpenSettings }) => {
 
       {/* Critical Warning Banner - Always on top */}
       <CriticalWarningBanner />
+
+      {/* Device connection prompt modal */}
+      {pendingDevice && (
+        <DevicePromptModal
+          device={pendingDevice}
+          onConfirm={handleDeviceConfirm}
+          onDismiss={handleDeviceDismiss}
+        />
+      )}
 
       {/* Settings button - top right - BIGGER for easier tapping */}
       <button

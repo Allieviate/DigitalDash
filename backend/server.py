@@ -523,6 +523,26 @@ class DHUController:
 # Global DHU controller instance
 dhu_controller = DHUController()
 
+# ============ DEVICE PREFERENCES (MongoDB) ============
+
+class DevicePreferences(BaseModel):
+    serial: str
+    name: str = "Unknown Device"
+    connection_type: str = "usb"  # "usb" or "bluetooth"
+    aa_mode: str = "embedded"     # "embedded" or "fullscreen"
+    auto_launch: bool = True
+    skip_prompt: bool = False     # True = don't show prompt again for this device
+
+class DeviceEvent(BaseModel):
+    action: str  # "connected" or "disconnected"
+    serial: str = ""
+    name: str = "Unknown Device"
+    vendor_id: str = ""
+    product_id: str = ""
+
+# In-memory pending device event (picked up by status polling)
+_pending_device_event = {"event": None}
+
 class DHUStartRequest(BaseModel):
     x: int = 640
     y: int = 200
@@ -530,17 +550,113 @@ class DHUStartRequest(BaseModel):
     height: int = 480
     borderless: bool = True
     alwaysOnTop: bool = True
-    mode: str = "embedded"  # "embedded" or "fullscreen"
+    mode: str = "embedded"
 
 class DHUResizeRequest(BaseModel):
-    mode: str = "fullscreen"  # "embedded" or "fullscreen"
+    mode: str = "fullscreen"
     screen_width: int = 1920
     screen_height: int = 800
+
+@api_router.post("/dhu/device-event")
+async def device_event(event: DeviceEvent):
+    """Called by udev script when a phone is plugged in or removed"""
+    logger.info(f"Device event: {event.action} serial={event.serial} name={event.name}")
+
+    if event.action == "connected" and event.serial:
+        # Check if we have saved preferences for this device
+        prefs = await db.device_preferences.find_one(
+            {"serial": event.serial},
+            {"_id": 0}
+        )
+
+        if prefs and prefs.get("skip_prompt"):
+            # Known device with skip_prompt — auto-launch
+            mode = prefs.get("aa_mode", "embedded")
+            logger.info(f"Auto-launching OpenAuto for known device {event.serial} in {mode} mode")
+
+            if mode == "fullscreen":
+                x, y, w, h = 0, 0, 1920, 800
+            else:
+                x, y, w, h = 640, 200, 640, 480
+
+            result = await dhu_controller.start(x=x, y=y, width=w, height=h, borderless=True)
+            _pending_device_event["event"] = {
+                "type": "auto_launched",
+                "serial": event.serial,
+                "name": event.name,
+                "mode": mode,
+                "result": result.get("status"),
+            }
+            return {"status": "auto_launched", "mode": mode}
+        else:
+            # New device or prompt not skipped — notify frontend to show prompt
+            _pending_device_event["event"] = {
+                "type": "prompt_needed",
+                "serial": event.serial,
+                "name": event.name,
+                "vendor_id": event.vendor_id,
+                "product_id": event.product_id,
+            }
+            return {"status": "prompt_needed", "serial": event.serial}
+
+    elif event.action == "disconnected":
+        # Auto-stop OpenAuto
+        logger.info("Phone disconnected — stopping OpenAuto")
+        result = await dhu_controller.stop()
+        _pending_device_event["event"] = {
+            "type": "disconnected",
+            "serial": event.serial,
+        }
+        return {"status": "stopped", "message": "Phone disconnected, OpenAuto stopped"}
+
+    return {"status": "ignored"}
+
+@api_router.post("/dhu/device-preferences")
+async def save_device_preferences(prefs: DevicePreferences):
+    """Save per-device preferences (called after user confirms prompt)"""
+    await db.device_preferences.update_one(
+        {"serial": prefs.serial},
+        {"$set": {
+            "serial": prefs.serial,
+            "name": prefs.name,
+            "connection_type": prefs.connection_type,
+            "aa_mode": prefs.aa_mode,
+            "auto_launch": prefs.auto_launch,
+            "skip_prompt": prefs.skip_prompt,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True,
+    )
+    return {"status": "saved", "serial": prefs.serial}
+
+@api_router.get("/dhu/device-preferences/{serial}")
+async def get_device_preferences(serial: str):
+    """Get saved preferences for a specific device"""
+    prefs = await db.device_preferences.find_one(
+        {"serial": serial},
+        {"_id": 0}
+    )
+    if prefs:
+        return {"status": "found", "preferences": prefs}
+    return {"status": "not_found"}
+
+@api_router.get("/dhu/devices")
+async def list_known_devices():
+    """List all devices with saved preferences"""
+    devices = []
+    async for doc in db.device_preferences.find({}, {"_id": 0}):
+        devices.append(doc)
+    return {"devices": devices}
+
+@api_router.delete("/dhu/device-preferences/{serial}")
+async def delete_device_preferences(serial: str):
+    """Delete saved preferences for a device (will prompt again next time)"""
+    result = await db.device_preferences.delete_one({"serial": serial})
+    return {"status": "deleted" if result.deleted_count > 0 else "not_found"}
 
 @api_router.post("/dhu/start")
 async def start_dhu(config: DHUStartRequest):
     """Start Android Auto DHU with window configuration"""
-    # Calculate position based on mode
     if config.mode == "fullscreen":
         x, y, w, h = 0, 0, 1920, 800
     else:
@@ -559,7 +675,6 @@ async def resize_dhu(config: DHUResizeRequest):
     if config.mode == "fullscreen":
         x, y, w, h = 0, 0, config.screen_width, config.screen_height
     else:
-        # Embedded: center panel area between gauges
         w, h = 640, 480
         x = (config.screen_width - w) // 2
         y = 160
@@ -570,12 +685,19 @@ async def resize_dhu(config: DHUResizeRequest):
 @api_router.post("/dhu/stop")
 async def stop_dhu():
     """Stop Android Auto DHU"""
-    return await dhu_controller.stop()
+    result = await dhu_controller.stop()
+    _pending_device_event["event"] = None
+    return result
 
 @api_router.get("/dhu/status")
 async def get_dhu_status():
-    """Get DHU status"""
-    return dhu_controller.get_status()
+    """Get DHU status + any pending device events"""
+    status = dhu_controller.get_status()
+    # Attach pending device event (consumed on read)
+    if _pending_device_event["event"]:
+        status["device_event"] = _pending_device_event["event"]
+        _pending_device_event["event"] = None
+    return status
 
 # Include the router in the main app
 app.include_router(api_router)
