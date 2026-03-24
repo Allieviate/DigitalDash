@@ -7,64 +7,75 @@ Build a custom vehicle HMI (Human-Machine Interface) dashboard intended to run o
 ```
 /app
 ├── backend/
-│   └── server.py       # FastAPI + WebSocket + DHU Controller
+│   └── server.py       # FastAPI + WebSocket + DHU Controller + Device Prefs
 ├── frontend/
 │   └── src/
-│       ├── components/hmi/   # All dashboard components
+│       ├── components/hmi/   # Dashboard, AndroidAutoPanel, DevicePromptModal, etc.
 │       ├── contexts/         # VehicleData, Settings, Theme contexts
 │       └── App.js            # Main app with boot sequence
 └── scripts/
-    ├── install_openauto.sh   # v12.0 - Pi 5 complete build (VERIFIED WORKING)
-    ├── setup_pi.sh           # Full Pi setup
-    ├── rebuild_ground_up.sh  # Frontend/Backend rebuild
-    └── diagnose.sh           # Troubleshooting helper
+    ├── install_openauto.sh       # v12.0 - Pi 5 build (VERIFIED)
+    ├── usb-phone-monitor.sh      # udev trigger script for auto-detect
+    ├── setup_pi.sh               # Full Pi setup
+    ├── rebuild_ground_up.sh      # Frontend/Backend rebuild
+    └── diagnose.sh               # Troubleshooting helper
 ```
 
 ## Key API Endpoints
 - `GET /api/vehicle-data` - Vehicle signals (simulated)
 - `WS /ws/vehicle-data` - WebSocket live telemetry
-- `GET /api/diagnostics` - Detailed OBD-style diagnostics
+- `GET /api/diagnostics` - OBD-style diagnostics
 - `GET /api/themes` / `GET /api/themes/{id}` - Theme configs
-- `GET /api/settings` / `POST /api/settings` - User settings (MongoDB)
-- `POST /api/dhu/start` - Launch OpenAuto (supports mode: embedded/fullscreen)
+- `GET /api/settings` / `POST /api/settings` - User settings
+- `POST /api/dhu/start` - Launch OpenAuto (mode: embedded/fullscreen)
 - `POST /api/dhu/stop` - Stop OpenAuto
-- `POST /api/dhu/resize` - Resize/reposition OpenAuto window live
-- `GET /api/dhu/status` - OpenAuto running status
+- `POST /api/dhu/resize` - Resize window live
+- `GET /api/dhu/status` - Status + pending device events
+- `POST /api/dhu/device-event` - Called by udev when phone connects/disconnects
+- `POST /api/dhu/device-preferences` - Save per-device preferences
+- `GET /api/dhu/device-preferences/{serial}` - Get device preferences
+- `GET /api/dhu/devices` - List all known devices
+- `DELETE /api/dhu/device-preferences/{serial}` - Delete device preferences
 
-## Android Auto Integration
-- **Modes**: Embedded (center panel, gauges visible) and Fullscreen (takes over screen)
-- **Backend**: DHUController manages subprocess + window positioning via wmctrl/xdotool
-- **Frontend**: AndroidAutoPanel with mode toggle, calls /api/dhu/start and /api/dhu/resize
-- **Install Script**: install_openauto.sh v12.0 (VERIFIED on Pi 5, includes --force flag)
-- **Binary paths**: Checks openauto-launcher, build/bin/autoapp, bin/autoapp
+## USB Auto-Detect Flow
+1. Phone plugs in → udev rule fires → frank-usb-monitor script runs
+2. Script detects phone via ADB → calls POST /api/dhu/device-event
+3. Backend checks MongoDB for saved preferences:
+   - **Known device (skip_prompt=true)**: Auto-launches OpenAuto
+   - **New/unknown device**: Sets pending event, frontend shows DevicePromptModal
+4. User picks: Wired/BT, Embedded/Fullscreen, "Remember" checkbox
+5. Preferences saved to MongoDB, OpenAuto launches
+6. Phone unplugs → udev fires disconnect → backend auto-stops OpenAuto
+
+## MongoDB Collections
+- `device_preferences` - Per-device AA preferences (serial, name, connection_type, aa_mode, skip_prompt)
 
 ## Completed Features
 - [x] Boot sequence animation
-- [x] RPM gauge with VTEC indicator, shift light, digital readout
-- [x] Speed gauge with needle rotation
-- [x] Shift lights bar (7 LEDs, flash at redline)
-- [x] Digital speed + gear display (Lambo URUS style)
-- [x] Turn signals with green glow (SVG filter — bug FIXED)
-- [x] Warning panel (7 warning lights)
-- [x] Critical warning banner
-- [x] Android Auto panel with API integration
-- [x] Android Auto embedded vs fullscreen mode toggle
-- [x] Live mode switching via /api/dhu/resize
-- [x] Settings persistence via LocalStorage (all tabs wired)
-- [x] Diagnostics tab reads live oil pressure and calculates IAT
-- [x] install_openauto.sh v12.0 (verified on Pi 5, all patches included)
-- [x] DHU controller with consistent binary path detection
+- [x] RPM + Speed gauges (PNG-based with needle rotation)
+- [x] Shift lights bar, digital speed/gear display
+- [x] Turn signals with SVG glow (bug fixed)
+- [x] Warning panel (7 lights) + critical warning banner
+- [x] Android Auto embedded vs fullscreen mode
+- [x] USB auto-detect via udev rules + auto-launch
+- [x] DevicePromptModal (connection type, display mode, remember checkbox)
+- [x] Per-device preferences stored in MongoDB
+- [x] Auto-disconnect when phone unplugged
+- [x] Manual launch fallback in Settings/Connectivity
+- [x] Settings persistence via LocalStorage (all tabs)
+- [x] Diagnostics reads live oil pressure + calculated IAT
+- [x] install_openauto.sh v12.0 with udev auto-detect rules
 
 ## Completed Phases
-- Phase 0 (P0): Android Auto API integration + Settings persistence + Script audit
-- Phase P1: Embedded vs fullscreen mode + Turn signal glow fix + install_openauto.sh v12.0
+- P0: Android Auto API integration + Settings persistence + Script audit
+- P1: Embedded vs fullscreen mode + Turn signal fix + Script v12.0
+- P1.5: USB auto-detect + device preferences + prompt modal
 
 ## Upcoming Tasks
-- **P2**: Info gauges (Fuel, Coolant, Battery, Oil) optionally on dashboard
-- **P2**: Any remaining visual polish or layout refinements
+- **P2**: Info gauges (Fuel, Coolant, Battery, Oil) on dashboard
+- **P2**: Visual polish and layout refinements
 
-## Notes
-- User environment: Raspberry Pi 5 (4GB)
-- Settings stored in browser LocalStorage under key `fran.dashboard.settings.v2`
-- Vehicle data is simulated via backend VehicleSimulator class
-- DO NOT add -DGST_BUILD=TRUE to openauto cmake (QGlib not available on Bookworm)
+## Critical Notes
+- DO NOT add -DGST_BUILD=TRUE to openauto cmake (QGlib unavailable on Bookworm)
+- install_openauto.sh is VERIFIED working on Pi 5 — do not modify build steps
+- Settings stored in localStorage under key `fran.dashboard.settings.v2`
