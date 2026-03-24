@@ -7,12 +7,12 @@ Build a custom vehicle HMI (Human-Machine Interface) dashboard intended to run o
 ```
 /app
 ├── backend/
-│   └── server.py       # FastAPI + WebSocket + DHU Controller + Device Prefs
+│   └── server.py       # FastAPI + WebSocket + DHU Controller + ADB Monitor + Device Prefs
 ├── frontend/
 │   └── src/
 │       ├── components/hmi/
-│       │   ├── Dashboard.jsx          # Main dashboard layout (embedded/fullscreen AA)
-│       │   ├── AndroidAutoPanel.jsx   # AA panel with mode toggle + API integration
+│       │   ├── Dashboard.jsx          # Main layout (hides AA when no phone)
+│       │   ├── AndroidAutoPanel.jsx   # AA panel (only when phone connected)
 │       │   ├── DevicePromptModal.jsx  # First-time device preferences prompt
 │       │   ├── SavedDevicesTab.jsx    # Device management in Settings
 │       │   ├── CustomGauges.jsx       # RPM + Speed gauges
@@ -31,56 +31,49 @@ Build a custom vehicle HMI (Human-Machine Interface) dashboard intended to run o
 │       │   └── ThemeContext.js         # Theme management
 │       └── App.js
 └── scripts/
-    ├── install_openauto.sh       # v12.0 - Pi 5 build (VERIFIED)
+    ├── install_openauto.sh       # v12.0 (VERIFIED on Pi 5)
     ├── usb-phone-monitor.sh      # udev trigger script
-    ├── setup_pi.sh               # Full Pi setup
-    └── rebuild_ground_up.sh      # Quick rebuild
+    ├── setup_pi.sh
+    └── rebuild_ground_up.sh
 ```
 
+## Key Features
+- **Auto-detect**: Backend ADB polling (4s interval) detects phone connect/disconnect
+- **Device prompt**: First-time devices show preferences modal (USB/BT, Embedded/Fullscreen, Remember)
+- **Auto-launch**: Known devices with skip_prompt=true launch AA without prompt
+- **Auto-disconnect**: Phone unplug stops OpenAuto automatically
+- **Clean UI**: AA panel hidden when no phone connected, no clutter
+- **Saved Devices**: Settings tab to manage remembered devices
+
 ## Key API Endpoints
-- `GET /api/vehicle-data` - Vehicle signals (simulated)
-- `WS /ws/vehicle-data` - WebSocket live telemetry
-- `POST /api/dhu/start` - Launch OpenAuto (mode: embedded/fullscreen)
-- `POST /api/dhu/stop` - Stop OpenAuto
-- `POST /api/dhu/resize` - Resize window live
-- `GET /api/dhu/status` - Status + pending device events
-- `POST /api/dhu/device-event` - Called by udev on phone connect/disconnect
-- `POST /api/dhu/device-preferences` - Save per-device preferences
-- `GET /api/dhu/device-preferences/{serial}` - Get device prefs
-- `GET /api/dhu/devices` - List all known devices
-- `DELETE /api/dhu/device-preferences/{serial}` - Delete device prefs
-
-## USB Auto-Detect Flow
-1. Phone plugs in → udev rule fires → frank-usb-monitor script
-2. Script detects phone via ADB → POST /api/dhu/device-event
-3. Known device (skip_prompt=true) → auto-launches OpenAuto
-4. New device → frontend shows DevicePromptModal
-5. User picks prefs → saved to MongoDB → launches
-6. Phone unplugs → auto-stops OpenAuto
-
-## MongoDB Collections
-- `device_preferences` - Per-device AA prefs (serial, name, connection_type, aa_mode, skip_prompt)
+- `GET /api/dhu/status` - Status + phone_connected + device events
+- `POST /api/dhu/device-event` - Called by udev/ADB on connect/disconnect
+- `POST /api/dhu/device-preferences` - Save per-device prefs
+- `GET /api/dhu/devices` - List known devices
+- `DELETE /api/dhu/device-preferences/{serial}` - Remove device
+- `POST /api/dhu/start` / `POST /api/dhu/stop` / `POST /api/dhu/resize`
 
 ## Completed Features
-- [x] Boot sequence animation
-- [x] RPM + Speed gauges (PNG-based with needle rotation)
-- [x] Shift lights, digital speed/gear, turn signals (SVG glow)
-- [x] Warning panel (7 lights) + critical warning banner
-- [x] Android Auto embedded vs fullscreen mode
-- [x] USB auto-detect via udev + auto-launch
-- [x] DevicePromptModal (connection type, display mode, remember checkbox)
-- [x] Per-device preferences (MongoDB)
-- [x] Saved Devices management in Settings
-- [x] Auto-disconnect on phone unplug
-- [x] Settings persistence via LocalStorage (all tabs)
-- [x] Diagnostics reads live oil pressure + calculated IAT
-- [x] install_openauto.sh v12.0 with udev auto-detect rules
+- [x] All gauges (RPM, Speed, Shift lights, Gear, Turn signals, Warnings)
+- [x] Android Auto embedded/fullscreen modes
+- [x] USB auto-detect via ADB polling + udev rules
+- [x] Device preferences prompt + saved devices management
+- [x] Auto-launch for known devices, auto-stop on disconnect
+- [x] AA panel hidden when no phone connected (clean UI)
+- [x] Settings persistence (LocalStorage)
+- [x] install_openauto.sh v12.0 (verified on Pi 5)
+
+## Bug Fixes Applied
+- Fixed: AA panel always visible (now hidden when no phone)
+- Fixed: Black screen on launch (fullscreen only when DHU running + mode=fullscreen)
+- Fixed: Auto-connect not working (added ADB polling background task)
+- Fixed: Device prompt not showing (ADB monitor triggers device-event flow)
+- Fixed: Turn signal intermittent glow (SVG filter instead of CSS blur)
 
 ## Upcoming Tasks
-- **P2**: Info gauges (Fuel, Coolant, Battery, Oil) on dashboard
-- **P2**: Visual polish and layout refinements
+- P2: Info gauges (Fuel, Coolant, Battery, Oil) on dashboard
+- P2: Visual polish and layout refinements
 
 ## Critical Notes
-- DO NOT add -DGST_BUILD=TRUE to openauto cmake (QGlib unavailable on Bookworm)
-- install_openauto.sh v12.0 VERIFIED on Pi 5
-- Settings in localStorage under key `fran.dashboard.settings.v2`
+- DO NOT add -DGST_BUILD=TRUE to cmake (QGlib unavailable on Bookworm)
+- install_openauto.sh v12.0 VERIFIED — don't modify build steps
