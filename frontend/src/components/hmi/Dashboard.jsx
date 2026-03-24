@@ -11,7 +11,16 @@ export const Dashboard = ({ onOpenSettings }) => {
   const { theme, themeId } = useTheme();
   const { signals, isConnected } = useVehicleData();
   const [showAndroidAuto, setShowAndroidAuto] = React.useState(false);
-  const [phoneConnected, setPhoneConnected] = React.useState(true); // Simulated for demo
+  const [aaActiveMode, setAaActiveMode] = React.useState(null); // null | 'embedded' | 'fullscreen'
+  const [phoneConnected, setPhoneConnected] = React.useState(true);
+
+  const isFullscreenAA = aaActiveMode === 'fullscreen';
+
+  const handleAAModeChange = React.useCallback((mode) => {
+    setAaActiveMode(mode);
+    if (mode) setShowAndroidAuto(true);
+    else setShowAndroidAuto(false);
+  }, []); // Simulated for demo
 
   // Calculate background color - GRADUAL transition from 86-120 mph
   const speed = signals.speed_mph;
@@ -114,53 +123,64 @@ export const Dashboard = ({ onOpenSettings }) => {
       {/* Main Layout */}
       <div className="absolute inset-0">
         
-        {/* TOP CENTER SECTION */}
-        <div className="absolute top-0 left-0 right-0 z-10 flex flex-col items-center pt-4">
-          
-          {/* Shift Lights Bar */}
-          <ShiftLightsBar className="mb-3" />
-          
-          {/* Digital Speed + Gear (URUS style) */}
-          <DigitalSpeedGear className="mb-3" />
-          
-          {/* Turn Signals */}
-          <TurnSignalsRow className="mb-3" />
-        </div>
-
-        {/* GAUGES ROW */}
-        <div className="absolute inset-0 flex items-end justify-center pb-24 px-8">
-          
-          {/* LEFT: RPM Gauge */}
-          <div className="relative flex items-end justify-center">
-            <RpmGauge 
-              size={640}
-              vtecStartRpm={3000}
-              shiftRpm={7800}
-              maxRpm={8000}
-            />
+        {/* TOP CENTER SECTION — hidden in fullscreen AA */}
+        {!isFullscreenAA && (
+          <div className="absolute top-0 left-0 right-0 z-10 flex flex-col items-center pt-4">
+            
+            {/* Shift Lights Bar */}
+            <ShiftLightsBar className="mb-3" />
+            
+            {/* Digital Speed + Gear (URUS style) */}
+            <DigitalSpeedGear className="mb-3" />
+            
+            {/* Turn Signals */}
+            <TurnSignalsRow className="mb-3" />
           </div>
+        )}
 
-          {/* CENTER GAP - Android Auto */}
-          <div 
-            className="flex flex-col items-center justify-start mx-6 pt-10" 
-            style={{ width: '500px', height: '450px' }}
-          >
-            <AndroidAutoPanel isActive={showAndroidAuto} />
+        {/* GAUGES ROW / FULLSCREEN AA */}
+        {isFullscreenAA ? (
+          /* Fullscreen Android Auto — takes over entire screen */
+          <div className="absolute inset-0 z-20">
+            <AndroidAutoPanel isActive={showAndroidAuto} onModeChange={handleAAModeChange} />
           </div>
+        ) : (
+          <div className="absolute inset-0 flex items-end justify-center pb-24 px-8">
+            
+            {/* LEFT: RPM Gauge */}
+            <div className="relative flex items-end justify-center">
+              <RpmGauge 
+                size={640}
+                vtecStartRpm={3000}
+                shiftRpm={7800}
+                maxRpm={8000}
+              />
+            </div>
 
-          {/* RIGHT: Speed Gauge */}
-          <div className="relative flex items-end justify-center">
-            <SpeedGauge 
-              size={640}
-              maxSpeed={170}
-            />
+            {/* CENTER GAP - Android Auto */}
+            <div 
+              className="flex flex-col items-center justify-start mx-6 pt-10" 
+              style={{ width: '500px', height: '450px' }}
+            >
+              <AndroidAutoPanel isActive={showAndroidAuto} onModeChange={handleAAModeChange} />
+            </div>
+
+            {/* RIGHT: Speed Gauge */}
+            <div className="relative flex items-end justify-center">
+              <SpeedGauge 
+                size={640}
+                maxSpeed={170}
+              />
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Bottom Warning Strip - MORE SPREAD OUT */}
-        <div className="absolute bottom-0 left-0 right-0 z-10">
-          <WarningPanel className="py-5 px-20" />
-        </div>
+        {/* Bottom Warning Strip — hidden in fullscreen AA */}
+        {!isFullscreenAA && (
+          <div className="absolute bottom-0 left-0 right-0 z-10">
+            <WarningPanel className="py-5 px-20" />
+          </div>
+        )}
       </div>
     </div>
   );

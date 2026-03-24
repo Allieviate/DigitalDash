@@ -195,6 +195,7 @@ const DEFAULT_SETTINGS = {
     rpm: true, speed: true, gear: true,
     shiftlights: true, turnsignals: true, diagnostics: false,
   },
+  aa_mode: 'embedded',
   layout: DEFAULT_LAYOUT,
   featureToggles: DEFAULT_FEATURE_TOGGLES,
 };

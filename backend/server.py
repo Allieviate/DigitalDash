@@ -524,23 +524,48 @@ class DHUController:
 dhu_controller = DHUController()
 
 class DHUStartRequest(BaseModel):
-    x: int = 640      # Centered for 1920 width
-    y: int = 200      # Below top widgets
-    width: int = 640  # OpenAuto default
-    height: int = 480 # OpenAuto default
+    x: int = 640
+    y: int = 200
+    width: int = 640
+    height: int = 480
     borderless: bool = True
     alwaysOnTop: bool = True
+    mode: str = "embedded"  # "embedded" or "fullscreen"
+
+class DHUResizeRequest(BaseModel):
+    mode: str = "fullscreen"  # "embedded" or "fullscreen"
+    screen_width: int = 1920
+    screen_height: int = 800
 
 @api_router.post("/dhu/start")
 async def start_dhu(config: DHUStartRequest):
     """Start Android Auto DHU with window configuration"""
+    # Calculate position based on mode
+    if config.mode == "fullscreen":
+        x, y, w, h = 0, 0, 1920, 800
+    else:
+        x, y, w, h = config.x, config.y, config.width, config.height
+
     return await dhu_controller.start(
-        x=config.x,
-        y=config.y,
-        width=config.width,
-        height=config.height,
-        borderless=config.borderless
+        x=x, y=y, width=w, height=h, borderless=config.borderless
     )
+
+@api_router.post("/dhu/resize")
+async def resize_dhu(config: DHUResizeRequest):
+    """Resize/reposition OpenAuto window without restarting"""
+    if not dhu_controller.is_running():
+        return {"status": "error", "message": "OpenAuto is not running"}
+
+    if config.mode == "fullscreen":
+        x, y, w, h = 0, 0, config.screen_width, config.screen_height
+    else:
+        # Embedded: center panel area between gauges
+        w, h = 640, 480
+        x = (config.screen_width - w) // 2
+        y = 160
+
+    await dhu_controller._configure_window(x, y, w, h, borderless=True)
+    return {"status": "running", "mode": config.mode, "geometry": {"x": x, "y": y, "width": w, "height": h}}
 
 @api_router.post("/dhu/stop")
 async def stop_dhu():
