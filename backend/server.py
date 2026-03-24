@@ -314,23 +314,29 @@ class DHUController:
         # Supported Android Auto implementations (in order of preference)
         self.implementations = [
             {
-                "name": "web-auto-electron",
-                "bin": "/usr/local/bin/web-auto-electron",
-                "check": "/opt/web-auto/package.json",
-                "process_name": "electron"
+                "name": "openauto-launcher",
+                "bin": "/usr/local/bin/openauto-launcher",
+                "check": "/usr/local/bin/openauto-launcher",
+                "process_name": "autoapp"
             },
             {
-                "name": "openauto",
+                "name": "openauto-build",
                 "bin": "/opt/openauto/openauto/build/bin/autoapp",
                 "check": "/opt/openauto/openauto/build/bin/autoapp",
                 "process_name": "autoapp"
             },
             {
-                "name": "openauto-launcher",
+                "name": "openauto-bin",
+                "bin": "/opt/openauto/openauto/bin/autoapp",
+                "check": "/opt/openauto/openauto/bin/autoapp",
+                "process_name": "autoapp"
+            },
+            {
+                "name": "openauto-symlink",
                 "bin": "/usr/local/bin/openauto",
                 "check": "/usr/local/bin/openauto",
                 "process_name": "autoapp"
-            }
+            },
         ]
         
     def get_available_implementation(self):
@@ -349,7 +355,7 @@ class DHUController:
                 result = subprocess.run(['pgrep', '-f', impl["process_name"]], capture_output=True, text=True)
                 if result.returncode == 0:
                     return True
-            except:
+            except Exception:
                 pass
         return False
     
@@ -432,7 +438,7 @@ class DHUController:
                         )
                         if result.stdout.strip():
                             window_id = result.stdout.strip().split('\n')[0]
-                    except:
+                    except Exception:
                         pass
             
             if not window_id:
@@ -488,11 +494,11 @@ class DHUController:
                 try:
                     os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
                     self.process.wait(timeout=3)
-                except:
+                except Exception:
                     try:
                         os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
                         self.process.wait(timeout=2)
-                    except:
+                    except Exception:
                         pass
             
             self.process = None

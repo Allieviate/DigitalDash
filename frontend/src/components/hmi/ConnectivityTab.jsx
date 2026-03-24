@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Wifi, Bluetooth, Volume2, Smartphone, Loader2 } from 'lucide-react';
+import { useSettings } from '../../contexts/SettingsContext';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -191,9 +192,13 @@ function VolumeSlider({ value, onChange }) {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function ConnectivityTab() {
-  const [wifiEnabled, setWifiEnabled]           = useState(true);
-  const [bluetoothEnabled, setBluetoothEnabled] = useState(true);
-  const [volume, setVolume]                     = useState(72);
+  const { settings, updateSetting } = useSettings();
+  const wifiEnabled = settings.wifi_enabled ?? true;
+  const bluetoothEnabled = settings.bluetooth_enabled ?? true;
+  const volume = settings.chime_volume ?? 72;
+  const setWifiEnabled = (val) => updateSetting('wifi_enabled', val);
+  const setBluetoothEnabled = (val) => updateSetting('bluetooth_enabled', val);
+  const setVolume = (val) => updateSetting('chime_volume', val);
   const [projectionLaunched, setProjectionLaunched] = useState(false);
   const [projectionLoading, setProjectionLoading] = useState(false);
   const [projectionError, setProjectionError] = useState(null);

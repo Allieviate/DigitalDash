@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Gauge, Zap, Hash, Lightbulb, TrendingUp, Activity } from 'lucide-react';
+import { useSettings } from '../../contexts/SettingsContext';
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 
@@ -222,14 +223,17 @@ const WIDGETS = [
 ];
 
 export default function DashBuilderTab() {
-  const [preset, setPreset] = useState('street');
-  const [widgets, setWidgets] = useState({
+  const { settings, updateSetting } = useSettings();
+  const preset = settings.layout_preset ?? 'street';
+  const widgets = settings.widget_visibility ?? {
     rpm: true, speed: true, gear: true,
     shiftlights: true, turnsignals: true, diagnostics: false,
-  });
-  const [gaugeScale, setGaugeScale] = useState(100);
+  };
+  const gaugeScale = settings.gauge_scale ?? 100;
 
-  const toggleWidget = (id) => setWidgets(prev => ({ ...prev, [id]: !prev[id] }));
+  const setPreset = (val) => updateSetting('layout_preset', val);
+  const setGaugeScale = (val) => updateSetting('gauge_scale', val);
+  const toggleWidget = (id) => updateSetting('widget_visibility', { ...widgets, [id]: !widgets[id] });
 
   return (
     <div style={{ maxWidth: 600 }}>
@@ -283,7 +287,7 @@ export default function DashBuilderTab() {
           borderRadius: 3,
           padding: '4px 10px',
         }}>
-          Values saved locally — LayoutContext sync coming in Step 6
+          Values saved locally — Layout changes take effect on next refresh
         </span>
       </div>
     </div>

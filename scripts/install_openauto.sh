@@ -216,7 +216,7 @@ echo "[4/7] Building OpenAuto (openDsh)..."
 
 cd $OPENAUTO_DIR
 
-if [ -f "$OPENAUTO_DIR/openauto/bin/autoapp" ]; then
+if [ -f "$OPENAUTO_DIR/openauto/build/bin/autoapp" ]; then
     echo -e "${GREEN}OpenAuto already built, skipping...${NC}"
 else
     if [ ! -d "openauto" ]; then
@@ -255,14 +255,23 @@ cat > /usr/local/bin/openauto-launcher << 'EOF'
 #!/bin/bash
 export DISPLAY=:0
 export QT_QPA_PLATFORM=xcb
-export LD_LIBRARY_PATH=/opt/openauto/openauto/lib:/usr/local/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/opt/openauto/openauto/build/lib:/opt/openauto/openauto/lib:/usr/local/lib:$LD_LIBRARY_PATH
 export PULSE_SERVER=unix:/run/user/$(id -u)/pulse/native
 
 pkill autoapp 2>/dev/null || true
 sleep 0.5
 
-cd /opt/openauto/openauto/bin
-exec ./autoapp "$@"
+# Try build directory first (standard cmake output), then flat bin
+if [ -x /opt/openauto/openauto/build/bin/autoapp ]; then
+    cd /opt/openauto/openauto/build/bin
+    exec ./autoapp "$@"
+elif [ -x /opt/openauto/openauto/bin/autoapp ]; then
+    cd /opt/openauto/openauto/bin
+    exec ./autoapp "$@"
+else
+    echo "ERROR: autoapp binary not found"
+    exit 1
+fi
 EOF
 
 chmod +x /usr/local/bin/openauto-launcher
@@ -277,21 +286,41 @@ echo -e "${GREEN}[5/7] Launcher created${NC}"
 echo "[6/7] Setting up USB permissions..."
 
 cat > /etc/udev/rules.d/51-android.rules << 'EOF'
-# Android Auto USB permissions
-SUBSYSTEM=="usb", ATTR{idVendor}=="*", MODE="0666", GROUP="plugdev"
+# Android Auto USB permissions - Comprehensive vendor list
+# Google
 SUBSYSTEM=="usb", ATTR{idVendor}=="18d1", MODE="0666", GROUP="plugdev"
+# Samsung
 SUBSYSTEM=="usb", ATTR{idVendor}=="04e8", MODE="0666", GROUP="plugdev"
+# OnePlus
 SUBSYSTEM=="usb", ATTR{idVendor}=="2a70", MODE="0666", GROUP="plugdev"
+# Xiaomi
 SUBSYSTEM=="usb", ATTR{idVendor}=="2717", MODE="0666", GROUP="plugdev"
+# Huawei
 SUBSYSTEM=="usb", ATTR{idVendor}=="12d1", MODE="0666", GROUP="plugdev"
+# Motorola
 SUBSYSTEM=="usb", ATTR{idVendor}=="22b8", MODE="0666", GROUP="plugdev"
+# Sony
 SUBSYSTEM=="usb", ATTR{idVendor}=="0fce", MODE="0666", GROUP="plugdev"
+# HTC
 SUBSYSTEM=="usb", ATTR{idVendor}=="0bb4", MODE="0666", GROUP="plugdev"
+# LG
 SUBSYSTEM=="usb", ATTR{idVendor}=="1004", MODE="0666", GROUP="plugdev"
+# OPPO / Realme
+SUBSYSTEM=="usb", ATTR{idVendor}=="22d9", MODE="0666", GROUP="plugdev"
+# Nokia
+SUBSYSTEM=="usb", ATTR{idVendor}=="0421", MODE="0666", GROUP="plugdev"
+# Nothing Phone
+SUBSYSTEM=="usb", ATTR{idVendor}=="2970", MODE="0666", GROUP="plugdev"
+# Catch-all for any USB device (fallback)
+SUBSYSTEM=="usb", MODE="0666", GROUP="plugdev"
 EOF
 
 udevadm control --reload-rules
 udevadm trigger
+
+# Add current user to plugdev group
+REAL_USER="${SUDO_USER:-$(logname 2>/dev/null || echo pi)}"
+usermod -aG plugdev "$REAL_USER" 2>/dev/null || true
 
 echo -e "${GREEN}[6/7] USB permissions configured${NC}"
 
@@ -300,13 +329,21 @@ echo -e "${GREEN}[6/7] USB permissions configured${NC}"
 # ============================================
 echo "[7/7] Verifying installation..."
 
-if [ -f "$OPENAUTO_DIR/openauto/bin/autoapp" ]; then
+AUTOAPP_BIN=""
+if [ -f "$OPENAUTO_DIR/openauto/build/bin/autoapp" ]; then
+    AUTOAPP_BIN="$OPENAUTO_DIR/openauto/build/bin/autoapp"
+elif [ -f "$OPENAUTO_DIR/openauto/bin/autoapp" ]; then
+    AUTOAPP_BIN="$OPENAUTO_DIR/openauto/bin/autoapp"
+fi
+
+if [ -n "$AUTOAPP_BIN" ]; then
     echo ""
     echo "=========================================="
     echo -e "${GREEN}  OpenAuto Installation Complete!${NC}"
     echo "=========================================="
     echo ""
-    echo "Binary: $OPENAUTO_DIR/openauto/bin/autoapp"
+    echo "Binary: $AUTOAPP_BIN"
+    echo "Launcher: /usr/local/bin/openauto-launcher"
     echo ""
     echo "To launch: android-auto"
     echo ""
@@ -319,5 +356,8 @@ if [ -f "$OPENAUTO_DIR/openauto/bin/autoapp" ]; then
     echo "  4. Accept USB debugging prompt on phone"
 else
     echo -e "${RED}Installation FAILED - autoapp not found${NC}"
+    echo "Checked paths:"
+    echo "  - $OPENAUTO_DIR/openauto/build/bin/autoapp"
+    echo "  - $OPENAUTO_DIR/openauto/bin/autoapp"
     exit 1
 fi

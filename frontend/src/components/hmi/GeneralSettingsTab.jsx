@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Sun, Moon, RefreshCw } from 'lucide-react';
+import { useSettings } from '../../contexts/SettingsContext';
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 
@@ -197,10 +198,15 @@ function UnitsToggle({ value, onChange }) {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function GeneralSettingsTab() {
-  const [brightness, setBrightness] = useState(80);
-  const [autoDim, setAutoDim]       = useState(false);
-  const [units, setUnits]           = useState('imperial');
-  const [rebooting, setRebooting]   = useState(false);
+  const { settings, updateSetting } = useSettings();
+  const brightness = settings.brightness ?? 80;
+  const autoDim = settings.auto_dim ?? false;
+  const units = settings.units ?? 'imperial';
+  const [rebooting, setRebooting] = React.useState(false);
+
+  const setBrightness = (val) => updateSetting('brightness', val);
+  const setAutoDim = (val) => updateSetting('auto_dim', val);
+  const setUnits = (val) => updateSetting('units', val);
 
   const handleReboot = () => {
     setRebooting(true);
@@ -291,7 +297,7 @@ export default function GeneralSettingsTab() {
           border: '1px solid rgba(255,255,255,0.06)',
           borderRadius: 3, padding: '4px 10px',
         }}>
-          Values saved locally — GlobalContext sync coming in Step 7
+          Settings saved locally
         </span>
       </div>
     </div>

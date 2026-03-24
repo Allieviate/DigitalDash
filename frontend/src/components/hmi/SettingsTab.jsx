@@ -5,17 +5,24 @@ import ConnectivityTab from './ConnectivityTab';
 import DashBuilderTab from './DashBuilderTab';
 import { Settings2 } from 'lucide-react'; 
 import GeneralSettingsTab from './GeneralSettingsTab';
+import { useSettings } from '../../contexts/SettingsContext';
 
 // ── Vehicle Parameters Tab with RPM & Shift Light Controls ──
 const VehicleParamsTab = () => {
-  // Local state for our shift light parameters (Default K24 values)
-  const [yellowShift, setYellowShift] = useState(7000);
-  const [redShift, setRedShift] = useState(7800);
-  const [redline, setRedline] = useState(8500);
+  const { settings, updateSetting } = useSettings();
+  
+  // Read from persisted settings, fallback to defaults
+  const yellowShift = settings.yellow_shift ?? 7000;
+  const redShift = settings.red_shift ?? 7800;
+  const redline = settings.redline ?? 8500;
+  const warnCoolant = settings.warn_coolant ?? true;
+  const warnOil = settings.warn_oil ?? true;
 
-  // Local state for Warning Toggles
-  const [warnCoolant, setWarnCoolant] = useState(true);
-  const [warnOil, setWarnOil] = useState(true);
+  const setYellowShift = (val) => updateSetting('yellow_shift', val);
+  const setRedShift = (val) => updateSetting('red_shift', val);
+  const setRedline = (val) => updateSetting('redline', val);
+  const setWarnCoolant = (val) => updateSetting('warn_coolant', val);
+  const setWarnOil = (val) => updateSetting('warn_oil', val);
 
   // A helper component for our custom sliders
   const CustomSlider = ({ label, value, min, max, step, onChange, color }) => (
