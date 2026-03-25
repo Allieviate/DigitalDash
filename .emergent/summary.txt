@@ -1,34 +1,112 @@
 <analysis>**original_problem_statement**: 
-The user wants to create a feature-rich, stable vehicle HMI (Human-Machine Interface) dashboard application running on a Raspberry Pi 5, with a secondary goal of enabling Android Auto functionality. 
+The user wants to create a feature-rich, stable vehicle HMI (Human-Machine Interface) dashboard application running on a Raspberry Pi 5. The primary goal is to display vehicle data (RPM, speed, etc.) and integrate Android Auto functionality. A key secondary objective is to implement a minimalist, native Turn-by-Turn navigation widget by intercepting HUD data from Android Auto, avoiding a full video-feed embed.
 
 PRODUCT REQUIREMENTS:
-- A functional vehicle dashboard displaying RPM, speed, gear, and other data via WebSocket simulation.
-- Settings panel with multiple tabs for diagnostics, vehicle parameters, connectivity, and layout customization.
-- A robust, working installation script () to set up Android Auto and its dependencies specifically for the Raspberry Pi 5 architecture.
-- Ability to launch Android Auto as an overlay window on top of the React Dashboard.
+- A functional vehicle dashboard displaying simulated data via WebSockets.
+- A settings panel for configuration.
+- A robust, working installation script () for Android Auto on a Raspberry Pi 5.
+- Ability to launch Android Auto as an overlay or embedded window.
+- Automatic Android Auto launch upon phone connection, with device-specific user preferences.
+- A Saved Devices management screen in the settings.
+- A C++/QML module to display native Turn-by-Turn navigation data from Android Auto within the OpenAuto QML interface.
 
 **User's preferred language**: English
 
-**what currently exists?** 
-A full-stack application with a React (Framer Motion, Tailwind) frontend and a FastAPI backend simulating vehicle data via WebSockets. After extensive debugging, there is now a fully functional, highly-customized  script that successfully compiles and installs  and  from source on a Raspberry Pi 5 (bypassing OMX/VideoCore limitations, OOM crashes, and C++ dependency deprecations).
+**what currently exists?**
+A full-stack application with a React frontend and a FastAPI backend. The backend simulates vehicle data via WebSockets, manages the Android Auto (OpenAuto) subprocess, and includes an  for automatic phone detection. The frontend displays the dashboard and includes a comprehensive settings panel. A highly-customized  script successfully compiles and installs Android Auto on a Raspberry Pi 5. A complete, self-contained C++/QML module for a native Turn-by-Turn navigation widget has been generated and is located in , ready for user integration.
 
 **Last working item**:
-- Last item agent was working: Finalizing the ==========================================
+- Last item agent was working: The agent just completed a code generation task. It created a C++/QML module for a native Turn-by-Turn (TBT) navigation widget. This module is designed to be integrated into the user's separate OpenAuto project. It intercepts navigation data from Android Auto's protobuf messages and displays it in a minimalist QML UI with hardware-accelerated animations. All the code, including C++ bridge classes, a QML component, SVG icons, and detailed integration instructions, has been created and placed in the  directory.
+- Status: COMPLETED
+- Agent Testing Done: N (This is a code generation task for a separate C++/QML project. It cannot be compiled or tested in the current environment.)
+- Which testing method agent to use? NA (User must test this on their local Raspberry Pi 5 hardware by following the provided integration guide.)
+- User Testing Done: N
+
+**All Pending/In progress Issue list**:
+  - Issue 1: Intermittent Turn Signal Glow Bug
+     - Attempted fixes: An agent rewrote  to use a more robust SVG filter approach instead of CSS. However, this fix has not been verified on hardware. It was also noted that the main dashboard might be using a different component ( in ).
+     - Next debug checklist: Consolidate the turn signal components to use the new SVG filter implementation. The user needs to test the visual effect on the Raspberry Pi hardware.
+     - Why fix this issue and what will be achieved with the fix? It will provide a stable and consistent visual indicator for turn signals, improving the UI polish.
+     - Status: NOT STARTED
+     - Is recurring issue? Y
+     - Should Test frontend/backend/both after fix? Frontend (User Hardware Testing)
+     - Blocked on other issue: None
+
+**In progress Task List**:
+  - None.
+
+**Upcoming and Future Tasks**
+- **P0: User to integrate the Turn-by-Turn Navigation Widget**. The user needs to follow the step-by-step instructions in  to compile and add the new C++/QML module to their main OpenAuto project on their Raspberry Pi.
+- **P1: Integrate Info Gauges onto Dashboard**. The Fuel, Coolant, Battery, and Oil pressure gauges are currently only visible in the Diagnostics tab. They need to be added to the main dashboard display for at-a-glance visibility.
+- **P2: Visual polish and layout refinements**. General UI/UX improvements to the dashboard.
+- **Future Tasks:**
+  - OBD1/OBD2 real data source integration (to replace the current WebSocket simulation).
+  - Theme customization options.
+  - Implement drag-and-drop layout functionality in the Dash Builder tab.
+
+**Completed work in this session**
+- **Generated Native Turn-by-Turn Navigation Widget Code**: Created a complete, self-contained C++/QML module in  with C++ bridge code (, ), a QML component (), all necessary SVG assets for turn icons, and a comprehensive  guide.
+- **Fixed 5 Major Bugs**:
+    - **Auto-connect**: Implemented a reliable  background task in  to poll for device connections.
+    - **AA panel always visible**: Rewrote  to only render the  when the backend reports .
+    - **Black screen on launch**: Corrected  to only show a black background when the Android Auto process is fully running.
+    - **Device prompt not appearing**: Fixed by implementing robust ADB polling.
+    - **Devices not saving**: Resolved as a consequence of the prompt now working correctly.
+- **Created Saved Devices Management Screen**: Built the  component and integrated it into the Settings panel, allowing users to view, edit, and delete preferences for remembered phones.
+- **Implemented USB Auto-Detect & Device Preferences**: Created a full workflow for phone connection/disconnection detection, a  for first-time setup, and stored preferences in MongoDB.
+- **Refined Android Auto Integration**: Implemented Embedded and Fullscreen modes for the Android Auto window, controllable from the UI and saved per device.
+- **Hardened **: Audited and updated the script to include the new udev rules and monitor script, ensuring a robust installation process.
+
+**Earlier issues found/mentioned but not fixed**
+   - Issue 1: Intermittent Turn Signal Glow Bug (See Pending Issues).
+
+**Known issue recurrence from previous fork**
+  - None.
+
+**Code Architecture**
+
+
+**Key Technical Concepts**
+- **Frontend**: React, Framer Motion, Tailwind CSS, WebSockets.
+- **Backend**: FastAPI,  for background tasks (), MongoDB (), Python .
+- **Hardware Integration**:  rules,  for Android device detection.
+- **C++/QML**: The newly generated code uses Qt's  system with  and signals/slots to bridge data from a C++ backend to a QML frontend.
+
+**key DB schema**
+- ** collection**:
+  -  (string, PK),  (string),  (string),  (string),  (boolean),  (datetime)
+
+**All files of reference**
+-  (NEW: Critical for the user's next step)
+-  (NEW: Directory containing the entire TBT widget module)
+-  (Modified for ADB polling and device management)
+-  (Modified for conditional UI rendering)
+-  (NEW)
+- ==========================================
   OpenAuto Installer for FRANK Dashboard
-  Version 11.0 - Pi 5 Complete Build
+  Version 12.0 - Pi 5 Complete Build
 ==========================================
 
-[0/7] Preparing system...
-[1;33mCleaning conflicting libraries...[0m
-[0;32m[0/7] System prepared[0m
-[1/7] Installing dependencies...
+
+[0;36m[0/8] Preparing system...[0m
+-------------------------------------------
+[1;33mDisabled conflicting MongoDB repo files[0m
+[1;33mCleaning conflicting protobuf/abseil libraries from /usr/local...[0m
+[1;33mSetting up 2GB swap for compilation...[0m
+Setting up swapspace version 1, size = 2 GiB (2147479552 bytes)
+no label, UUID=c302b689-fa6f-4350-8004-8495ecf1433f
+[0;32mManual 2GB swap enabled[0m
+[0;32m[0/8] System prepared[0m
+
+[0;36m[1/8] Installing dependencies...[0m
+-------------------------------------------
 Hit:1 https://cloudfront.debian.net/debian bookworm InRelease
 Get:2 https://cloudfront.debian.net/debian bookworm-updates InRelease [55.4 kB]
 Get:3 https://deb.nodesource.com/node_20.x nodistro InRelease [12.1 kB]
 Get:4 https://cloudfront.debian.net/debian-security bookworm-security InRelease [48.0 kB]
 Get:5 https://deb.nodesource.com/node_20.x nodistro/main arm64 Packages [13.7 kB]
 Get:6 https://cloudfront.debian.net/debian-security bookworm-security/main arm64 Packages [290 kB]
-Fetched 419 kB in 1s (490 kB/s)
+Fetched 419 kB in 1s (681 kB/s)
 Reading package lists...
 Reading package lists...
 Building dependency tree...
@@ -91,23 +169,22 @@ The following additional packages will be installed:
   libevent-openssl-2.1-7 libevent-pthreads-2.1-7 libexpat1-dev libfaad2
   libfabric1 libfftw3-double3 libfftw3-single3 libflac12 libflite1
   libfluidsynth3 libfreeaptx0 libgbm-dev libgfortran-12-dev libgfortran5
-  libgl-dev libgles-dev libgles1 libgles2 libglib2.0-dev libglib2.0-dev-bin
-  libglu1-mesa libglu1-mesa-dev libglx-dev libgme0 libgraphene-1.0-0
-  libgs-common libgs10 libgs10-common libgsm1 libgssdp-1.6-0
-  libgstreamer-gl1.0-0 libgstreamer-plugins-bad1.0-0
-  libgstreamer-plugins-base1.0-0 libgudev-1.0-0 libgudev-1.0-dev
-  libgupnp-1.6-0 libgupnp-igd-1.0-4 libhwloc-dev libhwloc-plugins libhwloc15
-  libhwy1 libibverbs-dev libibverbs1 libicu-dev libidn12 libiec61883-0
-  libijs-0.35 libimath-3-1-29 libinput-bin libinput10 libinstpatch-1.0-2
-  libjack-dev libjack0 libjbig2dec0 libjs-jquery libjs-jquery-ui
-  libjs-sphinxdoc libjs-underscore libjson-glib-1.0-0 libjson-glib-1.0-common
-  libjsoncpp25 libjxl0.7 libjxr-tools libjxr0 libkate1 liblapack3
-  libldacbt-enc2 liblilv-0-0 liblqr-1-0 liblrdf0 libltc11 libltdl-dev libltdl7
-  libmagic-mgc libmagic1 libmagickcore-6.q16-6 libmagickcore-6.q16-6-extra
-  libmagickwand-6.q16-6 libmbedcrypto7 libmd4c0 libmjpegutils-2.1-0
-  libmodplug1 libmount-dev libmp3lame0 libmpcdec6 libmpeg2-4
-  libmpeg2encpp-2.1-0 libmpg123-0 libmplex2-2.1-0 libmtdev1 libmunge2
-  libmysofa1 libneon27 libnice10 libnl-3-dev libnl-route-3-200
+  libgl-dev libgles-dev libgles1 libgles2 libglib2.0-dev-bin libglu1-mesa
+  libglu1-mesa-dev libglx-dev libgme0 libgraphene-1.0-0 libgs-common libgs10
+  libgs10-common libgsm1 libgssdp-1.6-0 libgstreamer-gl1.0-0
+  libgstreamer-plugins-bad1.0-0 libgstreamer-plugins-base1.0-0 libgudev-1.0-0
+  libgudev-1.0-dev libgupnp-1.6-0 libgupnp-igd-1.0-4 libhwloc-dev
+  libhwloc-plugins libhwloc15 libhwy1 libibverbs-dev libibverbs1 libicu-dev
+  libidn12 libiec61883-0 libijs-0.35 libimath-3-1-29 libinput-bin libinput10
+  libinstpatch-1.0-2 libjack-dev libjack0 libjbig2dec0 libjs-jquery
+  libjs-jquery-ui libjs-sphinxdoc libjs-underscore libjson-glib-1.0-0
+  libjson-glib-1.0-common libjsoncpp25 libjxl0.7 libjxr-tools libjxr0 libkate1
+  liblapack3 libldacbt-enc2 liblilv-0-0 liblqr-1-0 liblrdf0 libltc11
+  libltdl-dev libltdl7 libmagic-mgc libmagic1 libmagickcore-6.q16-6
+  libmagickcore-6.q16-6-extra libmagickwand-6.q16-6 libmbedcrypto7 libmd4c0
+  libmjpegutils-2.1-0 libmodplug1 libmount-dev libmp3lame0 libmpcdec6
+  libmpeg2-4 libmpeg2encpp-2.1-0 libmpg123-0 libmplex2-2.1-0 libmtdev1
+  libmunge2 libmysofa1 libneon27 libnice10 libnl-3-dev libnl-route-3-200
   libnl-route-3-dev libnorm1 libnuma-dev libogg0 libopenal-data libopenal1
   libopencore-amrnb0 libopencore-amrwb0 libopenexr-3-1-30 libopengl-dev
   libopengl0 libopenh264-7 libopenjp2-7 libopenmpi-dev libopenmpi3 libopenmpt0
@@ -830,7 +907,7 @@ Get:523 https://cloudfront.debian.net/debian bookworm/main arm64 va-driver-all a
 Get:524 https://cloudfront.debian.net/debian bookworm/main arm64 vdpau-driver-all arm64 1.5-2 [4320 B]
 Get:525 https://cloudfront.debian.net/debian bookworm/main arm64 wmctrl arm64 1.07-7+b1 [19.8 kB]
 Get:526 https://cloudfront.debian.net/debian bookworm/main arm64 xdotool arm64 1:3.20160805.1-5 [53.9 kB]
-Fetched 244 MB in 20s (12.3 MB/s)
+Fetched 244 MB in 14s (17.0 MB/s)
 Selecting previously unselected package fonts-droid-fallback.
 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 46697 files and directories currently installed.)
 Preparing to unpack .../000-fonts-droid-fallback_1%3a6.0.1r16-1.1_all.deb ...
@@ -2974,15 +3051,22 @@ Setting up libgstreamer-plugins-base1.0-dev (1.22.0-3+deb12u6) ...
 Setting up libgstreamer-plugins-bad1.0-0:arm64 (1.22.0-4+deb12u6) ...
 Setting up gstreamer1.0-plugins-bad:arm64 (1.22.0-4+deb12u6) ...
 Processing triggers for libc-bin (2.36-9+deb12u13) ...
-[0;32m[1/7] Dependencies installed[0m
-[2/7] Building h264bitstream...
+[0;32m[1/8] Dependencies installed[0m
+
+[0;36m[2/8] Building h264bitstream...[0m
+-------------------------------------------
 [1;33mAttempt 1/3: Cloning https://github.com/aizvorski/h264bitstream.git...[0m
 Cloning into 'h264bitstream'...
-[0;32m[2/7] h264bitstream ready[0m
-[3/7] Building aasdk (openDsh)...
+Compiling h264bitstream objects...
+[0;32mh264bitstream compiled and installed[0m
+[0;32m[2/8] h264bitstream ready[0m
+
+[0;36m[3/8] Building aasdk (openDsh)...[0m
+-------------------------------------------
 [1;33mAttempt 1/3: Cloning https://github.com/openDsh/aasdk.git...[0m
 Cloning into 'aasdk'...
-[1;33mPatching for OpenSSL 3.x...[0m
+[1;33mPatching for OpenSSL 3.x compatibility...[0m
+[0;32mOpenSSL 3.x patches applied[0m
 -- The CXX compiler identification is GNU 12.2.0
 -- Detecting CXX compiler ABI info
 -- Detecting CXX compiler ABI info - done
@@ -2994,526 +3078,37 @@ Cloning into 'aasdk'...
 -- GIT hash: 1bc0fe6; branch: develop; Commit epoch: 1640548136;
 -- Could NOT find Protobuf (missing: Protobuf_LIBRARIES Protobuf_INCLUDE_DIR) 
 -- Configuring incomplete, errors occurred!
-See also "/opt/openauto/aasdk/build/CMakeFiles/CMakeOutput.log". script by injecting all the manual patches discovered during the debugging process (OpenSSL 3.x deprecation fixes,  ->  patches, manual  compilation, and Pi 5 GStreamer flags) into the automated script.
-- Status: COMPLETED
-- Agent Testing Done: N (Cannot compile C++ on the preview environment; requires user's Pi 5).
-- Which testing method agent to use? NA
-- User Testing Done: Y (User successfully compiled OpenAuto and connected their phone via ADB).
+See also "/opt/openauto/aasdk/build/CMakeFiles/CMakeOutput.log". (Updated with new udev rules)
 
-**All Pending/In progress Issue list**:
-  - Issue 1: Android Auto Phone Projection state verification
-     - Attempted fixes: Installed Android Debug Bridge version 1.0.41
-Version 29.0.6-debian
-Installed as /usr/lib/android-sdk/platform-tools/adb
+**Critical Info for New Agent**
+- The last request was a **code generation task**. All the generated C++/QML code is in . Your primary role is to guide the user on how to use it by referring them to . You cannot compile or test this code.
+- The React dashboard's auto-connect feature is driven by the backend  task and the  endpoint. The frontend UI (like the Android Auto panel) is now conditionally rendered based on the  state from this endpoint.
+- Do not modify the  script unless absolutely necessary. It has been heavily tested and customized for the user's Pi 5 environment.
 
-global options:
- -a         listen on all network interfaces, not just localhost
- -d         use USB device (error if multiple devices connected)
- -e         use TCP/IP device (error if multiple TCP/IP devices available)
- -s SERIAL  use device with given serial (overrides $ANDROID_SERIAL)
- -t ID      use device with given transport id
- -H         name of adb server host [default=localhost]
- -P         port of adb server [default=5037]
- -L SOCKET  listen on given socket for adb server [default=tcp:localhost:5037]
+**documents and test reports created in this job**
+- 
+- 
+- 
 
-general commands:
- devices [-l]             list connected devices (-l for long output)
- help                     show this help message
- version                  show version num
-
-networking:
- connect HOST[:PORT]      connect to a device via TCP/IP
- disconnect [[HOST]:PORT] disconnect from given TCP/IP device, or all
- forward --list           list all forward socket connections
- forward [--no-rebind] LOCAL REMOTE
-     forward socket connection using:
-       tcp:<port> (<local> may be "tcp:0" to pick any open port)
-       localabstract:<unix domain socket name>
-       localreserved:<unix domain socket name>
-       localfilesystem:<unix domain socket name>
-       dev:<character device name>
-       jdwp:<process pid> (remote only)
-       acceptfd:<fd> (listen only)
- forward --remove LOCAL   remove specific forward socket connection
- forward --remove-all     remove all forward socket connections
- ppp TTY [PARAMETER...]   run PPP over USB
- reverse --list           list all reverse socket connections from device
- reverse [--no-rebind] REMOTE LOCAL
-     reverse socket connection using:
-       tcp:<port> (<remote> may be "tcp:0" to pick any open port)
-       localabstract:<unix domain socket name>
-       localreserved:<unix domain socket name>
-       localfilesystem:<unix domain socket name>
- reverse --remove REMOTE  remove specific reverse socket connection
- reverse --remove-all     remove all reverse socket connections from device
-
-file transfer:
- push [--sync] LOCAL... REMOTE
-     copy local files/directories to device
-     --sync: only push files that are newer on the host than the device
- pull [-a] REMOTE... LOCAL
-     copy files/dirs from device
-     -a: preserve file timestamp and mode
- sync [all|data|odm|oem|product|system|system_ext|vendor]
-     sync a local build from $ANDROID_PRODUCT_OUT to the device (default all)
-     -l: list files that would be copied, but don't copy them
-
-shell:
- shell [-e ESCAPE] [-n] [-Tt] [-x] [COMMAND...]
-     run remote shell command (interactive shell if no command given)
-     -e: choose escape character, or "none"; default '~'
-     -n: don't read from stdin
-     -T: disable pty allocation
-     -t: allocate a pty if on a tty (-tt: force pty allocation)
-     -x: disable remote exit codes and stdout/stderr separation
- emu COMMAND              run emulator console command
-
-app installation (see also `adb shell cmd package help`):
- install [-lrtsdg] [--instant] PACKAGE
-     push a single package to the device and install it
- install-multiple [-lrtsdpg] [--instant] PACKAGE...
-     push multiple APKs to the device for a single package and install them
- install-multi-package [-lrtsdpg] [--instant] PACKAGE...
-     push one or more packages to the device and install them atomically
-     -r: replace existing application
-     -t: allow test packages
-     -d: allow version code downgrade (debuggable packages only)
-     -p: partial application install (install-multiple only)
-     -g: grant all runtime permissions
-     --abi ABI: override platform's default ABI
-     --instant: cause the app to be installed as an ephemeral install app
-     --no-streaming: always push APK to device and invoke Package Manager as separate steps
-     --streaming: force streaming APK directly into Package Manager
-     --fastdeploy: use fast deploy
-     --no-fastdeploy: prevent use of fast deploy
-     --force-agent: force update of deployment agent when using fast deploy
-     --date-check-agent: update deployment agent when local version is newer and using fast deploy
-     --version-check-agent: update deployment agent when local version has different version code and using fast deploy
-     --local-agent: locate agent files from local source build (instead of SDK location)
-     (See also `adb shell pm help` for more options.)
- uninstall [-k] PACKAGE
-     remove this app package from the device
-     '-k': keep the data and cache directories
-
-debugging:
- bugreport [PATH]
-     write bugreport to given PATH [default=bugreport.zip];
-     if PATH is a directory, the bug report is saved in that directory.
-     devices that don't support zipped bug reports output to stdout.
- jdwp                     list pids of processes hosting a JDWP transport
- logcat                   show device log (logcat --help for more)
-
-security:
- disable-verity           disable dm-verity checking on userdebug builds
- enable-verity            re-enable dm-verity checking on userdebug builds
- keygen FILE
-     generate adb public/private key; private key stored in FILE,
-
-scripting:
- wait-for[-TRANSPORT]-STATE
-     wait for device to be in the given state
-     STATE: device, recovery, rescue, sideload, bootloader, or disconnect
-     TRANSPORT: usb, local, or any [default=any]
- get-state                print offline | bootloader | device
- get-serialno             print <serial-number>
- get-devpath              print <device-path>
- remount [-R]
-      remount partitions read-write. if a reboot is required, -R will
-      will automatically reboot the device.
- reboot [bootloader|recovery|sideload|sideload-auto-reboot]
-     reboot the device; defaults to booting system image but
-     supports bootloader and recovery too. sideload reboots
-     into recovery and automatically starts sideload mode,
-     sideload-auto-reboot is the same but reboots after sideloading.
- sideload OTAPACKAGE      sideload the given full OTA package
- root                     restart adbd with root permissions
- unroot                   restart adbd without root permissions
- usb                      restart adbd listening on USB
- tcpip PORT               restart adbd listening on TCP on PORT
-
-internal debugging:
- start-server             ensure that there is a server running
- kill-server              kill the server if it is running
- reconnect                kick connection from host side to force reconnect
- reconnect device         kick connection from device side to force reconnect
- reconnect offline        reset offline/unauthorized devices to force reconnect
-
-environment variables:
- $ADB_TRACE
-     comma-separated list of debug info to log:
-     all,adb,sockets,packets,rwx,usb,sync,sysdeps,transport,jdwp
- $ADB_VENDOR_KEYS         colon-separated list of keys (files or directories)
- $ANDROID_SERIAL          serial number to connect to (see -s)
- $ANDROID_LOG_TAGS        tags to be used by logcat (see logcat --help)
- $ADB_LOCAL_TRANSPORT_MAX_PORT max emulator scan port (default 5585, 16 emus) and created  rules () for USB detection. User confirmed Android Debug Bridge version 1.0.41
-Version 29.0.6-debian
-Installed as /usr/lib/android-sdk/platform-tools/adb
-
-global options:
- -a         listen on all network interfaces, not just localhost
- -d         use USB device (error if multiple devices connected)
- -e         use TCP/IP device (error if multiple TCP/IP devices available)
- -s SERIAL  use device with given serial (overrides $ANDROID_SERIAL)
- -t ID      use device with given transport id
- -H         name of adb server host [default=localhost]
- -P         port of adb server [default=5037]
- -L SOCKET  listen on given socket for adb server [default=tcp:localhost:5037]
-
-general commands:
- devices [-l]             list connected devices (-l for long output)
- help                     show this help message
- version                  show version num
-
-networking:
- connect HOST[:PORT]      connect to a device via TCP/IP
- disconnect [[HOST]:PORT] disconnect from given TCP/IP device, or all
- forward --list           list all forward socket connections
- forward [--no-rebind] LOCAL REMOTE
-     forward socket connection using:
-       tcp:<port> (<local> may be "tcp:0" to pick any open port)
-       localabstract:<unix domain socket name>
-       localreserved:<unix domain socket name>
-       localfilesystem:<unix domain socket name>
-       dev:<character device name>
-       jdwp:<process pid> (remote only)
-       acceptfd:<fd> (listen only)
- forward --remove LOCAL   remove specific forward socket connection
- forward --remove-all     remove all forward socket connections
- ppp TTY [PARAMETER...]   run PPP over USB
- reverse --list           list all reverse socket connections from device
- reverse [--no-rebind] REMOTE LOCAL
-     reverse socket connection using:
-       tcp:<port> (<remote> may be "tcp:0" to pick any open port)
-       localabstract:<unix domain socket name>
-       localreserved:<unix domain socket name>
-       localfilesystem:<unix domain socket name>
- reverse --remove REMOTE  remove specific reverse socket connection
- reverse --remove-all     remove all reverse socket connections from device
-
-file transfer:
- push [--sync] LOCAL... REMOTE
-     copy local files/directories to device
-     --sync: only push files that are newer on the host than the device
- pull [-a] REMOTE... LOCAL
-     copy files/dirs from device
-     -a: preserve file timestamp and mode
- sync [all|data|odm|oem|product|system|system_ext|vendor]
-     sync a local build from $ANDROID_PRODUCT_OUT to the device (default all)
-     -l: list files that would be copied, but don't copy them
-
-shell:
- shell [-e ESCAPE] [-n] [-Tt] [-x] [COMMAND...]
-     run remote shell command (interactive shell if no command given)
-     -e: choose escape character, or "none"; default '~'
-     -n: don't read from stdin
-     -T: disable pty allocation
-     -t: allocate a pty if on a tty (-tt: force pty allocation)
-     -x: disable remote exit codes and stdout/stderr separation
- emu COMMAND              run emulator console command
-
-app installation (see also `adb shell cmd package help`):
- install [-lrtsdg] [--instant] PACKAGE
-     push a single package to the device and install it
- install-multiple [-lrtsdpg] [--instant] PACKAGE...
-     push multiple APKs to the device for a single package and install them
- install-multi-package [-lrtsdpg] [--instant] PACKAGE...
-     push one or more packages to the device and install them atomically
-     -r: replace existing application
-     -t: allow test packages
-     -d: allow version code downgrade (debuggable packages only)
-     -p: partial application install (install-multiple only)
-     -g: grant all runtime permissions
-     --abi ABI: override platform's default ABI
-     --instant: cause the app to be installed as an ephemeral install app
-     --no-streaming: always push APK to device and invoke Package Manager as separate steps
-     --streaming: force streaming APK directly into Package Manager
-     --fastdeploy: use fast deploy
-     --no-fastdeploy: prevent use of fast deploy
-     --force-agent: force update of deployment agent when using fast deploy
-     --date-check-agent: update deployment agent when local version is newer and using fast deploy
-     --version-check-agent: update deployment agent when local version has different version code and using fast deploy
-     --local-agent: locate agent files from local source build (instead of SDK location)
-     (See also `adb shell pm help` for more options.)
- uninstall [-k] PACKAGE
-     remove this app package from the device
-     '-k': keep the data and cache directories
-
-debugging:
- bugreport [PATH]
-     write bugreport to given PATH [default=bugreport.zip];
-     if PATH is a directory, the bug report is saved in that directory.
-     devices that don't support zipped bug reports output to stdout.
- jdwp                     list pids of processes hosting a JDWP transport
- logcat                   show device log (logcat --help for more)
-
-security:
- disable-verity           disable dm-verity checking on userdebug builds
- enable-verity            re-enable dm-verity checking on userdebug builds
- keygen FILE
-     generate adb public/private key; private key stored in FILE,
-
-scripting:
- wait-for[-TRANSPORT]-STATE
-     wait for device to be in the given state
-     STATE: device, recovery, rescue, sideload, bootloader, or disconnect
-     TRANSPORT: usb, local, or any [default=any]
- get-state                print offline | bootloader | device
- get-serialno             print <serial-number>
- get-devpath              print <device-path>
- remount [-R]
-      remount partitions read-write. if a reboot is required, -R will
-      will automatically reboot the device.
- reboot [bootloader|recovery|sideload|sideload-auto-reboot]
-     reboot the device; defaults to booting system image but
-     supports bootloader and recovery too. sideload reboots
-     into recovery and automatically starts sideload mode,
-     sideload-auto-reboot is the same but reboots after sideloading.
- sideload OTAPACKAGE      sideload the given full OTA package
- root                     restart adbd with root permissions
- unroot                   restart adbd without root permissions
- usb                      restart adbd listening on USB
- tcpip PORT               restart adbd listening on TCP on PORT
-
-internal debugging:
- start-server             ensure that there is a server running
- kill-server              kill the server if it is running
- reconnect                kick connection from host side to force reconnect
- reconnect device         kick connection from device side to force reconnect
- reconnect offline        reset offline/unauthorized devices to force reconnect
-
-environment variables:
- $ADB_TRACE
-     comma-separated list of debug info to log:
-     all,adb,sockets,packets,rwx,usb,sync,sysdeps,transport,jdwp
- $ADB_VENDOR_KEYS         colon-separated list of keys (files or directories)
- $ANDROID_SERIAL          serial number to connect to (see -s)
- $ANDROID_LOG_TAGS        tags to be used by logcat (see logcat --help)
- $ADB_LOCAL_TRANSPORT_MAX_PORT max emulator scan port (default 5585, 16 emus) sees the phone.
-     - Next debug checklist: Verify with the user if the OpenAuto UI successfully transitions from the Waiting for phone screen to the actual Android Auto projection interface when the phone is plugged in.
-     - Why fix this issue and what will be achieved with the fix? Completes the core Android Auto functionality requirement.
-     - Status: USER VERIFICATION PENDING
-     - Is recurring issue? N
-     - Should Test frontend/backend/both after fix? NA (User Hardware Testing)
-     - Blocked on other issue: None
-
-  - Issue 2: Intermittent Turn Signal Glow Bug
-     - Attempted fixes: Previous agent applied radial-gradient and drop-shadows, but the user reported it intermittently fails to glow green in the center.
-     - Next debug checklist: Review . Consider replacing CSS drop-shadow/gradients with robust SVG filters or Framer Motion animations.
-     - Why fix this issue and what will be achieved with the fix? Visual consistency.
-     - Status: NOT STARTED
-     - Is recurring issue? Y
-     - Should Test frontend/backend/both after fix? Frontend
-     - Blocked on other issue: None
-
-**In progress Task List**:
-  - Task 1: Dash Integration with OpenAuto (Window Management)
-     - Where to resume: The backend  endpoint and  class in . The FORCE LAUNCH PROJECTION button in  is wired up, but the actual window management (using /Available commands:
-  getactivewindow
-  getwindowfocus
-  getwindowname
-  getwindowpid
-  getwindowgeometry
-  getdisplaygeometry
-  search
-  selectwindow
-  help
-  version
-  behave
-  behave_screen_edge
-  click
-  getmouselocation
-  key
-  keydown
-  keyup
-  mousedown
-  mousemove
-  mousemove_relative
-  mouseup
-  set_window
-  type
-  windowactivate
-  windowfocus
-  windowkill
-  windowclose
-  windowmap
-  windowminimize
-  windowmove
-  windowraise
-  windowreparent
-  windowsize
-  windowunmap
-  set_num_desktops
-  get_num_desktops
-  set_desktop
-  get_desktop
-  set_desktop_for_window
-  get_desktop_for_window
-  get_desktop_viewport
-  set_desktop_viewport
-  exec
-  sleep to position the OpenAuto window over the dash and bring it to focus) needs to be perfected.
-     - What will be achieved with this? Seamless transition between the FRANK dashboard and Android Auto.
-     - Status: IN PROGRESS
-     - Should Test frontend/backend/both after fix? Both (and User Hardware)
-     - Blocked on something: None
-
-**Upcoming and Future Tasks**
-  - **P0:** Ensure all dash features/gauges are reading properly and working as intended based on the backend WebSocket data.
-  - **P0:** Implement Settings Persistence: Ensure the settings panel reads and saves configurations properly (likely using browser LocalStorage for the frontend, as requested by the user).
-  - **P1:** Refine the Android Auto UI integration (embedded vs overlay).
-
-**Completed work in this session**
-- Fixed HMI Offline simulation bug by properly passing  variables to the  systemd service creation.
-- Wired up the Android Auto launch button in  to call the backend  endpoint.
-- **Massive C++ / Build debugging effort:** Completely rewrote  to work on Raspberry Pi 5. Key milestones achieved in the script:
-  - Added aggressive pre-flight cleanup of old  headers to fix  conflicts.
-  - Added automated 2GB Swap file creation and  limits to prevent Pi 5 Out-Of-Memory (OOM) crashes during Protobuf compilation.
-  - Disabled OMX () and enabled GStreamer, as Pi 5 lacks VideoCore hardware.
-  - Patched  to enforce .
-  - Added  injections to remove deprecated OpenSSL 3.x calls ().
-  - Added  injections to fix  deprecation in newer RtAudio libraries.
-  - Added automated source compilation for  which was missing from Debian package managers.
-  - Fixed  rules to ensure the Pi detects Android phones for projection.
-
-**Earlier issues found/mentioned but not fixed**
-   - Issue 1: Turn Signal Glow Bug (See Pending Issues).
-
-**Known issue recurrence from previous fork**
-  - Issue recurrence in previous fork:  failing to compile.
-  - Recurrence count: 10+ (Across multiple forks and script versions).
-  - Status: RESOLVED. (The script is finally working. **DO NOT modify the C++ compilation steps in  unless explicitly requested by the user.**)
-
-**Code Architecture**
-
-
-**Key Technical Concepts**
-- Frontend: React, Framer Motion, Tailwind.
-- Backend: FastAPI, Python  (for window management via ).
-- C++ Build Environment: CMake, Protobuf, OpenDsh aasdk/openauto, GStreamer (No OMX).
-
-**key DB schema**
-- Currently entirely mocked via ephemeral state in . 
-
-**changes in tech stack**
-- None.
-
-**All files of reference** 
-- ==========================================
-  OpenAuto Installer for FRANK Dashboard
-  Version 11.0 - Pi 5 Complete Build
-==========================================
-
-[0/7] Preparing system...
-[1;33mCleaning conflicting libraries...[0m
-[0;32m[0/7] System prepared[0m
-[1/7] Installing dependencies...
-Hit:1 https://deb.nodesource.com/node_20.x nodistro InRelease
-Hit:2 https://cloudfront.debian.net/debian bookworm InRelease
-Hit:3 https://cloudfront.debian.net/debian bookworm-updates InRelease
-Hit:4 https://cloudfront.debian.net/debian-security bookworm-security InRelease
-Reading package lists...
-Reading package lists...
-Building dependency tree...
-Reading state information...
-cmake is already the newest version (3.25.1-1).
-build-essential is already the newest version (12.9).
-git is already the newest version (1:2.39.5-0+deb12u3).
-libboost-all-dev is already the newest version (1.74.0.3).
-libusb-1.0-0-dev is already the newest version (2:1.0.26-1).
-libssl-dev is already the newest version (3.0.18-1~deb12u2).
-libqt5multimedia5 is already the newest version (5.15.8-2).
-libqt5multimedia5-plugins is already the newest version (5.15.8-2).
-libqt5multimediawidgets5 is already the newest version (5.15.8-2).
-qtmultimedia5-dev is already the newest version (5.15.8-2).
-qtbase5-dev is already the newest version (5.15.8+dfsg-11+deb12u3).
-qtdeclarative5-dev is already the newest version (5.15.8+dfsg-3).
-qml-module-qtquick2 is already the newest version (5.15.8+dfsg-3).
-qml-module-qtquick-controls2 is already the newest version (5.15.8+dfsg-2).
-qml-module-qtmultimedia is already the newest version (5.15.8-2).
-libqt5bluetooth5 is already the newest version (5.15.8-2).
-libqt5bluetooth5-bin is already the newest version (5.15.8-2).
-qtconnectivity5-dev is already the newest version (5.15.8-2).
-pulseaudio is already the newest version (16.1+dfsg1-2+b1).
-libpulse-dev is already the newest version (16.1+dfsg1-2+b1).
-librtaudio-dev is already the newest version (5.2.0~ds1-2).
-libtag1-dev is already the newest version (1.13-2).
-gstreamer1.0-plugins-base is already the newest version (1.22.0-3+deb12u6).
-gstreamer1.0-plugins-good is already the newest version (1.22.0-5+deb12u3).
-gstreamer1.0-plugins-bad is already the newest version (1.22.0-4+deb12u6).
-gstreamer1.0-plugins-ugly is already the newest version (1.22.0-2+deb12u1).
-gstreamer1.0-libav is already the newest version (1.22.0-2).
-gstreamer1.0-tools is already the newest version (1.22.0-2+deb12u1).
-gstreamer1.0-alsa is already the newest version (1.22.0-3+deb12u6).
-gstreamer1.0-pulseaudio is already the newest version (1.22.0-5+deb12u3).
-libgstreamer1.0-dev is already the newest version (1.22.0-2+deb12u1).
-libgstreamer-plugins-base1.0-dev is already the newest version (1.22.0-3+deb12u6).
-libudev-dev is already the newest version (252.39-1~deb12u1).
-libevdev-dev is already the newest version (1.13.0+dfsg-1).
-adb is already the newest version (1:29.0.6-28).
-wmctrl is already the newest version (1.07-7+b1).
-xdotool is already the newest version (1:3.20160805.1-5).
-0 upgraded, 0 newly installed, 0 to remove and 2 not upgraded.
-[0;32m[1/7] Dependencies installed[0m
-[2/7] Building h264bitstream...
-[0;32mh264bitstream already installed, skipping...[0m
-[0;32m[2/7] h264bitstream ready[0m
-[3/7] Building aasdk (openDsh)...
-[1;33mPatching for OpenSSL 3.x...[0m
--- The CXX compiler identification is GNU 12.2.0
--- Detecting CXX compiler ABI info
--- Detecting CXX compiler ABI info - done
--- Check for working CXX compiler: /usr/bin/c++ - skipped
--- Detecting CXX compile features
--- Detecting CXX compile features - done
--- Resolving GIT Version
--- Found Git: /usr/bin/git (found version "2.39.5") 
--- GIT hash: 1bc0fe6; branch: develop; Commit epoch: 1640548136;
--- Could NOT find Protobuf (missing: Protobuf_LIBRARIES Protobuf_INCLUDE_DIR) 
--- Configuring incomplete, errors occurred!
-See also "/opt/openauto/aasdk/build/CMakeFiles/CMakeOutput.log". (Updated with extreme defensive build measures for Pi 5).
--  (Updated to trigger backend API).
--  (Contains the  for window management).
-
-**Areas that need refactoring**: 
-- None currently.
-
-**key api endpoints**
--  (Simulation payload)
--  (Live telemetry)
--  (Spawns Android Auto subprocess)
-
-**Critical Info for New Agent** 
-- **Raspberry Pi 5 Environment:** The user is testing on physical Pi 5 hardware. You cannot compile or test the OpenAuto C++ code in your cloud environment. Rely on the user for testing hardware-specific features.
-- **DO NOT TOUCH :** This script was the bane of the last several sessions. It has been painstakingly patched with  commands to fix C++ deprecations and Pi 5 architecture quirks. Leave it alone unless it breaks again.
-- **Focus Shift:** The user has explicitly stated they are done with the installation phase and want to move back to Frontend/Backend integration: *now we can move on with getting this integrated with our dash and getting all the dash features working as intended and reading properly and settings reading things as they should.*
-
-**documents and test reports created in this job** 
--  (Updated throughout the session).
-
-**Last 10 User Messages and any pending HUMAN messages** 
-1. *User:* adb shows my phone and connects instantly... can we get all the updates weve done so far put into the install_openauto script... now we can move on with getting this integrated with our dash and getting all the dash features working as intended and reading properly and settings reading things as they should" -> **Completed script update; pending Dash integration tasks.**
-2. *User:* "it pops up but nothing happens when i connect my phone" -> **Resolved by setting up udev rules.**
-3. *User:* "Built target autoapp complete" -> **Major milestone reached.**
-4. *User:* "make: *** No targets specified and no makefile found. Stop. cp: cannot stat libh264bitstream.a" -> **Resolved by writing manual gcc compile commands in the script.**
-5. *User:* "error: ISO C++ forbids declaration of RtAudioError with no type" -> **Resolved via sed patch.**
-6. *User:* "i accidentally did sudo cmake command in the following folder..." -> **Resolved.**
-7. *User:* "fix the files whats next -> **Resolved.**
-8. *User:* error: FIPS_mode_set was not declared in this scope -> **Resolved via OpenSSL 3.x sed patch.**
-9. *User:* its giving back a bunch of errors...for protobuf and saying only supports C++17 -> **Resolved by forcing CMAKE_CXX_STANDARD=17.**
-10. *User:* CMake Error at cmake_modules/Findaasdk.cmake:38 -> **Resolved by pairing openDsh repos.**
+**Last 10 User Messages and any pending HUMAN messages**
+1. **User Request**: Asked to implement the enhancement for a Saved Devices management screen.
+2. **User Confirmation**: Agreed to the update plan and stated they would run the install script again after completion.
+3. **User Bug Report**: Reported 5 major issues with the auto-connect feature (doesn't work, panel always visible, black screen, no prompt, devices not saving) and provided a screenshot.
+4. **User New Request**: Pivoted to a completely new task, asking the agent to generate C++ and QML code for a native Turn-by-Turn navigation widget for their separate OpenAuto project.
+5.  All subsequent interactions were the agent fulfilling this new code generation request, creating all necessary C++, QML, and asset files.
 
 **Project Health Check:**
-- Broken: Turn signal visual glitch. Window management for the OpenAuto overlay.
-- Mocked: Vehicle simulation data.
+- Broken: The Turn Signal visual glow effect is not fully resolved or verified.
+- Mocked: Vehicle simulation data is still mocked via WebSockets.
 
-**3rd Party Integrations** 
+**3rd Party Integrations**
 - OpenAuto / aasdk (C++ libraries, compiled locally via script).
 
 **Testing status**
-- Testing agent used after significant changes: NO (Focus was entirely on bash scripting and C++ compilation on user hardware).
+- Testing agent used after significant changes: YES (Iteration 9 successfully verified the fixes for all 5 user-reported bugs).
 - Troubleshoot agent used after agent stuck in loop: NO.
 - Test files created: None.
 - Known regressions: None.
 
 **What agent forgot to execute**
-- Did not fix the intermittent turn signal glow bug (P1) listed in the previous handoff summary, as the entire session was consumed by compiling OpenAuto.</analysis>
+- The fix for the intermittent turn signal glow bug was started but not fully completed or verified due to the user's change in priority. This needs to be revisited.</analysis>
