@@ -5,6 +5,7 @@ import { useSettings } from '../../contexts/SettingsContext';
 import { RpmGauge, SpeedGauge } from './CustomGauges';
 import { ShiftLightsBar, DigitalSpeedGear } from './DashWidgets';
 import { WarningPanel, TurnSignalsRow, CriticalWarningBanner } from './WarningPanel';
+import { FuelGauge, CoolantGauge, BatteryGauge, OilPressureGauge } from './InfoGauges';
 import AndroidAutoPanel from './AndroidAutoPanel';
 import DevicePromptModal from './DevicePromptModal';
 import { Settings, Activity } from 'lucide-react';
@@ -201,6 +202,15 @@ export const Dashboard = ({ onOpenSettings }) => {
           </div>
         ) : (
           <div className="absolute inset-0 flex items-end justify-center pb-24 px-8">
+            {/* FAR LEFT: Info Gauges (Coolant + Oil) */}
+            <div
+              className="flex flex-col items-center justify-end gap-4 pb-16 mr-2"
+              data-testid="info-gauges-left"
+            >
+              <CoolantGauge />
+              <OilPressureGauge />
+            </div>
+
             {/* LEFT: RPM */}
             <div className="relative flex items-end justify-center">
               <RpmGauge size={640} vtecStartRpm={3000} shiftRpm={7800} maxRpm={8000} />
@@ -221,6 +231,15 @@ export const Dashboard = ({ onOpenSettings }) => {
             {/* RIGHT: Speed */}
             <div className="relative flex items-end justify-center">
               <SpeedGauge size={640} maxSpeed={170} />
+            </div>
+
+            {/* FAR RIGHT: Info Gauges (Fuel + Battery) */}
+            <div
+              className="flex flex-col items-center justify-end gap-4 pb-16 ml-2"
+              data-testid="info-gauges-right"
+            >
+              <FuelGauge />
+              <BatteryGauge />
             </div>
           </div>
         )}

@@ -42,9 +42,9 @@ const InfoGauge = ({
     >
       {/* Icon */}
       <Icon
-        size={18}
+        size={16}
         style={{
-          color: danger || warning ? barColor : '#71717a',
+          color: danger || warning ? barColor : '#52525b',
         }}
       />
 
@@ -52,9 +52,9 @@ const InfoGauge = ({
         <>
           {/* Vertical bar container */}
           <div
-            className="relative w-6 h-32 rounded-full overflow-hidden"
+            className="relative w-3 h-28 rounded-full overflow-hidden"
             style={{
-              background: '#18181b',
+              background: '#0c0c0e',
               border: '1px solid #27272a',
             }}
           >
@@ -63,17 +63,17 @@ const InfoGauge = ({
               className="absolute bottom-0 left-0 right-0 rounded-full transition-all duration-150"
               style={{
                 height: `${percentage}%`,
-                background: barColor,
-                boxShadow: `0 0 10px ${barColor}40`,
+                background: `linear-gradient(to top, ${barColor}, ${barColor}cc)`,
+                boxShadow: `0 0 8px ${barColor}50, inset 0 0 4px ${barColor}30`,
               }}
             />
 
             {/* Tick marks */}
-            {[0, 25, 50, 75, 100].map((tick) => (
+            {[25, 50, 75].map((tick) => (
               <div
                 key={tick}
-                className="absolute left-0 right-0 h-px bg-zinc-700"
-                style={{ bottom: `${tick}%` }}
+                className="absolute left-0 right-0 h-px"
+                style={{ bottom: `${tick}%`, background: '#27272a' }}
               />
             ))}
           </div>
@@ -81,16 +81,16 @@ const InfoGauge = ({
           {/* Value */}
           <div className="text-center">
             <span
-              className="font-mono text-lg font-bold"
-              style={{ color: danger || warning ? barColor : '#ffffff' }}
+              className="font-orbitron text-sm font-bold"
+              style={{ color: danger || warning ? barColor : '#e4e4e7' }}
             >
               {Math.round(value)}
             </span>
-            <span className="text-zinc-500 text-xs ml-0.5">{unit}</span>
+            <span className="text-zinc-600 text-[10px] ml-0.5">{unit}</span>
           </div>
 
           {/* Label */}
-          <span className="text-[10px] uppercase tracking-wider text-zinc-600">
+          <span className="text-[9px] uppercase tracking-widest text-zinc-600 font-orbitron">
             {label}
           </span>
         </>
