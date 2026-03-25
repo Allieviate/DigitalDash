@@ -151,7 +151,7 @@ const TurnArrow = ({ direction, active }) => {
         height="44"
         viewBox="0 0 48 36"
         style={{
-          transform: isLeft ? 'scaleX(-1)' : 'none',
+          transform: isLeft ? 'none' : 'scaleX(-1)',
           position: 'relative',
           zIndex: 1,
         }}
