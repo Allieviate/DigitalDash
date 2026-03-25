@@ -79,5 +79,5 @@
     "DHU start/stop": "Returns error in non-Pi environment since OpenAuto is not installed. This is expected behavior - the API endpoints work correctly, they just can't launch the actual OpenAuto process."
   },
   
-  "context_for_next_testing_agent": "USB auto-detect + device preferences feature fully tested. All backend CRUD endpoints for device preferences working. DevicePromptModal renders correctly and integrates with backend. The modal appears when a device-event with prompt_needed is received via status polling. Known devices with skip_prompt=true auto-launch without showing the prompt. Boot sequence takes 8-12 seconds. App URL: https://dash-android.preview.emergentagent.com"
+  "context_for_next_testing_agent": "USB auto-detect + device preferences feature fully tested. All backend CRUD endpoints for device preferences working. DevicePromptModal renders correctly and integrates with backend. The modal appears when a device-event with prompt_needed is received via status polling. Known devices with skip_prompt=true auto-launch without showing the prompt. Boot sequence takes 8-12 seconds. App URL: https://car-dash-hmi.preview.emergentagent.com"
 }

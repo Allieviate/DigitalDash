@@ -1,0 +1,21 @@
+<RCC>
+    <qresource prefix="/">
+        <file alias="qml/TurnByTurnWidget.qml">qml/TurnByTurnWidget.qml</file>
+        <file alias="nav-icons/straight.svg">assets/straight.svg</file>
+        <file alias="nav-icons/turn_left.svg">assets/turn_left.svg</file>
+        <file alias="nav-icons/turn_right.svg">assets/turn_right.svg</file>
+        <file alias="nav-icons/slight_left.svg">assets/slight_left.svg</file>
+        <file alias="nav-icons/slight_right.svg">assets/slight_right.svg</file>
+        <file alias="nav-icons/sharp_left.svg">assets/sharp_left.svg</file>
+        <file alias="nav-icons/sharp_right.svg">assets/sharp_right.svg</file>
+        <file alias="nav-icons/keep_left.svg">assets/keep_left.svg</file>
+        <file alias="nav-icons/keep_right.svg">assets/keep_right.svg</file>
+        <file alias="nav-icons/uturn_left.svg">assets/uturn_left.svg</file>
+        <file alias="nav-icons/uturn_right.svg">assets/uturn_right.svg</file>
+        <file alias="nav-icons/merge_left.svg">assets/merge_left.svg</file>
+        <file alias="nav-icons/merge_right.svg">assets/merge_right.svg</file>
+        <file alias="nav-icons/roundabout.svg">assets/roundabout.svg</file>
+        <file alias="nav-icons/destination.svg">assets/destination.svg</file>
+        <file alias="nav-icons/ferry.svg">assets/ferry.svg</file>
+    </qresource>
+</RCC>

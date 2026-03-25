@@ -108,5 +108,5 @@
     "DHU start/stop": "Returns error in non-Pi environment since OpenAuto is not installed. This is expected behavior."
   },
   
-  "context_for_next_testing_agent": "Bug fix iteration 9 complete. All 5 user-reported issues verified as fixed. Key visual change: Dashboard center area is EMPTY when no phone connected (phone_connected=false from backend). DevicePromptModal appears when device-event with prompt_needed is received. Saved Devices tab accessible in Settings. Boot sequence takes 8-12 seconds. App URL: https://dash-android.preview.emergentagent.com"
+  "context_for_next_testing_agent": "Bug fix iteration 9 complete. All 5 user-reported issues verified as fixed. Key visual change: Dashboard center area is EMPTY when no phone connected (phone_connected=false from backend). DevicePromptModal appears when device-event with prompt_needed is received. Saved Devices tab accessible in Settings. Boot sequence takes 8-12 seconds. App URL: https://car-dash-hmi.preview.emergentagent.com"
 }
