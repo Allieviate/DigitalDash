@@ -1,0 +1,105 @@
+{
+  "summary": "Iteration 11 testing complete. All 3 phases verified: Phase 3 (USB auto-detect uses model name as stable device ID), Phase 2 (removed embedded/fullscreen modes), Phase 1 (turn signals solid-filled chevrons). 15/15 backend tests passed. All frontend UI elements verified.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "passed_tests": [
+    "Backend: POST /api/dhu/device-event accepts device_model field",
+    "Backend: POST /api/dhu/device-preferences saves with device_model as key",
+    "Backend: GET /api/dhu/device-preferences/{model} lookup by model name works",
+    "Backend: DELETE /api/dhu/device-preferences/{model} works",
+    "Backend: Same model with different serial returns auto_launched (KEY TEST)",
+    "Backend: POST /api/dhu/start only accepts borderless+alwaysOnTop (no x/y/width/height/mode)",
+    "Backend: /api/dhu/resize endpoint does NOT exist (removed)",
+    "Backend: GET /api/dhu/status returns phone_connected and status fields",
+    "Backend: GET /api/dhu/devices lists all saved devices",
+    "Backend: GET /api/vehicle-data returns turn_left and turn_right booleans",
+    "Backend: GET /api/ returns 200",
+    "Backend: GET /api/vehicle-data returns all expected fields",
+    "Backend: GET /api/themes returns theme list",
+    "Backend: GET /api/settings returns 200",
+    "Backend: GET /api/diagnostics returns diagnostic data",
+    "Frontend: Dashboard loads with turn signals row visible",
+    "Frontend: SVG filter 'turn-glow-left' found in DOM",
+    "Frontend: SVG filter 'turn-glow-right' found in DOM",
+    "Frontend: Turn signals have solid fill (#152118 inactive, #2D8C4E active) - never hollow",
+    "Frontend: No embedded/fullscreen mode toggle visible on dashboard",
+    "Frontend: AA logo indicator not shown when phone not connected (correct behavior)",
+    "Frontend: Info gauges LEFT container (Coolant + Oil Pressure) visible",
+    "Frontend: Info gauges RIGHT container (Fuel + Battery) visible",
+    "Frontend: Warning panel at bottom with all 7 warning lights",
+    "Frontend: Settings button opens settings panel",
+    "Frontend: Saved Devices tab accessible in settings navigation",
+    "Frontend: Saved Devices tab shows device_model field (not aa_mode)",
+    "Frontend: Refresh button present in Saved Devices tab"
+  ],
+
+  "features_verified": [
+    {
+      "feature": "Phase 3: USB Auto-detect Fix (Model-based Device ID)",
+      "status": "VERIFIED",
+      "details": "Device preferences keyed by device_model (ro.product.model) instead of serial. KEY TEST PASSED: Save prefs for model SM-S928B with skip_prompt=true, then POST device-event with DIFFERENT serial but same model — returns auto_launched (not prompt_needed)."
+    },
+    {
+      "feature": "Phase 2: Removed Embedded/Fullscreen Modes",
+      "status": "VERIFIED",
+      "details": "POST /api/dhu/start only accepts borderless+alwaysOnTop. /api/dhu/resize endpoint removed (returns 404). No mode toggle visible in UI. AndroidAutoPanel simplified to just launch/stop."
+    },
+    {
+      "feature": "Phase 1: Turn Signals Solid-Filled Chevrons",
+      "status": "VERIFIED",
+      "details": "TurnArrow component uses thick pointed chevron path with solid fill (#152118 inactive, #2D8C4E active). Never hollow/transparent. SVG filter glow applied when active. Left arrow points left, right arrow points right."
+    }
+  ],
+
+  "test_report_links": [
+    "/app/backend/tests/test_iteration11_phase3.py",
+    "/app/test_reports/pytest/pytest_iteration11.xml"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "Backend server.py: ADBMonitor._get_device_model() correctly queries ro.product.model via adb shell getprop",
+    "Backend server.py: device_event endpoint correctly looks up preferences by device_model first, then serial as fallback",
+    "Backend server.py: DHUStartRequest model only has borderless+alwaysOnTop fields (no x/y/width/height/mode)",
+    "Backend server.py: No /api/dhu/resize endpoint exists (correctly removed)",
+    "Frontend WarningPanel.jsx: TurnArrow uses solid fill colors (#152118 inactive, #2D8C4E active) - never transparent",
+    "Frontend Dashboard.jsx: AALogoIndicator shown only when phoneConnected=true",
+    "Frontend AndroidAutoPanel.jsx: Simplified to just launch/stop, no mode selection",
+    "Frontend DevicePromptModal.jsx: No embedded/fullscreen mode selection, only connection type (USB/Bluetooth)",
+    "Frontend SavedDevicesTab.jsx: Shows device_model field, no aa_mode references"
+  ],
+
+  "updated_files": [
+    "/app/backend/tests/test_iteration11_phase3.py"
+  ],
+
+  "success_rate": {
+    "backend": "100% (15/15 tests passed)",
+    "frontend": "100% (all features working)"
+  },
+
+  "seed_data_creation": "Test devices created during testing were cleaned up (TEST_SM-S928B, TEST_PIXEL8, TEST_DELETE_MODEL)",
+
+  "retest_needed": false,
+
+  "should_main_agent_self_test": false,
+
+  "mocked_apis": {
+    "Vehicle simulation data": "Mocked via backend VehicleSimulator class - generates realistic vehicle signals",
+    "ADB monitor": "Won't find devices in cloud env - phone_connected will be false. Device events can be simulated via POST /api/dhu/device-event",
+    "DHU start/stop": "Returns error in non-Pi environment since OpenAuto is not installed. This is expected behavior."
+  },
+
+  "context_for_next_testing_agent": "Iteration 11 complete. All 3 phases verified: (1) Phase 3 - USB auto-detect uses model name as stable device ID (KEY TEST: same model + different serial = auto_launched), (2) Phase 2 - removed embedded/fullscreen modes, simplified to launch/stop, (3) Phase 1 - turn signals always solid-filled thick chevrons. Boot sequence takes 8-12 seconds. Vehicle data is simulated. App URL: https://car-dash-hmi.preview.emergentagent.com"
+}

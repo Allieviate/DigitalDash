@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Smartphone, Trash2, Usb, Bluetooth, Maximize2, Minimize2, RefreshCw, Loader2 } from 'lucide-react';
+import { Smartphone, Trash2, Usb, Bluetooth, RefreshCw, Loader2 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -22,11 +22,12 @@ export default function SavedDevicesTab() {
 
   useEffect(() => { fetchDevices(); }, [fetchDevices]);
 
-  const handleDelete = async (serial) => {
-    setDeleting(serial);
+  const handleDelete = async (device) => {
+    const key = device.device_model || device.serial;
+    setDeleting(key);
     try {
-      await fetch(`${API_URL}/api/dhu/device-preferences/${serial}`, { method: 'DELETE' });
-      setDevices(prev => prev.filter(d => d.serial !== serial));
+      await fetch(`${API_URL}/api/dhu/device-preferences/${encodeURIComponent(key)}`, { method: 'DELETE' });
+      setDevices(prev => prev.filter(d => (d.device_model || d.serial) !== key));
     } catch {
       // Delete failed
     }
@@ -41,20 +42,10 @@ export default function SavedDevicesTab() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated),
       });
-      setDevices(prev => prev.map(d => d.serial === device.serial ? { ...d, skip_prompt: updated.skip_prompt } : d));
-    } catch {
-      // Update failed
-    }
-  };
-
-  const handleChangeMode = async (device, newMode) => {
-    try {
-      await fetch(`${API_URL}/api/dhu/device-preferences`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...device, aa_mode: newMode }),
-      });
-      setDevices(prev => prev.map(d => d.serial === device.serial ? { ...d, aa_mode: newMode } : d));
+      const key = device.device_model || device.serial;
+      setDevices(prev => prev.map(d =>
+        (d.device_model || d.serial) === key ? { ...d, skip_prompt: updated.skip_prompt } : d
+      ));
     } catch {
       // Update failed
     }
@@ -67,7 +58,10 @@ export default function SavedDevicesTab() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...device, connection_type: newType }),
       });
-      setDevices(prev => prev.map(d => d.serial === device.serial ? { ...d, connection_type: newType } : d));
+      const key = device.device_model || device.serial;
+      setDevices(prev => prev.map(d =>
+        (d.device_model || d.serial) === key ? { ...d, connection_type: newType } : d
+      ));
     } catch {
       // Update failed
     }
@@ -155,27 +149,31 @@ export default function SavedDevicesTab() {
       )}
 
       {/* Device cards */}
-      {!loading && devices.map(device => (
-        <DeviceCard
-          key={device.serial}
-          device={device}
-          deleting={deleting === device.serial}
-          onDelete={() => handleDelete(device.serial)}
-          onToggleSkipPrompt={() => handleToggleSkipPrompt(device)}
-          onChangeMode={(mode) => handleChangeMode(device, mode)}
-          onChangeConnectionType={(type) => handleChangeConnectionType(device, type)}
-        />
-      ))}
+      {!loading && devices.map(device => {
+        const key = device.device_model || device.serial;
+        return (
+          <DeviceCard
+            key={key}
+            device={device}
+            deleting={deleting === key}
+            onDelete={() => handleDelete(device)}
+            onToggleSkipPrompt={() => handleToggleSkipPrompt(device)}
+            onChangeConnectionType={(type) => handleChangeConnectionType(device, type)}
+          />
+        );
+      })}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
 
-function DeviceCard({ device, deleting, onDelete, onToggleSkipPrompt, onChangeMode, onChangeConnectionType }) {
+function DeviceCard({ device, deleting, onDelete, onToggleSkipPrompt, onChangeConnectionType }) {
+  const deviceKey = device.device_model || device.serial;
+
   return (
     <div
-      data-testid={`device-card-${device.serial}`}
+      data-testid={`device-card-${deviceKey}`}
       style={{
         background: 'rgba(255,255,255,0.03)',
         border: '1px solid rgba(255,255,255,0.07)',
@@ -207,7 +205,7 @@ function DeviceCard({ device, deleting, onDelete, onToggleSkipPrompt, onChangeMo
               fontFamily: 'monospace', fontSize: 10,
               color: 'rgba(255,255,255,0.25)', marginTop: 2,
             }}>
-              {device.serial}
+              {device.device_model || device.serial}
             </div>
           </div>
         </div>
@@ -215,7 +213,7 @@ function DeviceCard({ device, deleting, onDelete, onToggleSkipPrompt, onChangeMo
         <button
           onClick={onDelete}
           disabled={deleting}
-          data-testid={`delete-device-${device.serial}`}
+          data-testid={`delete-device-${deviceKey}`}
           style={{
             background: deleting ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.08)',
             border: '1px solid rgba(239,68,68,0.2)',
@@ -238,61 +236,30 @@ function DeviceCard({ device, deleting, onDelete, onToggleSkipPrompt, onChangeMo
         </button>
       </div>
 
-      {/* Settings row */}
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-
-        {/* Connection type toggle */}
-        <div style={{ flex: 1, minWidth: 160 }}>
-          <div style={{
-            fontFamily: 'Helvetica Neue, sans-serif', fontSize: 8,
-            letterSpacing: '0.3em', textTransform: 'uppercase',
-            color: 'rgba(255,255,255,0.25)', marginBottom: 6,
-          }}>
-            Connection
-          </div>
-          <div style={{ display: 'flex', gap: 4, background: 'rgba(0,0,0,0.2)', borderRadius: 6, padding: 3 }}>
-            <MiniToggle
-              icon={<Usb size={10} />}
-              label="USB"
-              active={device.connection_type === 'usb'}
-              onClick={() => onChangeConnectionType('usb')}
-              testId={`conn-usb-${device.serial}`}
-            />
-            <MiniToggle
-              icon={<Bluetooth size={10} />}
-              label="BT"
-              active={device.connection_type === 'bluetooth'}
-              onClick={() => onChangeConnectionType('bluetooth')}
-              testId={`conn-bt-${device.serial}`}
-            />
-          </div>
+      {/* Connection type */}
+      <div>
+        <div style={{
+          fontFamily: 'Helvetica Neue, sans-serif', fontSize: 8,
+          letterSpacing: '0.3em', textTransform: 'uppercase',
+          color: 'rgba(255,255,255,0.25)', marginBottom: 6,
+        }}>
+          Connection
         </div>
-
-        {/* Display mode toggle */}
-        <div style={{ flex: 1, minWidth: 160 }}>
-          <div style={{
-            fontFamily: 'Helvetica Neue, sans-serif', fontSize: 8,
-            letterSpacing: '0.3em', textTransform: 'uppercase',
-            color: 'rgba(255,255,255,0.25)', marginBottom: 6,
-          }}>
-            Display Mode
-          </div>
-          <div style={{ display: 'flex', gap: 4, background: 'rgba(0,0,0,0.2)', borderRadius: 6, padding: 3 }}>
-            <MiniToggle
-              icon={<Minimize2 size={10} />}
-              label="Embedded"
-              active={device.aa_mode === 'embedded'}
-              onClick={() => onChangeMode('embedded')}
-              testId={`mode-embedded-${device.serial}`}
-            />
-            <MiniToggle
-              icon={<Maximize2 size={10} />}
-              label="Fullscreen"
-              active={device.aa_mode === 'fullscreen'}
-              onClick={() => onChangeMode('fullscreen')}
-              testId={`mode-fullscreen-${device.serial}`}
-            />
-          </div>
+        <div style={{ display: 'flex', gap: 4, background: 'rgba(0,0,0,0.2)', borderRadius: 6, padding: 3, maxWidth: 200 }}>
+          <MiniToggle
+            icon={<Usb size={10} />}
+            label="USB"
+            active={device.connection_type === 'usb'}
+            onClick={() => onChangeConnectionType('usb')}
+            testId={`conn-usb-${deviceKey}`}
+          />
+          <MiniToggle
+            icon={<Bluetooth size={10} />}
+            label="BT"
+            active={device.connection_type === 'bluetooth'}
+            onClick={() => onChangeConnectionType('bluetooth')}
+            testId={`conn-bt-${deviceKey}`}
+          />
         </div>
       </div>
 
@@ -324,7 +291,7 @@ function DeviceCard({ device, deleting, onDelete, onToggleSkipPrompt, onChangeMo
           type="checkbox"
           checked={device.skip_prompt || false}
           onChange={onToggleSkipPrompt}
-          data-testid={`skip-prompt-${device.serial}`}
+          data-testid={`skip-prompt-${deviceKey}`}
           style={{ width: 18, height: 18, accentColor: '#2563EB', cursor: 'pointer' }}
         />
       </div>

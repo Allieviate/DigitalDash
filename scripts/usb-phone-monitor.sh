@@ -8,8 +8,8 @@
 # It detects the phone via ADB and notifies the FRANK backend API.
 #
 # Usage (called automatically by udev):
-#   /opt/frank/scripts/usb-phone-monitor.sh connected
-#   /opt/frank/scripts/usb-phone-monitor.sh disconnected
+#   /usr/local/bin/frank-usb-monitor connected
+#   /usr/local/bin/frank-usb-monitor disconnected
 
 ACTION="${1:-connected}"
 VENDOR_ID="${ID_VENDOR_ID:-}"
@@ -28,39 +28,44 @@ log() {
 log "Event: action=$ACTION vendor=$VENDOR_ID product=$PRODUCT_ID"
 
 if [ "$ACTION" = "connected" ]; then
-    # Wait for ADB to detect the device
-    sleep 2
+    # Wait for device to settle (Samsung devices re-enumerate)
+    sleep 3
 
-    # Get device serial and model via ADB
     SERIAL=""
-    DEVICE_NAME="Unknown Device"
+    DEVICE_NAME="Android Device"
+    DEVICE_MODEL=""
 
     if command -v adb >/dev/null 2>&1; then
-        # Restart ADB server to pick up new device
-        adb kill-server 2>/dev/null
-        sleep 1
-        adb start-server 2>/dev/null
-        sleep 2
+        # Try up to 3 times to find the device (Samsung can be slow to enumerate)
+        for attempt in 1 2 3; do
+            ADB_OUTPUT=$(adb devices -l 2>/dev/null)
+            log "ADB attempt $attempt: $ADB_OUTPUT"
 
-        # Get list of connected devices
-        ADB_OUTPUT=$(adb devices -l 2>/dev/null)
-        log "ADB output: $ADB_OUTPUT"
+            SERIAL=$(echo "$ADB_OUTPUT" | grep -v "^List" | grep "device " | head -1 | awk '{print $1}')
 
-        # Parse first connected device
-        SERIAL=$(echo "$ADB_OUTPUT" | grep -v "^List" | grep "device " | head -1 | awk '{print $1}')
+            if [ -n "$SERIAL" ]; then
+                break
+            fi
+            log "No device found, retrying in 2s..."
+            sleep 2
+        done
 
         if [ -n "$SERIAL" ]; then
-            # Try to get device model name
-            DEVICE_NAME=$(adb -s "$SERIAL" shell getprop ro.product.model 2>/dev/null | tr -d '\r\n')
+            # Get model name (stable identifier — doesn't change between connections)
+            DEVICE_MODEL=$(adb -s "$SERIAL" shell getprop ro.product.model 2>/dev/null | tr -d '\r\n')
+
+            # Get friendly device name
+            DEVICE_NAME=$(adb -s "$SERIAL" shell getprop ro.product.marketname 2>/dev/null | tr -d '\r\n')
             if [ -z "$DEVICE_NAME" ]; then
-                DEVICE_NAME=$(adb -s "$SERIAL" shell getprop ro.product.device 2>/dev/null | tr -d '\r\n')
+                DEVICE_NAME=$(adb -s "$SERIAL" shell getprop ro.product.model 2>/dev/null | tr -d '\r\n')
             fi
             if [ -z "$DEVICE_NAME" ]; then
                 DEVICE_NAME="Android Device"
             fi
-            log "Device detected: serial=$SERIAL name=$DEVICE_NAME"
+
+            log "Device detected: serial=$SERIAL model=$DEVICE_MODEL name=$DEVICE_NAME"
         else
-            log "No ADB device found after connect event"
+            log "No ADB device found after 3 attempts"
             exit 0
         fi
     else
@@ -68,13 +73,13 @@ if [ "$ACTION" = "connected" ]; then
         exit 0
     fi
 
-    # Notify FRANK backend
+    # Notify FRANK backend with model name as stable identifier
     curl -s -X POST "$API_URL/dhu/device-event" \
         -H "Content-Type: application/json" \
-        -d "{\"action\":\"connected\",\"serial\":\"$SERIAL\",\"name\":\"$DEVICE_NAME\",\"vendor_id\":\"$VENDOR_ID\",\"product_id\":\"$PRODUCT_ID\"}" \
+        -d "{\"action\":\"connected\",\"serial\":\"$SERIAL\",\"name\":\"$DEVICE_NAME\",\"device_model\":\"$DEVICE_MODEL\",\"vendor_id\":\"$VENDOR_ID\",\"product_id\":\"$PRODUCT_ID\"}" \
         >> "$LOG" 2>&1
 
-    log "Backend notified: connected serial=$SERIAL"
+    log "Backend notified: connected serial=$SERIAL model=$DEVICE_MODEL"
 
 elif [ "$ACTION" = "disconnected" ]; then
     # Notify backend about disconnection

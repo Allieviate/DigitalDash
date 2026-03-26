@@ -526,10 +526,14 @@ dhu_controller = DHUController()
 # ============ ADB DEVICE MONITOR ============
 
 class ADBMonitor:
-    """Background ADB polling to detect phone connect/disconnect."""
+    """Background ADB polling to detect phone connect/disconnect.
+    
+    Uses model name (ro.product.model) as stable device identifier
+    since ADB serial numbers can change between connections on Samsung devices.
+    """
 
     def __init__(self):
-        self.connected_devices = {}  # serial -> name
+        self.connected_devices = {}  # serial -> {name, model}
         self.running = False
         self._task = None
 
@@ -553,6 +557,22 @@ class ADBMonitor:
                 logger.debug(f"ADB poll error: {e}")
             await asyncio.sleep(4)
 
+    async def _get_device_model(self, serial):
+        """Get stable model name via adb shell getprop."""
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                'adb', '-s', serial, 'shell', 'getprop', 'ro.product.model',
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=5)
+            model = stdout.decode('utf-8', errors='ignore').strip()
+            if model:
+                return model
+        except Exception:
+            pass
+        return None
+
     async def _check_devices(self):
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -573,7 +593,7 @@ class ADBMonitor:
             parts = line.split()
             if len(parts) >= 2 and parts[1] == 'device':
                 serial = parts[0]
-                # Try to extract model name
+                # Extract model name from adb devices -l output
                 name = 'Android Device'
                 for part in parts[2:]:
                     if part.startswith('model:'):
@@ -584,37 +604,37 @@ class ADBMonitor:
         # Detect new connections
         for serial, name in current.items():
             if serial not in self.connected_devices:
-                logger.info(f"ADB: Device connected — {serial} ({name})")
-                self.connected_devices[serial] = name
-                await self._handle_connect(serial, name)
+                # Get stable model identifier via getprop
+                model = await self._get_device_model(serial) or name
+                logger.info(f"ADB: Device connected — serial={serial} name={name} model={model}")
+                self.connected_devices[serial] = {"name": name, "model": model}
+                await self._handle_connect(serial, name, model)
 
         # Detect disconnections
         for serial in list(self.connected_devices.keys()):
             if serial not in current:
-                logger.info(f"ADB: Device disconnected — {serial}")
-                name = self.connected_devices.pop(serial, 'Unknown')
+                self.connected_devices.pop(serial, {})
+                logger.info(f"ADB: Device disconnected — serial={serial}")
                 await self._handle_disconnect(serial)
 
-    async def _handle_connect(self, serial, name):
+    async def _handle_connect(self, serial, name, model):
+        # Look up preferences by model name (stable) — fallback to serial
         prefs = await db.device_preferences.find_one(
-            {"serial": serial}, {"_id": 0}
+            {"device_model": model}, {"_id": 0}
         )
+        if not prefs:
+            prefs = await db.device_preferences.find_one(
+                {"serial": serial}, {"_id": 0}
+            )
 
         if prefs and prefs.get("skip_prompt"):
-            mode = prefs.get("aa_mode", "embedded")
-            logger.info(f"Auto-launching for known device {serial} in {mode} mode")
-
-            if mode == "fullscreen":
-                x, y, w, h = 0, 0, 1920, 800
-            else:
-                x, y, w, h = 640, 160, 640, 480
-
-            result = await dhu_controller.start(x=x, y=y, width=w, height=h, borderless=True)
+            logger.info(f"Auto-launching for known device model={model}")
+            result = await dhu_controller.start()
             _pending_device_event["event"] = {
                 "type": "auto_launched",
                 "serial": serial,
                 "name": name,
-                "mode": mode,
+                "model": model,
                 "result": result.get("status"),
             }
         else:
@@ -622,10 +642,11 @@ class ADBMonitor:
                 "type": "prompt_needed",
                 "serial": serial,
                 "name": name,
+                "model": model,
             }
 
     async def _handle_disconnect(self, serial):
-        logger.info(f"Stopping OpenAuto — device {serial} disconnected")
+        logger.info("Stopping OpenAuto — device disconnected")
         await dhu_controller.stop()
         _pending_device_event["event"] = {
             "type": "disconnected",
@@ -634,8 +655,8 @@ class ADBMonitor:
 
     def get_connected_device(self):
         """Return first connected device info or None."""
-        for serial, name in self.connected_devices.items():
-            return {"serial": serial, "name": name}
+        for serial, info in self.connected_devices.items():
+            return {"serial": serial, "name": info["name"], "model": info["model"]}
         return None
 
 adb_monitor = ADBMonitor()
@@ -647,17 +668,18 @@ async def start_adb_monitor():
 # ============ DEVICE PREFERENCES (MongoDB) ============
 
 class DevicePreferences(BaseModel):
-    serial: str
+    serial: str = ""
+    device_model: str = ""             # Stable identifier (ro.product.model)
     name: str = "Unknown Device"
-    connection_type: str = "usb"  # "usb" or "bluetooth"
-    aa_mode: str = "embedded"     # "embedded" or "fullscreen"
+    connection_type: str = "usb"       # "usb" or "bluetooth"
     auto_launch: bool = True
-    skip_prompt: bool = False     # True = don't show prompt again for this device
+    skip_prompt: bool = False          # True = don't show prompt again for this device
 
 class DeviceEvent(BaseModel):
     action: str  # "connected" or "disconnected"
     serial: str = ""
     name: str = "Unknown Device"
+    device_model: str = ""             # Stable model name
     vendor_id: str = ""
     product_id: str = ""
 
@@ -665,63 +687,49 @@ class DeviceEvent(BaseModel):
 _pending_device_event = {"event": None}
 
 class DHUStartRequest(BaseModel):
-    x: int = 640
-    y: int = 200
-    width: int = 640
-    height: int = 480
     borderless: bool = True
     alwaysOnTop: bool = True
-    mode: str = "embedded"
-
-class DHUResizeRequest(BaseModel):
-    mode: str = "fullscreen"
-    screen_width: int = 1920
-    screen_height: int = 800
 
 @api_router.post("/dhu/device-event")
 async def device_event(event: DeviceEvent):
     """Called by udev script when a phone is plugged in or removed"""
-    logger.info(f"Device event: {event.action} serial={event.serial} name={event.name}")
+    logger.info(f"Device event: {event.action} serial={event.serial} model={event.device_model} name={event.name}")
 
-    if event.action == "connected" and event.serial:
-        # Check if we have saved preferences for this device
-        prefs = await db.device_preferences.find_one(
-            {"serial": event.serial},
-            {"_id": 0}
-        )
+    if event.action == "connected" and (event.serial or event.device_model):
+        # Look up saved preferences by model name (stable) then serial (fallback)
+        prefs = None
+        if event.device_model:
+            prefs = await db.device_preferences.find_one(
+                {"device_model": event.device_model}, {"_id": 0}
+            )
+        if not prefs and event.serial:
+            prefs = await db.device_preferences.find_one(
+                {"serial": event.serial}, {"_id": 0}
+            )
 
         if prefs and prefs.get("skip_prompt"):
-            # Known device with skip_prompt — auto-launch
-            mode = prefs.get("aa_mode", "embedded")
-            logger.info(f"Auto-launching OpenAuto for known device {event.serial} in {mode} mode")
-
-            if mode == "fullscreen":
-                x, y, w, h = 0, 0, 1920, 800
-            else:
-                x, y, w, h = 640, 200, 640, 480
-
-            result = await dhu_controller.start(x=x, y=y, width=w, height=h, borderless=True)
+            logger.info(f"Auto-launching OpenAuto for known device model={event.device_model}")
+            result = await dhu_controller.start()
             _pending_device_event["event"] = {
                 "type": "auto_launched",
                 "serial": event.serial,
                 "name": event.name,
-                "mode": mode,
+                "model": event.device_model,
                 "result": result.get("status"),
             }
-            return {"status": "auto_launched", "mode": mode}
+            return {"status": "auto_launched"}
         else:
-            # New device or prompt not skipped — notify frontend to show prompt
             _pending_device_event["event"] = {
                 "type": "prompt_needed",
                 "serial": event.serial,
                 "name": event.name,
+                "model": event.device_model,
                 "vendor_id": event.vendor_id,
                 "product_id": event.product_id,
             }
             return {"status": "prompt_needed", "serial": event.serial}
 
     elif event.action == "disconnected":
-        # Auto-stop OpenAuto
         logger.info("Phone disconnected — stopping OpenAuto")
         result = await dhu_controller.stop()
         _pending_device_event["event"] = {
@@ -734,27 +742,28 @@ async def device_event(event: DeviceEvent):
 
 @api_router.post("/dhu/device-preferences")
 async def save_device_preferences(prefs: DevicePreferences):
-    """Save per-device preferences (called after user confirms prompt)"""
+    """Save per-device preferences keyed by model name (stable across connections)"""
+    key = prefs.device_model or prefs.serial
     await db.device_preferences.update_one(
-        {"serial": prefs.serial},
+        {"device_model": key} if prefs.device_model else {"serial": key},
         {"$set": {
             "serial": prefs.serial,
+            "device_model": prefs.device_model or prefs.serial,
             "name": prefs.name,
             "connection_type": prefs.connection_type,
-            "aa_mode": prefs.aa_mode,
             "auto_launch": prefs.auto_launch,
             "skip_prompt": prefs.skip_prompt,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }},
         upsert=True,
     )
-    return {"status": "saved", "serial": prefs.serial}
+    return {"status": "saved", "device_model": key}
 
-@api_router.get("/dhu/device-preferences/{serial}")
-async def get_device_preferences(serial: str):
-    """Get saved preferences for a specific device"""
+@api_router.get("/dhu/device-preferences/{identifier}")
+async def get_device_preferences(identifier: str):
+    """Get saved preferences by model name or serial"""
     prefs = await db.device_preferences.find_one(
-        {"serial": serial},
+        {"$or": [{"device_model": identifier}, {"serial": identifier}]},
         {"_id": 0}
     )
     if prefs:
@@ -769,39 +778,18 @@ async def list_known_devices():
         devices.append(doc)
     return {"devices": devices}
 
-@api_router.delete("/dhu/device-preferences/{serial}")
-async def delete_device_preferences(serial: str):
-    """Delete saved preferences for a device (will prompt again next time)"""
-    result = await db.device_preferences.delete_one({"serial": serial})
+@api_router.delete("/dhu/device-preferences/{identifier}")
+async def delete_device_preferences(identifier: str):
+    """Delete saved preferences by model name or serial"""
+    result = await db.device_preferences.delete_one(
+        {"$or": [{"device_model": identifier}, {"serial": identifier}]}
+    )
     return {"status": "deleted" if result.deleted_count > 0 else "not_found"}
 
 @api_router.post("/dhu/start")
 async def start_dhu(config: DHUStartRequest):
-    """Start Android Auto DHU with window configuration"""
-    if config.mode == "fullscreen":
-        x, y, w, h = 0, 0, 1920, 800
-    else:
-        x, y, w, h = config.x, config.y, config.width, config.height
-
-    return await dhu_controller.start(
-        x=x, y=y, width=w, height=h, borderless=config.borderless
-    )
-
-@api_router.post("/dhu/resize")
-async def resize_dhu(config: DHUResizeRequest):
-    """Resize/reposition OpenAuto window without restarting"""
-    if not dhu_controller.is_running():
-        return {"status": "error", "message": "OpenAuto is not running"}
-
-    if config.mode == "fullscreen":
-        x, y, w, h = 0, 0, config.screen_width, config.screen_height
-    else:
-        w, h = 640, 480
-        x = (config.screen_width - w) // 2
-        y = 160
-
-    await dhu_controller._configure_window(x, y, w, h, borderless=True)
-    return {"status": "running", "mode": config.mode, "geometry": {"x": x, "y": y, "width": w, "height": h}}
+    """Start Android Auto DHU"""
+    return await dhu_controller.start(borderless=config.borderless)
 
 @api_router.post("/dhu/stop")
 async def stop_dhu():

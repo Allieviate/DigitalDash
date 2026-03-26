@@ -1,26 +1,25 @@
 import React, { useState } from 'react';
-import { Smartphone, Usb, Bluetooth, Monitor, Maximize2, Minimize2, X } from 'lucide-react';
+import { Smartphone, Usb, Bluetooth, X } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
 export default function DevicePromptModal({ device, onConfirm, onDismiss }) {
   const [connectionType, setConnectionType] = useState('usb');
-  const [mode, setMode] = useState('embedded');
   const [skipPrompt, setSkipPrompt] = useState(false);
 
   if (!device) return null;
 
   const handleConfirm = async () => {
-    // Save device preferences
+    // Save device preferences using model as stable key
     try {
       await fetch(`${API_URL}/api/dhu/device-preferences`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           serial: device.serial,
+          device_model: device.model || device.name,
           name: device.name,
           connection_type: connectionType,
-          aa_mode: mode,
           auto_launch: true,
           skip_prompt: skipPrompt,
         }),
@@ -29,7 +28,7 @@ export default function DevicePromptModal({ device, onConfirm, onDismiss }) {
       // Save failed — still launch
     }
 
-    onConfirm({ connectionType, mode });
+    onConfirm({ connectionType });
   };
 
   return (
@@ -83,6 +82,11 @@ export default function DevicePromptModal({ device, onConfirm, onDismiss }) {
                 marginTop: 2,
               }}>
                 {device.name || 'Android Device'}
+                {device.model && device.model !== device.name && (
+                  <span style={{ color: 'rgba(255,255,255,0.25)', marginLeft: 6 }}>
+                    ({device.model})
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -125,35 +129,6 @@ export default function DevicePromptModal({ device, onConfirm, onDismiss }) {
           </div>
         </div>
 
-        {/* Display Mode */}
-        <div>
-          <div style={{
-            fontFamily: 'Helvetica Neue, sans-serif',
-            fontSize: 9, letterSpacing: '0.3em', textTransform: 'uppercase',
-            color: 'rgba(255,255,255,0.35)', marginBottom: 8,
-          }}>
-            Display Mode
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <OptionButton
-              icon={<Minimize2 size={14} />}
-              label="Embedded"
-              desc="Between gauges"
-              selected={mode === 'embedded'}
-              onClick={() => setMode('embedded')}
-              testId="display-mode-embedded"
-            />
-            <OptionButton
-              icon={<Maximize2 size={14} />}
-              label="Fullscreen"
-              desc="Takes over screen"
-              selected={mode === 'fullscreen'}
-              onClick={() => setMode('fullscreen')}
-              testId="display-mode-fullscreen"
-            />
-          </div>
-        </div>
-
         {/* Remember checkbox */}
         <label
           data-testid="skip-prompt-checkbox"
@@ -186,7 +161,7 @@ export default function DevicePromptModal({ device, onConfirm, onDismiss }) {
               fontSize: 9, color: 'rgba(255,255,255,0.3)',
               marginTop: 2,
             }}>
-              Skip this prompt next time "{device.name || 'this device'}" connects
+              Auto-launch next time "{device.name || 'this device'}" connects
             </div>
           </div>
         </label>
@@ -220,7 +195,7 @@ export default function DevicePromptModal({ device, onConfirm, onDismiss }) {
   );
 }
 
-function OptionButton({ icon, label, desc, selected, onClick, testId }) {
+function OptionButton({ icon, label, selected, onClick, testId }) {
   return (
     <button
       data-testid={testId}
@@ -250,14 +225,6 @@ function OptionButton({ icon, label, desc, selected, onClick, testId }) {
       }}>
         {label}
       </div>
-      {desc && (
-        <div style={{
-          fontFamily: 'Helvetica Neue, sans-serif',
-          fontSize: 8, color: 'rgba(255,255,255,0.2)',
-        }}>
-          {desc}
-        </div>
-      )}
     </button>
   );
 }

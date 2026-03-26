@@ -119,37 +119,43 @@ export const WarningPanel = ({ className = '' }) => {
   );
 };
 
-// Turn Signal Arrow SVG Component - SVG filter glow (hardware-accelerated, no CSS drop-shadow stacking)
+// Turn Signal Arrow — thick solid chevron, ALWAYS filled, never hollow
+// Active: bright green with soft glow | Inactive: dim dark green
 const TurnArrow = ({ direction, active }) => {
-  const activeColor = '#28D86A';
-  const inactiveColor = '#3f3f46';
   const isLeft = direction === 'left';
   const filterId = `turn-glow-${direction}`;
+
+  // Active: deep green fill with glow | Inactive: very dark green, still visible
+  const fillColor = active ? '#2D8C4E' : '#152118';
+  const strokeColor = active ? '#3DA864' : '#1e3326';
+
+  // Thick pointed chevron — matching reference image proportions
+  const chevronPath = 'M38 1 L4 20 L38 39 L26 20 Z';
 
   return (
     <div
       className="relative flex items-center justify-center"
-      style={{ padding: '25px 35px' }}
+      style={{ width: 80, height: 70 }}
     >
-      {/* Bloom layer — always mounted, opacity toggled */}
+      {/* Soft bloom glow — always mounted, opacity toggled */}
       <div
         style={{
           position: 'absolute',
-          inset: -4,
+          inset: -12,
           borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(40,216,106,0.5) 0%, rgba(40,216,106,0.12) 45%, transparent 70%)',
-          filter: 'blur(12px)',
+          background: 'radial-gradient(circle, rgba(45,140,78,0.55) 0%, rgba(45,140,78,0.12) 50%, transparent 75%)',
+          filter: 'blur(18px)',
           opacity: active ? 1 : 0,
-          transition: active ? 'opacity 0.02s' : 'opacity 0.08s ease-out',
+          transition: active ? 'opacity 0.02s' : 'opacity 0.12s ease-out',
           willChange: 'opacity',
           pointerEvents: 'none',
         }}
       />
 
       <svg
-        width="60"
-        height="44"
-        viewBox="0 0 48 36"
+        width="72"
+        height="62"
+        viewBox="0 0 42 40"
         style={{
           transform: isLeft ? 'none' : 'scaleX(-1)',
           position: 'relative',
@@ -157,15 +163,15 @@ const TurnArrow = ({ direction, active }) => {
         }}
       >
         <defs>
-          <filter id={filterId} x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur" />
+          <filter id={filterId} x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="2.2" result="blur" />
             <feColorMatrix
               in="blur"
               type="matrix"
-              values="0 0 0 0 0.16
-                      0 0 0 0 0.85
-                      0 0 0 0 0.42
-                      0 0 0 0.85 0"
+              values="0 0 0 0 0.18
+                      0 0 0 0 0.55
+                      0 0 0 0 0.31
+                      0 0 0 0.7 0"
               result="greenGlow"
             />
             <feMerge>
@@ -176,32 +182,26 @@ const TurnArrow = ({ direction, active }) => {
         </defs>
 
         <path
-          d="M4 18 L20 4 L20 12 L44 12 L44 24 L20 24 L20 32 Z"
-          fill={active ? activeColor : 'transparent'}
-          stroke={active ? '#5AFA9A' : inactiveColor}
-          strokeWidth="1.5"
+          d={chevronPath}
+          fill={fillColor}
+          stroke={strokeColor}
+          strokeWidth="1.2"
+          strokeLinejoin="round"
           filter={active ? `url(#${filterId})` : 'none'}
-          style={{
-            transition: active ? 'none' : 'fill 0.075s ease-out, stroke 0.075s ease-out',
-          }}
         />
       </svg>
     </div>
   );
 };
 
-// Turn Signals Row - SVG filter glow, no CSS drop-shadow stacking
+// Turn Signals Row — always visible, solid filled
 export const TurnSignalsRow = ({ className = '' }) => {
   const { signals } = useVehicleData();
-  
+
   return (
-    <div className={`flex items-center justify-center gap-8 ${className}`} data-testid="turn-signals">
-      <div style={{ opacity: signals.turn_left ? 1 : 0.3, transition: 'opacity 0.1s' }}>
-        <TurnArrow direction="left" active={signals.turn_left} />
-      </div>
-      <div style={{ opacity: signals.turn_right ? 1 : 0.3, transition: 'opacity 0.1s' }}>
-        <TurnArrow direction="right" active={signals.turn_right} />
-      </div>
+    <div className={`flex items-center justify-center gap-4 ${className}`} data-testid="turn-signals">
+      <TurnArrow direction="left" active={signals.turn_left} />
+      <TurnArrow direction="right" active={signals.turn_right} />
     </div>
   );
 };
