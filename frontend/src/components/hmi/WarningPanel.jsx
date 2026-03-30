@@ -129,8 +129,8 @@ const TurnArrow = ({ direction, active }) => {
   const fillColor = active ? '#2D8C4E' : '#152118';
   const strokeColor = active ? '#3DA864' : '#1e3326';
 
-  // Thick pointed chevron — matching reference image proportions
-  const chevronPath = 'M38 1 L4 20 L38 39 L26 20 Z';
+  // Original arrow shape — with shaft, always solid filled
+  const chevronPath = 'M4 18 L20 4 L20 12 L44 12 L44 24 L20 24 L20 32 Z';
 
   return (
     <div
@@ -154,8 +154,8 @@ const TurnArrow = ({ direction, active }) => {
 
       <svg
         width="72"
-        height="62"
-        viewBox="0 0 42 40"
+        height="52"
+        viewBox="0 0 48 36"
         style={{
           transform: isLeft ? 'none' : 'scaleX(-1)',
           position: 'relative',
