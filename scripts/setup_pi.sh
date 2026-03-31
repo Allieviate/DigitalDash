@@ -275,6 +275,7 @@ APP_URL="http://localhost:3000"
 
 COMMON_FLAGS=(
   --kiosk
+  --no-sandbox
   --noerrdialogs
   --disable-infobars
   --disable-session-crashed-bubble
@@ -407,6 +408,10 @@ WantedBy=multi-user.target
 EOF
 
 # Kiosk service (fullscreen browser)
+# Determine the real (non-root) user for the kiosk service
+KIOSK_USER="${SUDO_USER:-$(logname 2>/dev/null || echo pi)}"
+KIOSK_HOME="/home/$KIOSK_USER"
+
 sudo tee /etc/systemd/system/frank-kiosk.service > /dev/null << EOF
 [Unit]
 Description=FRANK HMI Kiosk Display
@@ -415,8 +420,8 @@ Wants=frank-frontend.service frank-display.service network-online.target
 
 [Service]
 Type=simple
-User=$USER
-Environment=HOME=/home/$USER
+User=$KIOSK_USER
+Environment=HOME=$KIOSK_HOME
 PAMName=login
 ExecStartPre=/bin/sleep 8
 ExecStart=$PROJECT_DIR/scripts/launch_kiosk.sh
