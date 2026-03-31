@@ -536,6 +536,7 @@ class ADBMonitor:
         self.connected_devices = {}  # serial -> {name, model}
         self.running = False
         self._task = None
+        self._adb_initialized = False
 
     async def start(self):
         if self.running:
@@ -549,9 +550,26 @@ class ADBMonitor:
         if self._task:
             self._task.cancel()
 
+    async def _ensure_adb_server(self):
+        """Make sure ADB daemon is running — called once on first poll."""
+        if self._adb_initialized:
+            return
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                'adb', 'start-server',
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            await asyncio.wait_for(proc.communicate(), timeout=10)
+            self._adb_initialized = True
+            logger.info("ADB server started")
+        except (FileNotFoundError, asyncio.TimeoutError) as e:
+            logger.debug(f"ADB server start failed: {e}")
+
     async def _poll_loop(self):
         while self.running:
             try:
+                await self._ensure_adb_server()
                 await self._check_devices()
             except Exception as e:
                 logger.debug(f"ADB poll error: {e}")
