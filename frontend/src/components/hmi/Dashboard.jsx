@@ -87,7 +87,6 @@ export const Dashboard = ({ onOpenSettings }) => {
       const res = await fetch(`${API_URL}/api/dhu/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ borderless: true, alwaysOnTop: true }),
       });
       const data = await res.json();
       if (data.status === 'running') {
