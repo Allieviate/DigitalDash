@@ -424,241 +424,19 @@ class DHUController:
 # Global DHU controller instance
 dhu_controller = DHUController()
 
-# ============ ADB DEVICE MONITOR ============
-
-class ADBMonitor:
-    """Background ADB polling to detect phone connect/disconnect.
-    
-    Uses model name (ro.product.model) as stable device identifier
-    since ADB serial numbers can change between connections on Samsung devices.
-    """
-
-    def __init__(self):
-        self.connected_devices = {}  # serial -> {name, model}
-        self.running = False
-        self._task = None
-        self._adb_initialized = False
-
-    async def start(self):
-        if self.running:
-            return
-        self.running = True
-        self._task = asyncio.create_task(self._poll_loop())
-        logger.info("ADB monitor started")
-
-    async def stop(self):
-        self.running = False
-        if self._task:
-            self._task.cancel()
-
-    async def _ensure_adb_server(self):
-        """Make sure ADB daemon is running — called once on first poll."""
-        if self._adb_initialized:
-            return
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                'adb', 'start-server',
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            await asyncio.wait_for(proc.communicate(), timeout=10)
-            self._adb_initialized = True
-            logger.info("ADB server started")
-        except (FileNotFoundError, asyncio.TimeoutError) as e:
-            logger.debug(f"ADB server start failed: {e}")
-
-    async def _poll_loop(self):
-        while self.running:
-            try:
-                await self._ensure_adb_server()
-                await self._check_devices()
-            except Exception as e:
-                logger.debug(f"ADB poll error: {e}")
-            await asyncio.sleep(4)
-
-    async def _get_device_model(self, serial):
-        """Get stable model name via adb shell getprop."""
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                'adb', '-s', serial, 'shell', 'getprop', 'ro.product.model',
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=5)
-            model = stdout.decode('utf-8', errors='ignore').strip()
-            if model:
-                return model
-        except Exception:
-            pass
-        return None
-
-    async def _check_devices(self):
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                'adb', 'devices', '-l',
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
-            output = stdout.decode('utf-8', errors='ignore')
-        except (FileNotFoundError, asyncio.TimeoutError):
-            return
-
-        # Parse ADB output
-        current = {}
-        for line in output.strip().split('\n'):
-            if line.startswith('List') or not line.strip():
-                continue
-            parts = line.split()
-            if len(parts) >= 2 and parts[1] == 'device':
-                serial = parts[0]
-                # Extract model name from adb devices -l output
-                name = 'Android Device'
-                for part in parts[2:]:
-                    if part.startswith('model:'):
-                        name = part.split(':', 1)[1].replace('_', ' ')
-                        break
-                current[serial] = name
-
-        # Detect new connections
-        for serial, name in current.items():
-            if serial not in self.connected_devices:
-                # Get stable model identifier via getprop
-                model = await self._get_device_model(serial) or name
-                logger.info(f"ADB: Device connected — serial={serial} name={name} model={model}")
-                self.connected_devices[serial] = {"name": name, "model": model}
-                await self._handle_connect(serial, name, model)
-
-        # Detect disconnections
-        for serial in list(self.connected_devices.keys()):
-            if serial not in current:
-                self.connected_devices.pop(serial, {})
-                logger.info(f"ADB: Device disconnected — serial={serial}")
-                await self._handle_disconnect(serial)
-
-    async def _handle_connect(self, serial, name, model):
-        # Look up preferences by model name (stable) — fallback to serial
-        prefs = await db.device_preferences.find_one(
-            {"device_model": model}, {"_id": 0}
-        )
-        if not prefs:
-            prefs = await db.device_preferences.find_one(
-                {"serial": serial}, {"_id": 0}
-            )
-
-        if prefs and prefs.get("skip_prompt"):
-            logger.info(f"Auto-launching for known device model={model}")
-            result = await dhu_controller.start()
-            _pending_device_event["event"] = {
-                "type": "auto_launched",
-                "serial": serial,
-                "name": name,
-                "model": model,
-                "result": result.get("status"),
-            }
-        else:
-            _pending_device_event["event"] = {
-                "type": "prompt_needed",
-                "serial": serial,
-                "name": name,
-                "model": model,
-            }
-
-    async def _handle_disconnect(self, serial):
-        logger.info("Stopping OpenAuto — device disconnected")
-        await dhu_controller.stop()
-        _pending_device_event["event"] = {
-            "type": "disconnected",
-            "serial": serial,
-        }
-
-    def get_connected_device(self):
-        """Return first connected device info or None."""
-        for serial, info in self.connected_devices.items():
-            return {"serial": serial, "name": info["name"], "model": info["model"]}
-        return None
-
-adb_monitor = ADBMonitor()
-
-@app.on_event("startup")
-async def start_adb_monitor():
-    await adb_monitor.start()
-
-# ============ DEVICE PREFERENCES (MongoDB) ============
+# ============ DEVICE PREFERENCES (MongoDB) — kept for Saved Devices UI ============
 
 class DevicePreferences(BaseModel):
     serial: str = ""
-    device_model: str = ""             # Stable identifier (ro.product.model)
+    device_model: str = ""
     name: str = "Unknown Device"
-    connection_type: str = "usb"       # "usb" or "bluetooth"
+    connection_type: str = "usb"
     auto_launch: bool = True
-    skip_prompt: bool = False          # True = don't show prompt again for this device
-
-class DeviceEvent(BaseModel):
-    action: str  # "connected" or "disconnected"
-    serial: str = ""
-    name: str = "Unknown Device"
-    device_model: str = ""             # Stable model name
-    vendor_id: str = ""
-    product_id: str = ""
-
-# In-memory pending device event (picked up by status polling)
-_pending_device_event = {"event": None}
-
-
-@api_router.post("/dhu/device-event")
-async def device_event(event: DeviceEvent):
-    """Called by udev script when a phone is plugged in or removed"""
-    logger.info(f"Device event: {event.action} serial={event.serial} model={event.device_model} name={event.name}")
-
-    if event.action == "connected" and (event.serial or event.device_model):
-        # Look up saved preferences by model name (stable) then serial (fallback)
-        prefs = None
-        if event.device_model:
-            prefs = await db.device_preferences.find_one(
-                {"device_model": event.device_model}, {"_id": 0}
-            )
-        if not prefs and event.serial:
-            prefs = await db.device_preferences.find_one(
-                {"serial": event.serial}, {"_id": 0}
-            )
-
-        if prefs and prefs.get("skip_prompt"):
-            logger.info(f"Auto-launching OpenAuto for known device model={event.device_model}")
-            result = await dhu_controller.start()
-            _pending_device_event["event"] = {
-                "type": "auto_launched",
-                "serial": event.serial,
-                "name": event.name,
-                "model": event.device_model,
-                "result": result.get("status"),
-            }
-            return {"status": "auto_launched"}
-        else:
-            _pending_device_event["event"] = {
-                "type": "prompt_needed",
-                "serial": event.serial,
-                "name": event.name,
-                "model": event.device_model,
-                "vendor_id": event.vendor_id,
-                "product_id": event.product_id,
-            }
-            return {"status": "prompt_needed", "serial": event.serial}
-
-    elif event.action == "disconnected":
-        logger.info("Phone disconnected — stopping OpenAuto")
-        result = await dhu_controller.stop()
-        _pending_device_event["event"] = {
-            "type": "disconnected",
-            "serial": event.serial,
-        }
-        return {"status": "stopped", "message": "Phone disconnected, OpenAuto stopped"}
-
-    return {"status": "ignored"}
+    skip_prompt: bool = False
 
 @api_router.post("/dhu/device-preferences")
 async def save_device_preferences(prefs: DevicePreferences):
-    """Save per-device preferences keyed by model name (stable across connections)"""
+    """Save per-device preferences"""
     key = prefs.device_model or prefs.serial
     await db.device_preferences.update_one(
         {"device_model": key} if prefs.device_model else {"serial": key},
@@ -704,32 +482,18 @@ async def delete_device_preferences(identifier: str):
 
 @api_router.post("/dhu/start")
 async def start_dhu():
-    """Start Android Auto — just launch, no window management"""
+    """Start Android Auto — just launch OpenAuto, no window management"""
     return await dhu_controller.start()
 
 @api_router.post("/dhu/stop")
 async def stop_dhu():
-    """Stop Android Auto DHU"""
-    result = await dhu_controller.stop()
-    _pending_device_event["event"] = None
-    return result
+    """Stop Android Auto"""
+    return await dhu_controller.stop()
 
 @api_router.get("/dhu/status")
 async def get_dhu_status():
-    """Get DHU status + phone connection state + pending device events"""
-    status = dhu_controller.get_status()
-
-    # Phone connection state from ADB monitor
-    connected_device = adb_monitor.get_connected_device()
-    status["phone_connected"] = connected_device is not None
-    if connected_device:
-        status["connected_device"] = connected_device
-
-    # Attach pending device event (consumed on read)
-    if _pending_device_event["event"]:
-        status["device_event"] = _pending_device_event["event"]
-        _pending_device_event["event"] = None
-    return status
+    """Get DHU status — simple, no auto-detect"""
+    return dhu_controller.get_status()
 
 # Include the router in the main app
 app.include_router(api_router)
@@ -751,5 +515,4 @@ logger = logging.getLogger(__name__)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    await adb_monitor.stop()
     client.close()

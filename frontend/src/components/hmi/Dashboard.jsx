@@ -4,85 +4,62 @@ import { RpmGauge, SpeedGauge } from './CustomGauges';
 import { ShiftLightsBar, DigitalSpeedGear } from './DashWidgets';
 import { WarningPanel, TurnSignalsRow, CriticalWarningBanner } from './WarningPanel';
 import { FuelGauge, CoolantGauge, BatteryGauge, OilPressureGauge } from './InfoGauges';
-import AndroidAutoPanel from './AndroidAutoPanel';
-import DevicePromptModal from './DevicePromptModal';
 import { Settings, Activity } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
-// Android Auto logo SVG — user-provided asset, shown near settings when phone is connected
-const AALogoIndicator = ({ visible }) => {
-  if (!visible) return null;
-  return (
-    <div
-      data-testid="aa-logo-indicator"
-      className="flex items-center gap-2"
-      style={{ opacity: 0.9 }}
-    >
-      <svg width="22" height="22" viewBox="-0.72 -0.72 25.44 25.44" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path
-          d="M12 0c-.6 0-1.11.32-1.39.8L.48 18.4a1.6 1.6 0 0 0 1.39 2.4h2l7.7-13.58.43-.77 8.13 14.35h2a1.6 1.6 0 0 0 1.39-2.4L13.39.8A1.6 1.6 0 0 0 12 0zm0 7.47l-9.07 16 .54.53L12 20.8l8.53 3.2.54-.53z"
-          fill="#2563EB"
-        />
-      </svg>
-      <span style={{
-        fontFamily: 'Helvetica Neue, sans-serif',
-        fontSize: 9, letterSpacing: '0.15em', textTransform: 'uppercase',
-        color: '#2563EB',
-      }}>
-        AA
-      </span>
-    </div>
-  );
+// Android Auto logo — clickable to launch/stop AA manually
+const AALogoIndicator = ({ visible, onStop }) => {
+  if (visible) {
+    // AA is running — show active indicator with stop action
+    return (
+      <button
+        data-testid="aa-stop-btn"
+        onClick={onStop}
+        className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-white/5 transition-colors"
+        title="Stop Android Auto"
+      >
+        <svg width="20" height="20" viewBox="-0.72 -0.72 25.44 25.44" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M12 0c-.6 0-1.11.32-1.39.8L.48 18.4a1.6 1.6 0 0 0 1.39 2.4h2l7.7-13.58.43-.77 8.13 14.35h2a1.6 1.6 0 0 0 1.39-2.4L13.39.8A1.6 1.6 0 0 0 12 0zm0 7.47l-9.07 16 .54.53L12 20.8l8.53 3.2.54-.53z"
+            fill="#22C55E"
+          />
+        </svg>
+        <span style={{
+          fontFamily: 'Helvetica Neue, sans-serif',
+          fontSize: 9, letterSpacing: '0.15em', textTransform: 'uppercase',
+          color: '#22C55E',
+        }}>
+          AA ACTIVE
+        </span>
+      </button>
+    );
+  }
+  return null;
 };
 
 export const Dashboard = ({ onOpenSettings }) => {
   const { signals, isConnected } = useVehicleData();
 
-  // Phone/AA state — driven entirely by backend status polling
-  const [phoneConnected, setPhoneConnected] = React.useState(false);
+  // DHU state — simple polling, no auto-detect
   const [dhuRunning, setDhuRunning] = React.useState(false);
-  const [pendingDevice, setPendingDevice] = React.useState(null);
 
-  // Poll backend every 2s for phone state + device events
   React.useEffect(() => {
     const poll = async () => {
       try {
         const res = await fetch(`${API_URL}/api/dhu/status`);
         const data = await res.json();
-
-        setPhoneConnected(data.phone_connected === true);
         setDhuRunning(data.status === 'running');
-
-        // Handle device events
-        if (data.device_event) {
-          const evt = data.device_event;
-          if (evt.type === 'prompt_needed') {
-            setPendingDevice({
-              serial: evt.serial,
-              name: evt.name,
-              model: evt.model || evt.name,
-            });
-          } else if (evt.type === 'auto_launched') {
-            setDhuRunning(true);
-          } else if (evt.type === 'disconnected') {
-            setDhuRunning(false);
-            setPendingDevice(null);
-          }
-        }
       } catch {
         // Backend unreachable
       }
     };
-
     poll();
-    const interval = setInterval(poll, 2000);
+    const interval = setInterval(poll, 3000);
     return () => clearInterval(interval);
   }, []);
 
-  // User confirms device prompt — launch AA
-  const handleDeviceConfirm = React.useCallback(async ({ connectionType }) => {
-    setPendingDevice(null);
+  const handleLaunchAA = React.useCallback(async () => {
     try {
       const res = await fetch(`${API_URL}/api/dhu/start`, {
         method: 'POST',
@@ -97,16 +74,15 @@ export const Dashboard = ({ onOpenSettings }) => {
     }
   }, []);
 
-  const handleDeviceDismiss = React.useCallback(() => {
-    setPendingDevice(null);
-  }, []);
-
-  // Called by AndroidAutoPanel when stopped
-  const handleAAChange = React.useCallback((state) => {
-    if (!state) {
+  const handleStopAA = React.useCallback(async () => {
+    try {
+      await fetch(`${API_URL}/api/dhu/stop`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
       setDhuRunning(false);
-    } else {
-      setDhuRunning(true);
+    } catch {
+      // Stop failed
     }
   }, []);
 
@@ -135,8 +111,6 @@ export const Dashboard = ({ onOpenSettings }) => {
     return `radial-gradient(ellipse 100% 80% at 50% 50%, rgba(${80 + 40 * redIntensity}, ${20 - 10 * redIntensity}, ${20 - 10 * redIntensity}, ${opacity}) 0%, transparent 70%)`;
   };
 
-  // Show AA panel in center only when phone is connected OR DHU is running
-  const showAAPanel = phoneConnected || dhuRunning;
 
   return (
     <div
@@ -156,18 +130,9 @@ export const Dashboard = ({ onOpenSettings }) => {
       {/* Critical Warning Banner */}
       <CriticalWarningBanner />
 
-      {/* Device prompt modal */}
-      {pendingDevice && (
-        <DevicePromptModal
-          device={pendingDevice}
-          onConfirm={handleDeviceConfirm}
-          onDismiss={handleDeviceDismiss}
-        />
-      )}
-
       {/* Top-right: AA logo + connection status + settings */}
       <div className="absolute top-4 right-4 z-20 flex items-center gap-4">
-        <AALogoIndicator visible={phoneConnected} />
+        <AALogoIndicator visible={dhuRunning} onStop={handleStopAA} />
         <div className="flex items-center gap-2">
           <Activity
             size={14}
@@ -220,17 +185,8 @@ export const Dashboard = ({ onOpenSettings }) => {
             <RpmGauge size={640} vtecStartRpm={3000} shiftRpm={7800} maxRpm={8000} />
           </div>
 
-          {/* CENTER: AA panel (only when phone connected) or empty gap */}
-          {showAAPanel ? (
-            <div
-              className="flex flex-col items-center justify-start mx-6 pt-10"
-              style={{ width: '500px', height: '450px' }}
-            >
-              <AndroidAutoPanel isActive={dhuRunning} onModeChange={handleAAChange} />
-            </div>
-          ) : (
-            <div className="mx-6" style={{ width: '500px' }} />
-          )}
+          {/* CENTER: gap between gauges */}
+          <div className="mx-6" style={{ width: '500px' }} />
 
           {/* RIGHT: Speed */}
           <div className="relative flex items-end justify-center">
