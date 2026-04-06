@@ -235,10 +235,18 @@ export default function ConnectivityTab() {
           setProjectionLaunched(false);
         }
       } else {
-        // Start OpenAuto
+        // Start OpenAuto - centered position for overlay
         const response = await fetch(`${API_URL}/api/dhu/start`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            x: 640,      // Centered for 1920 width display
+            y: 160,      // Below top bar
+            width: 640,
+            height: 480,
+            borderless: true,
+            alwaysOnTop: true
+          })
         });
         const data = await response.json();
         

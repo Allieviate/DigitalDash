@@ -305,10 +305,11 @@ import signal
 class DHUController:
     """
     Android Auto Controller for Raspberry Pi
-    Launches OpenAuto and lets it manage its own window.
+    Supports both OpenAuto (C++) and WebAuto (Node.js)
     """
     def __init__(self):
         self.process = None
+        self.window_id = None
         
         # Supported Android Auto implementations (in order of preference)
         self.implementations = [
@@ -348,6 +349,7 @@ class DHUController:
     def is_running(self):
         if self.process is not None and self.process.poll() is None:
             return True
+        # Check if any known process is running
         for impl in self.implementations:
             try:
                 result = subprocess.run(['pgrep', '-f', impl["process_name"]], capture_output=True, text=True)
@@ -357,11 +359,12 @@ class DHUController:
                 pass
         return False
     
-    async def start(self):
-        """Launch Android Auto — no window management, let OpenAuto handle it"""
+    async def start(self, x=640, y=200, width=640, height=480, borderless=True):
+        """Launch Android Auto and configure window"""
         if self.is_running():
             return {"status": "running", "message": "Android Auto already running"}
         
+        # Find available implementation
         impl = self.get_available_implementation()
         
         if not impl:
@@ -371,24 +374,106 @@ class DHUController:
             }
         
         try:
+            # Set display environment
             env = os.environ.copy()
             env['DISPLAY'] = ':0'
             
+            # Launch subprocess
             self.process = subprocess.Popen(
                 [impl["bin"]],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 env=env,
+                shell=impl["name"] == "web-auto-electron",
                 preexec_fn=os.setsid
             )
             
+            # Wait for window to appear
             await asyncio.sleep(2.0)
+            
+            # Find and configure OpenAuto window
+            await self._configure_window(x, y, width, height, borderless)
             
             return {"status": "running", "message": "OpenAuto started successfully", "pid": self.process.pid}
             
         except Exception as e:
             logger.error(f"Failed to start OpenAuto: {e}")
             return {"status": "error", "message": str(e)}
+    
+    async def _configure_window(self, x, y, width, height, borderless):
+        """Configure OpenAuto window position and style using X11 tools"""
+        try:
+            await asyncio.sleep(1.0)
+            
+            result = subprocess.run(
+                ["wmctrl", "-l"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            window_id = None
+            search_terms = ['openauto', 'autoapp', 'android auto', 'aasdk']
+            
+            for line in result.stdout.splitlines():
+                line_lower = line.lower()
+                for term in search_terms:
+                    if term in line_lower:
+                        window_id = line.split()[0]
+                        break
+                if window_id:
+                    break
+            
+            if not window_id:
+                if self.process:
+                    try:
+                        result = subprocess.run(
+                            ["xdotool", "search", "--pid", str(self.process.pid)],
+                            capture_output=True,
+                            text=True,
+                            timeout=5
+                        )
+                        if result.stdout.strip():
+                            window_id = result.stdout.strip().split('\n')[0]
+                    except Exception:
+                        pass
+            
+            if not window_id:
+                logger.warning("Could not find OpenAuto window - it may need manual positioning")
+                return
+            
+            self.window_id = window_id
+            
+            if borderless:
+                subprocess.run(
+                    ["xdotool", "windowmove", window_id, str(x), str(y)],
+                    timeout=5
+                )
+                subprocess.run(
+                    ["xdotool", "windowsize", window_id, str(width), str(height)],
+                    timeout=5
+                )
+                subprocess.run(
+                    ["wmctrl", "-i", "-r", window_id, "-b", "add,above"],
+                    timeout=5
+                )
+            else:
+                subprocess.run(
+                    ["wmctrl", "-i", "-r", window_id, "-e", f"0,{x},{y},{width},{height}"],
+                    timeout=5
+                )
+            
+            subprocess.run(
+                ["wmctrl", "-i", "-a", window_id],
+                timeout=5
+            )
+            
+            logger.info(f"OpenAuto window configured: {window_id} at ({x},{y}) {width}x{height}")
+            
+        except FileNotFoundError:
+            logger.warning("wmctrl/xdotool not installed. Run: sudo apt install wmctrl xdotool")
+        except Exception as e:
+            logger.error(f"Error configuring OpenAuto window: {e}")
     
     async def stop(self):
         """Stop OpenAuto subprocess cleanly"""
@@ -408,6 +493,7 @@ class DHUController:
                         pass
             
             self.process = None
+            self.window_id = None
             return {"status": "stopped", "message": "OpenAuto stopped successfully"}
             
         except Exception as e:
@@ -418,7 +504,11 @@ class DHUController:
         """Get current OpenAuto status"""
         if self.is_running():
             pid = self.process.pid if self.process else "unknown"
-            return {"status": "running", "pid": pid}
+            return {
+                "status": "running",
+                "pid": pid,
+                "window_id": self.window_id
+            }
         return {"status": "stopped"}
 
 # Global DHU controller instance
@@ -433,6 +523,14 @@ class DevicePreferences(BaseModel):
     connection_type: str = "usb"
     auto_launch: bool = True
     skip_prompt: bool = False
+
+class DHUStartRequest(BaseModel):
+    x: int = 640
+    y: int = 200
+    width: int = 640
+    height: int = 480
+    borderless: bool = True
+    alwaysOnTop: bool = True
 
 @api_router.post("/dhu/device-preferences")
 async def save_device_preferences(prefs: DevicePreferences):
@@ -481,9 +579,15 @@ async def delete_device_preferences(identifier: str):
     return {"status": "deleted" if result.deleted_count > 0 else "not_found"}
 
 @api_router.post("/dhu/start")
-async def start_dhu():
-    """Start Android Auto — just launch OpenAuto, no window management"""
-    return await dhu_controller.start()
+async def start_dhu(config: DHUStartRequest):
+    """Start Android Auto DHU with window configuration"""
+    return await dhu_controller.start(
+        x=config.x,
+        y=config.y,
+        width=config.width,
+        height=config.height,
+        borderless=config.borderless
+    )
 
 @api_router.post("/dhu/stop")
 async def stop_dhu():
@@ -492,7 +596,7 @@ async def stop_dhu():
 
 @api_router.get("/dhu/status")
 async def get_dhu_status():
-    """Get DHU status — simple, no auto-detect"""
+    """Get DHU status"""
     return dhu_controller.get_status()
 
 # Include the router in the main app
