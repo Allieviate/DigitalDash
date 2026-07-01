@@ -199,11 +199,11 @@ export default function Retro89Cluster() {
 
   return (
     <div
-      className="flex items-center justify-center"
+      className="flex items-center justify-between w-full"
       data-testid="retro89-cluster"
-      style={{ gap: '12px' }}
+      style={{ paddingLeft: 40, paddingRight: 40 }}
     >
-      {/* TACHOMETER */}
+      {/* TACHOMETER — far left */}
       <div style={{ width: 420, height: 420 }}>
         <GaugePod
           id="tach"
@@ -215,7 +215,7 @@ export default function Retro89Cluster() {
         />
       </div>
 
-      {/* SPEEDOMETER */}
+      {/* SPEEDOMETER — far right */}
       <div style={{ width: 420, height: 420 }}>
         <GaugePod
           id="speedo"
