@@ -1,109 +1,115 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 
 export default function EditableWidget({ id, editing, transform, onUpdate, children, label }) {
-  const ref = useRef(null);
-  const [dragging, setDragging] = useState(false);
-  const [resizing, setResizing] = useState(false);
-  const startRef = useRef({ px: 0, py: 0, tx: 0, ty: 0, scale: 1, dist: 0 });
+  const outerRef = useRef(null);
+  const [active, setActive] = useState(false);
+  const dragState = useRef({ mode: null });
 
-  const t = transform || { x: 0, y: 0, scale: 1, rotation: 0 };
+  const t = { x: 0, y: 0, scale: 1, rotation: 0, ...(transform || {}) };
 
-  // DRAG
-  const onDragStart = useCallback((e) => {
+  /* ---- DRAG ---- */
+  const startDrag = useCallback((e) => {
     if (!editing) return;
     e.stopPropagation();
     e.preventDefault();
-    setDragging(true);
-    const pt = e.touches ? e.touches[0] : e;
-    startRef.current = { px: pt.clientX, py: pt.clientY, tx: t.x, ty: t.y };
-  }, [editing, t.x, t.y]);
 
-  const onDragMove = useCallback((e) => {
-    if (!dragging) return;
-    const pt = e.touches ? e.touches[0] : e;
-    const dx = pt.clientX - startRef.current.px;
-    const dy = pt.clientY - startRef.current.py;
-    onUpdate(id, { x: startRef.current.tx + dx, y: startRef.current.ty + dy });
-  }, [dragging, id, onUpdate]);
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const origTx = t.x;
+    const origTy = t.y;
+    dragState.current = { mode: 'drag' };
+    setActive(true);
 
-  const onDragEnd = useCallback(() => {
-    setDragging(false);
-  }, []);
+    const onMove = (ev) => {
+      ev.preventDefault();
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      onUpdate(id, { x: origTx + dx, y: origTy + dy });
+    };
 
-  // SCALE via corner handle
-  const onScaleStart = useCallback((e) => {
+    const onUp = () => {
+      dragState.current = { mode: null };
+      setActive(false);
+      window.removeEventListener('mousemove', onMove, true);
+      window.removeEventListener('mouseup', onUp, true);
+      window.removeEventListener('touchmove', onMove, { capture: true });
+      window.removeEventListener('touchend', onUp, true);
+    };
+
+    window.addEventListener('mousemove', onMove, true);
+    window.addEventListener('mouseup', onUp, true);
+    window.addEventListener('touchmove', onMove, { capture: true, passive: false });
+    window.addEventListener('touchend', onUp, true);
+  }, [editing, t.x, t.y, id, onUpdate]);
+
+  /* ---- SCALE (corner handle) ---- */
+  const startScale = useCallback((e) => {
     if (!editing) return;
     e.stopPropagation();
     e.preventDefault();
-    setResizing(true);
-    const pt = e.touches ? e.touches[0] : e;
-    const rect = ref.current?.getBoundingClientRect();
+
+    const rect = outerRef.current?.getBoundingClientRect();
     const cx = rect ? rect.left + rect.width / 2 : 0;
     const cy = rect ? rect.top + rect.height / 2 : 0;
-    const dist = Math.hypot(pt.clientX - cx, pt.clientY - cy);
-    startRef.current = { ...startRef.current, scale: t.scale, dist, cx, cy };
-  }, [editing, t.scale]);
+    const startDist = Math.hypot(e.clientX - cx, e.clientY - cy);
+    const origScale = t.scale;
+    dragState.current = { mode: 'scale' };
+    setActive(true);
 
-  const onScaleMove = useCallback((e) => {
-    if (!resizing) return;
-    const pt = e.touches ? e.touches[0] : e;
-    const { cx, cy } = startRef.current;
-    const dist = Math.hypot(pt.clientX - cx, pt.clientY - cy);
-    const ratio = dist / Math.max(startRef.current.dist, 1);
-    const newScale = Math.max(0.3, Math.min(3, startRef.current.scale * ratio));
-    onUpdate(id, { scale: Math.round(newScale * 100) / 100 });
-  }, [resizing, id, onUpdate]);
-
-  const onScaleEnd = useCallback(() => {
-    setResizing(false);
-  }, []);
-
-  // ROTATE via button increments (simpler for touch screens)
-  const rotate = useCallback((deg) => {
-    onUpdate(id, { rotation: (t.rotation + deg) % 360 });
-  }, [id, t.rotation, onUpdate]);
-
-  // Global move/end listeners
-  useEffect(() => {
-    if (!dragging && !resizing) return;
-    const moveHandler = dragging ? onDragMove : onScaleMove;
-    const endHandler = dragging ? onDragEnd : onScaleEnd;
-    window.addEventListener('mousemove', moveHandler);
-    window.addEventListener('mouseup', endHandler);
-    window.addEventListener('touchmove', moveHandler, { passive: false });
-    window.addEventListener('touchend', endHandler);
-    return () => {
-      window.removeEventListener('mousemove', moveHandler);
-      window.removeEventListener('mouseup', endHandler);
-      window.removeEventListener('touchmove', moveHandler);
-      window.removeEventListener('touchend', endHandler);
+    const onMove = (ev) => {
+      ev.preventDefault();
+      const pt = ev.touches ? ev.touches[0] : ev;
+      const dist = Math.hypot(pt.clientX - cx, pt.clientY - cy);
+      const ratio = dist / Math.max(startDist, 1);
+      const newScale = Math.max(0.3, Math.min(3, origScale * ratio));
+      onUpdate(id, { scale: Math.round(newScale * 100) / 100 });
     };
-  }, [dragging, resizing, onDragMove, onDragEnd, onScaleMove, onScaleEnd]);
+
+    const onUp = () => {
+      dragState.current = { mode: null };
+      setActive(false);
+      window.removeEventListener('mousemove', onMove, true);
+      window.removeEventListener('mouseup', onUp, true);
+      window.removeEventListener('touchmove', onMove, { capture: true });
+      window.removeEventListener('touchend', onUp, true);
+    };
+
+    window.addEventListener('mousemove', onMove, true);
+    window.addEventListener('mouseup', onUp, true);
+    window.addEventListener('touchmove', onMove, { capture: true, passive: false });
+    window.addEventListener('touchend', onUp, true);
+  }, [editing, t.scale, id, onUpdate]);
+
+  /* ---- ROTATE (button increments) ---- */
+  const rotate = useCallback((deg) => {
+    onUpdate(id, { rotation: ((t.rotation || 0) + deg) % 360 });
+  }, [id, t.rotation, onUpdate]);
 
   const style = {
     transform: `translate(${t.x}px, ${t.y}px) scale(${t.scale}) rotate(${t.rotation}deg)`,
     transformOrigin: 'center center',
     position: 'relative',
-    zIndex: dragging || resizing ? 50 : 'auto',
-    cursor: editing ? (dragging ? 'grabbing' : 'grab') : 'default',
-    transition: dragging || resizing ? 'none' : 'transform 0.15s ease-out',
+    zIndex: active ? 50 : 'auto',
+    cursor: editing ? (active ? 'grabbing' : 'grab') : 'default',
+    transition: active ? 'none' : 'transform 0.15s ease-out',
+    touchAction: editing ? 'none' : 'auto',
+    userSelect: editing ? 'none' : 'auto',
   };
 
   return (
-    <div ref={ref} style={style} data-testid={`editable-${id}`}>
-      {/* Drag area */}
-      <div
-        onMouseDown={onDragStart}
-        onTouchStart={onDragStart}
-        style={{ position: 'relative' }}
-      >
-        {children}
-      </div>
+    <div
+      ref={outerRef}
+      style={style}
+      data-testid={`editable-${id}`}
+      onMouseDown={startDrag}
+      onTouchStart={startDrag}
+    >
+      {children}
 
       {/* Edit controls — only visible in edit mode */}
       {editing && (
         <>
-          {/* Outline */}
+          {/* Dashed outline */}
           <div style={{
             position: 'absolute', inset: -2,
             border: '1.5px dashed rgba(59,130,246,0.5)',
@@ -125,17 +131,18 @@ export default function EditableWidget({ id, editing, transform, onUpdate, child
 
           {/* Scale handle — bottom-right corner */}
           <div
-            onMouseDown={onScaleStart}
-            onTouchStart={onScaleStart}
+            onMouseDown={(e) => { e.stopPropagation(); startScale(e); }}
+            onTouchStart={(e) => { e.stopPropagation(); startScale(e); }}
             style={{
               position: 'absolute', bottom: -6, right: -6,
               width: 14, height: 14, borderRadius: 3,
               background: '#3B82F6', cursor: 'nwse-resize',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
+              touchAction: 'none',
             }}
           >
-            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" style={{ pointerEvents: 'none' }}>
               <path d="M7 1L1 7M7 4L4 7M7 7L7 7" stroke="white" strokeWidth="1" strokeLinecap="round" />
             </svg>
           </div>
@@ -146,30 +153,32 @@ export default function EditableWidget({ id, editing, transform, onUpdate, child
             display: 'flex', gap: 2,
           }}>
             <button
-              onMouseDown={e => { e.stopPropagation(); rotate(-15); }}
-              onTouchStart={e => { e.stopPropagation(); rotate(-15); }}
+              onMouseDown={e => { e.stopPropagation(); e.preventDefault(); rotate(-15); }}
+              onTouchStart={e => { e.stopPropagation(); e.preventDefault(); rotate(-15); }}
               style={{
                 width: 14, height: 14, borderRadius: 3, border: 'none',
                 background: '#8B5CF6', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
+                touchAction: 'none',
               }}
             >
-              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none" style={{ pointerEvents: 'none' }}>
                 <path d="M2 1C1 2 1 5 4 6M1 1L3 1L1 3" stroke="white" strokeWidth="0.8" strokeLinecap="round" fill="none" />
               </svg>
             </button>
             <button
-              onMouseDown={e => { e.stopPropagation(); rotate(15); }}
-              onTouchStart={e => { e.stopPropagation(); rotate(15); }}
+              onMouseDown={e => { e.stopPropagation(); e.preventDefault(); rotate(15); }}
+              onTouchStart={e => { e.stopPropagation(); e.preventDefault(); rotate(15); }}
               style={{
                 width: 14, height: 14, borderRadius: 3, border: 'none',
                 background: '#8B5CF6', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
+                touchAction: 'none',
               }}
             >
-              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none" style={{ pointerEvents: 'none' }}>
                 <path d="M6 1C7 2 7 5 4 6M7 1L5 1L7 3" stroke="white" strokeWidth="0.8" strokeLinecap="round" fill="none" />
               </svg>
             </button>
