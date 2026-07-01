@@ -1,6 +1,6 @@
 import React from 'react';
 import { useVehicleData } from '../../contexts/VehicleDataContext';
-import { RpmGauge, SpeedGauge } from './CustomGauges';
+import Retro89Cluster from './Retro89Cluster';
 import { ShiftLightsBar, DigitalSpeedGear } from './DashWidgets';
 import { WarningPanel, TurnSignalsRow, CriticalWarningBanner } from './WarningPanel';
 import { FuelGauge, CoolantGauge, BatteryGauge, OilPressureGauge } from './InfoGauges';
@@ -169,33 +169,23 @@ export const Dashboard = ({ onOpenSettings }) => {
           <TurnSignalsRow className="mb-3" />
         </div>
 
-        {/* GAUGES + CENTER PANEL */}
-        <div className="absolute inset-0 flex items-end justify-center pb-24 px-8">
+        {/* GAUGES + INFO */}
+        <div className="absolute inset-0 flex items-center justify-center px-8">
           {/* FAR LEFT: Info Gauges (Coolant + Oil) */}
           <div
-            className="flex flex-col items-center justify-end gap-4 pb-16 mr-2"
+            className="flex flex-col items-center justify-center gap-4 mr-4"
             data-testid="info-gauges-left"
           >
             <CoolantGauge />
             <OilPressureGauge />
           </div>
 
-          {/* LEFT: RPM */}
-          <div className="relative flex items-end justify-center">
-            <RpmGauge size={640} vtecStartRpm={3000} shiftRpm={7800} maxRpm={8000} />
-          </div>
-
-          {/* CENTER: gap between gauges */}
-          <div className="mx-6" style={{ width: '500px' }} />
-
-          {/* RIGHT: Speed */}
-          <div className="relative flex items-end justify-center">
-            <SpeedGauge size={640} maxSpeed={170} />
-          </div>
+          {/* RETRO '89 CLUSTER — Tach + Speedo */}
+          <Retro89Cluster />
 
           {/* FAR RIGHT: Info Gauges (Fuel + Battery) */}
           <div
-            className="flex flex-col items-center justify-end gap-4 pb-16 ml-2"
+            className="flex flex-col items-center justify-center gap-4 ml-4"
             data-testid="info-gauges-right"
           >
             <FuelGauge />
