@@ -152,8 +152,8 @@ function GaugePod({ value, max, ticks, unit, redlineStart, id }) {
               fill={inRedline ? '#dc2626' : '#f0f0f0'}
               style={{
                 fontSize,
-                fontFamily: "'Helvetica Neue', Arial, sans-serif",
-                fontWeight: 700,
+                fontFamily: "'Orbitron', sans-serif",
+                fontWeight: 500,
               }}
             >
               {tickVal}
@@ -170,7 +170,7 @@ function GaugePod({ value, max, ticks, unit, redlineStart, id }) {
         fill="rgba(255,255,255,0.35)"
         style={{
           fontSize: '3px',
-          fontFamily: "'Courier New', monospace",
+          fontFamily: "'Orbitron', sans-serif",
           letterSpacing: '0.1em',
         }}
       >
