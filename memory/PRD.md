@@ -12,12 +12,13 @@ Build a custom vehicle HMI (Human-Machine Interface) dashboard intended to run o
 │   └── src/
 │       ├── components/hmi/
 │       │   ├── Dashboard.jsx          # Main layout - all widgets individually editable
-│       │   ├── Retro89Cluster.jsx     # GaugePod component (horseshoe SVG gauges)
+│       │   ├── Retro89Cluster.jsx     # GaugePod (horseshoe SVG, VTEC, digital readout, smooth needle)
 │       │   ├── EditableWidget.jsx     # Drag/Scale/Rotate wrapper (touch+mouse, grid snap)
 │       │   ├── EditModeLegend.jsx     # Edit mode bar (hints + grid snap + Save/Reset/Cancel)
-│       │   ├── DashWidgets.jsx        # ShiftLightsBar, DigitalSpeed, GearDisplay (separate exports)
+│       │   ├── DashWidgets.jsx        # ShiftLightsBar, DigitalSpeed, GearDisplay
 │       │   ├── WarningPanel.jsx       # WarningLight (individual), TurnSignalsRow, CriticalWarningBanner
 │       │   ├── InfoGauges.jsx         # CoolantGauge, OilPressureGauge, FuelGauge, BatteryGauge
+│       │   ├── CustomGauges.jsx       # Legacy PNG-based gauges (preserved, not active)
 │       │   ├── AndroidAutoPanel.jsx   # Simple launch/stop AA
 │       │   ├── DevicePromptModal.jsx  # Connection type prompt
 │       │   └── SavedDevicesTab.jsx    # Device management by model name
@@ -29,39 +30,35 @@ Build a custom vehicle HMI (Human-Machine Interface) dashboard intended to run o
 │       │   └── ThemeContext.js
 │       └── App.js
 ├── scripts/
-│   ├── install_openauto.sh       # v12.0 (VERIFIED on Pi 5)
-│   └── usb-phone-monitor.sh      # Model-based device detection
-└── openauto-nav/                 # TBT navigation widget module
+│   ├── install_openauto.sh
+│   └── usb-phone-monitor.sh
+└── openauto-nav/
 ```
 
 ## Completed Features
-- [x] All gauges (RPM, Speed, Shift lights, Gear, Warnings)
-- [x] Turn signals: solid-filled chevrons with SVG filter glow
-- [x] Info gauges on dashboard (Fuel, Coolant, Battery, Oil Pressure)
-- [x] USB auto-detect using model name as stable device ID
-- [x] Device preferences prompt (connection type, remember device)
-- [x] Saved Devices management (keyed by device_model)
-- [x] Android Auto simple launch/stop (manual, no auto-detect)
-- [x] Retro '89 horseshoe gauge cluster (Orbitron font, maroon face, chrome rim)
-- [x] Dashboard Edit Mode — all widgets individually draggable/scalable/rotatable
-- [x] Individual warning lights (7 total, each independently editable)
-- [x] Speed display and Gear display separated (individually editable)
-- [x] Tachometer and Speedometer separated (individually editable)
-- [x] Info gauges separated (Coolant, Oil, Fuel, Battery each independent)
-- [x] Grid snap feature (Off / 20px / 40px toggle with visual grid overlay)
-- [x] Touch event handling fixed (Pi touchscreen compatible via getXY helper)
-- [x] Edit Mode persistence via localStorage
-- [x] Edit Mode legend bar with Grid Snap toggle + Save/Reset/Cancel
+- [x] Retro '89 horseshoe gauges (Orbitron font, maroon face, chrome rim)
+- [x] VTEC engagement indicator (red text with glow, 3000-8000 RPM)
+- [x] Digital RPM readout inside tachometer
+- [x] Smooth needle animation (CSS transform:rotate + transition:100ms)
+- [x] Speedometer: 9 readable ticks (0-160 by 20s)
+- [x] Dashboard Edit Mode — 18 individually draggable/scalable/rotatable widgets
+- [x] Grid snap (Off/20px/40px toggle with SVG grid overlay)
+- [x] Touch event handling (Pi touchscreen compatible)
+- [x] MIL Warning Lights visible at bottom (7 individual lights, opacity 0.35 when inactive)
+- [x] Shift lights, Turn signals, Info gauges (Fuel, Coolant, Battery, Oil)
+- [x] Digital Speed + Gear display (separately editable)
+- [x] Android Auto manual launch/stop
+- [x] Boot sequence with gauge sweep test
+- [x] USB device detection by model name
+- [x] Device preferences and saved devices
 
-## Key Changes (Jul 1, 2026 — Session 2)
-- **ENHANCEMENT**: All grouped components broken into individual editable widgets:
-  - Retro89Cluster → separate Tachometer + Speedometer
-  - DigitalSpeedGear → separate DigitalSpeed + GearDisplay
-  - Info gauges → individual Coolant, Oil Pressure, Fuel, Battery
-  - WarningPanel → 7 individual WarningLight widgets
-- **FEATURE**: Grid snap (Off/20px/40px cycle toggle) with SVG grid overlay
-- **BUG FIX**: Touch events now handled via getXY() helper (fixes Pi touchscreen drag)
-- **BUG FIX (previous)**: CSS `scale(undefined)` fix via default spreading
+## Key Changes (Jul 1, 2026 — Bug Fixes)
+- **FIX: Speedometer labels** — Reduced from 18 bunched ticks to 9 readable ticks (0,20,40...160), max=160
+- **FIX: VTEC indicator** — Added `vtecRange` prop to GaugePod, renders red "VTEC" text with SVG glow filter inside gauge face when RPM in range
+- **FIX: RPM digital readout** — Added `showDigitalValue` prop to GaugePod, shows numeric value (e.g. "3905") inside gauge
+- **FIX: Needle smoothness** — Replaced SVG `<line x1/y1/x2/y2>` (doesn't support CSS transitions) with CSS `transform: rotate()` + `transition: 100ms ease-out` on a fixed line rotated around center
+- **FIX: Warning lights visibility** — Increased inactive opacity from 0.20→0.35, inactive color from #3f3f46→#52525b
+- **FIX: Touch events** — `getXY()` helper extracts coords from both mouse and touch events
 
 ## Individually Editable Widgets (18 total)
 | Widget ID | Component | Label |
@@ -86,16 +83,15 @@ Build a custom vehicle HMI (Human-Machine Interface) dashboard intended to run o
 | status | Activity indicator | Status |
 
 ## Upcoming Tasks
-- P0: User to verify Edit Mode on Raspberry Pi touchscreen
+- P0: User to verify all fixes on Raspberry Pi touchscreen
 - P1: Android Auto auto-launch rebuild (on explicit request only)
 - P2: Raspberry Pi splash screen fix (1920x1080 logo sizing)
 - P3: OBD1/OBD2 real data source integration
 - P3: Theme customization
-- P3: Dashboard.jsx further refactoring if needed
 
 ## Critical Notes
 - DO NOT re-implement Android Auto auto-detect/udev/ADB Monitor
 - Vehicle data is MOCKED via backend VehicleSimulator class
-- Device preferences keyed on `device_model` (not `serial`)
 - Pi build: `REACT_APP_BACKEND_URL=http://localhost:8001 yarn build` (never sudo)
-- install_openauto.sh v12.0 VERIFIED — don't modify build steps
+- install_openauto.sh v12.0 VERIFIED — don't modify
+- GaugePod needle uses CSS transform (not SVG attributes) for smooth animation
