@@ -64,27 +64,32 @@ export const WarningLight = ({ type, active, className = '' }) => {
   return (
     <div 
       className={`
-        flex flex-col items-center justify-center p-3 rounded-lg transition-all duration-200
+        flex flex-col items-center justify-center transition-all duration-200
         ${className}
       `}
-      style={{ opacity: active ? 1 : 0.35 }}
+      style={{
+        padding: '8px 12px',
+        borderRadius: 8,
+        background: active ? `${config.color}15` : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${active ? config.color + '40' : 'rgba(255,255,255,0.08)'}`,
+      }}
       data-testid={`warning-${type}`}
       data-active={active}
     >
       <Icon 
-        size={32} 
+        size={28} 
         className={`
           warning-light
           ${active ? (config.critical ? 'critical' : 'active animate-pulse-glow') : ''}
         `}
         style={{ 
-          color: active ? config.color : '#52525b',
+          color: active ? config.color : '#71717a',
           filter: active ? `drop-shadow(0 0 10px ${config.color})` : 'none'
         }}
       />
       <span 
-        className="text-xs uppercase tracking-wider mt-2 font-medium font-orbitron"
-        style={{ color: active ? config.color : '#52525b' }}
+        className="text-[10px] uppercase tracking-wider mt-1.5 font-medium font-orbitron"
+        style={{ color: active ? config.color : '#71717a' }}
       >
         {config.label}
       </span>
@@ -121,7 +126,7 @@ export const WarningPanel = ({ className = '' }) => {
 
 // Turn Signal Arrow — thick solid chevron, ALWAYS filled, never hollow
 // Active: bright green with soft glow | Inactive: dim dark green
-const TurnArrow = ({ direction, active }) => {
+export const TurnArrow = ({ direction, active }) => {
   const isLeft = direction === 'left';
   const filterId = `turn-glow-${direction}`;
 

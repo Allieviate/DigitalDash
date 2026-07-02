@@ -1,8 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { useVehicleData } from '../../contexts/VehicleDataContext';
-import { GaugePod } from './Retro89Cluster';
+import { RpmGauge, SpeedGauge } from './CustomGauges';
 import { ShiftLightsBar, DigitalSpeed, GearDisplay } from './DashWidgets';
-import { WarningLight, TurnSignalsRow, CriticalWarningBanner } from './WarningPanel';
+import { WarningLight, TurnArrow, CriticalWarningBanner } from './WarningPanel';
 import { FuelGauge, CoolantGauge, BatteryGauge, OilPressureGauge } from './InfoGauges';
 import EditableWidget from './EditableWidget';
 import EditModeLegend from './EditModeLegend';
@@ -11,12 +11,35 @@ import { Settings, Activity, Pencil } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
-const GRID_SIZES = [0, 20, 40]; // 0 = off
+const GRID_SIZES = [0, 20, 40];
 
 const WARNING_KEYS = [
   'check_engine', 'oil_pressure_warning', 'high_coolant',
   'low_fuel', 'maintenance', 'brake_warning', 'abs_warning',
 ];
+
+/* RPM Digital Readout — standalone draggable component */
+const RpmReadout = () => {
+  const { signals } = useVehicleData();
+  const rpm = Math.round(signals.rpm || 0);
+  const inVtec = rpm >= 3000 && rpm <= 8000;
+  const vtecProgress = inVtec ? Math.min(1, (rpm - 3000) / 5000) : 0;
+
+  return (
+    <div className="flex flex-col items-center" data-testid="rpm-readout">
+      <span
+        className="font-orbitron text-3xl font-medium text-white/90"
+        style={{
+          letterSpacing: '2px',
+          textShadow: inVtec ? `0 0 ${6 + vtecProgress * 10}px rgba(255, 0, 0, 0.55)` : 'none',
+        }}
+      >
+        {rpm}
+      </span>
+      <span className="font-orbitron text-[10px] text-white/50 tracking-widest mt-0.5">RPM</span>
+    </div>
+  );
+};
 
 const AALogoIndicator = ({ visible, onStop }) => {
   if (!visible) return null;
@@ -35,7 +58,7 @@ const AALogoIndicator = ({ visible, onStop }) => {
   );
 };
 
-/* Grid Overlay — visible lines when snap is active */
+/* Grid Overlay */
 const GridOverlay = ({ gridSize }) => {
   if (!gridSize || gridSize <= 0) return null;
   return (
@@ -118,12 +141,10 @@ export const Dashboard = ({ onOpenSettings }) => {
   };
 
   // Shorthand for editable props
-  const ep = (id) => ({
-    id, editing: editMode, transform: getWidgetTransform(id),
+  const ep = (id, label) => ({
+    id, label, editing: editMode, transform: getWidgetTransform(id),
     onUpdate: updateWidget, gridSize: editMode ? gridSize : 0,
   });
-
-  const rpm = signals.rpm || 0;
 
   return (
     <div className="relative w-full h-screen overflow-hidden" data-testid="dashboard">
@@ -133,18 +154,14 @@ export const Dashboard = ({ onOpenSettings }) => {
       <CriticalWarningBanner />
 
       {/* Edit mode overlay tint */}
-      {editMode && (
-        <div className="absolute inset-0 z-10 pointer-events-none" style={{ background: 'rgba(0,0,0,0.15)', border: '2px solid rgba(59,130,246,0.3)' }} />
-      )}
-
-      {/* Grid overlay */}
+      {editMode && <div className="absolute inset-0 z-10 pointer-events-none" style={{ background: 'rgba(0,0,0,0.15)', border: '2px solid rgba(59,130,246,0.3)' }} />}
       {editMode && <GridOverlay gridSize={gridSize} />}
 
       {/* Top-right: AA logo + status + edit + settings */}
       <div className="absolute top-4 right-4 z-40 flex items-center gap-3">
         <AALogoIndicator visible={dhuRunning} onStop={handleStopAA} />
 
-        <EditableWidget {...ep('status')} label="Status">
+        <EditableWidget {...ep('status', 'Status')}>
           <div className="flex items-center gap-2">
             <Activity size={14} className={isConnected ? 'text-green-500 animate-pulse' : 'text-red-500'} />
             <span className={`text-xs uppercase tracking-wider font-orbitron ${isConnected ? 'text-zinc-500' : 'text-red-400'}`}>
@@ -177,66 +194,77 @@ export const Dashboard = ({ onOpenSettings }) => {
 
       <div className="absolute inset-0">
         {/* ─── TOP CENTER ─── */}
-        <div className="absolute top-0 left-0 right-0 z-10 flex flex-col items-center pt-4">
-          <EditableWidget {...ep('shift-lights')} label="Shift Lights">
+        <div className="absolute top-0 left-0 right-0 z-20 flex flex-col items-center pt-4">
+          <EditableWidget {...ep('shift-lights', 'Shift Lights')}>
             <ShiftLightsBar className="mb-3" />
           </EditableWidget>
 
-          <EditableWidget {...ep('digital-speed')} label="Speed">
+          <EditableWidget {...ep('digital-speed', 'Speed')}>
             <DigitalSpeed className="mb-2" />
           </EditableWidget>
 
-          <EditableWidget {...ep('gear-display')} label="Gear">
+          <EditableWidget {...ep('gear-display', 'Gear')}>
             <GearDisplay className="mb-2" />
           </EditableWidget>
 
-          <EditableWidget {...ep('turn-signals')} label="Turn Signals">
-            <TurnSignalsRow className="mb-3" />
-          </EditableWidget>
+          {/* Individual turn signal arrows */}
+          <div className="flex items-center gap-4 mb-3">
+            <EditableWidget {...ep('turn-left', 'Left Arrow')}>
+              <TurnArrow direction="left" active={signals.turn_left} />
+            </EditableWidget>
+            <EditableWidget {...ep('turn-right', 'Right Arrow')}>
+              <TurnArrow direction="right" active={signals.turn_right} />
+            </EditableWidget>
+          </div>
         </div>
 
         {/* ─── GAUGES + INFO (middle area) ─── */}
         <div className="absolute inset-0 flex items-center justify-center px-8">
-          {/* Left info gauges — each independent */}
+          {/* Left info gauges */}
           <div className="flex flex-col items-center justify-center gap-4 mr-4">
-            <EditableWidget {...ep('coolant')} label="Coolant">
+            <EditableWidget {...ep('coolant', 'Coolant')}>
               <CoolantGauge />
             </EditableWidget>
-            <EditableWidget {...ep('oil-pressure')} label="Oil Pressure">
+            <EditableWidget {...ep('oil-pressure', 'Oil Pressure')}>
               <OilPressureGauge />
             </EditableWidget>
           </div>
 
-          {/* Tachometer */}
-          <EditableWidget {...ep('tachometer')} label="Tachometer">
+          {/* Tachometer (PNG background) */}
+          <EditableWidget {...ep('tachometer', 'Tachometer')}>
             <div style={{ width: 420, height: 420 }}>
-              <GaugePod id="tach" value={rpm} max={8000} ticks={[0, 1, 2, 3, 4, 5, 6, 7, 8]} unit="x1000r/min" redlineStart={7000} showDigitalValue vtecRange={{ start: 3000, end: 8000 }} />
+              <RpmGauge size={420} />
             </div>
           </EditableWidget>
 
-          {/* Speedometer */}
-          <EditableWidget {...ep('speedometer')} label="Speedometer">
+          {/* RPM Digital Readout — separate draggable widget */}
+          <EditableWidget {...ep('rpm-readout', 'RPM Readout')}>
+            <RpmReadout />
+          </EditableWidget>
+
+          {/* Speedometer (PNG background) */}
+          <EditableWidget {...ep('speedometer', 'Speedometer')}>
             <div style={{ width: 420, height: 420 }}>
-              <GaugePod id="speedo" value={speed} max={160} ticks={[0, 20, 40, 60, 80, 100, 120, 140, 160]} unit="mph" />
+              <SpeedGauge size={420} />
             </div>
           </EditableWidget>
 
-          {/* Right info gauges — each independent */}
+          {/* Right info gauges */}
           <div className="flex flex-col items-center justify-center gap-4 ml-4">
-            <EditableWidget {...ep('fuel')} label="Fuel">
+            <EditableWidget {...ep('fuel', 'Fuel')}>
               <FuelGauge />
             </EditableWidget>
-            <EditableWidget {...ep('battery')} label="Battery">
+            <EditableWidget {...ep('battery', 'Battery')}>
               <BatteryGauge />
             </EditableWidget>
           </div>
         </div>
 
-        {/* ─── BOTTOM: Warning lights — each independent ─── */}
-        <div className="absolute bottom-0 left-0 right-0 z-10">
-          <div className="flex items-center justify-center py-5 px-20" style={{ gap: '50px' }}>
+        {/* ─── BOTTOM: MIL Warning lights ─── */}
+        <div className="absolute bottom-3 left-0 right-0 z-20">
+          <div className="flex items-center justify-center px-10" style={{ gap: '16px' }}>
             {WARNING_KEYS.map((warnKey) => (
-              <EditableWidget key={warnKey} {...ep(`warn-${warnKey}`)} label={warnKey.replace(/_/g, ' ')}>
+              <EditableWidget key={warnKey} {...ep(`warn-${warnKey}`, warnKey.replace(/_/g, ' '))}>
                 <WarningLight type={warnKey} active={signals[warnKey]} />
               </EditableWidget>
             ))}

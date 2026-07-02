@@ -181,23 +181,7 @@ const vtecProgress = inVtec
         </div>
       )}
       
-      {/* RPM Digital Readout - with Orbitron font - aligned with 0 and 8 */}
-      <div 
-        className="absolute inset-0 flex items-center justify-center"
-        style={{ paddingTop: '42%' }}
-      >
-        <span 
-          className="font-orbitron text-3xl font-medium text-white/90"
-          style={{ 
-            textShadow: inVtec ? `0 0 ${6 + vtecProgress * 10}px rgba(255, 0, 0, 0.55)` : 'none',
-            letterSpacing: '2px'
-          }}
-        >
-          {Math.round(rpm)}
-        </span>
-      </div>
-      
-      {/* x1000 RPM label - BELOW the RPM readout inside gauge face */}
+      {/* x1000 RPM label */}
       <div 
         className="absolute left-0 right-0 flex justify-center"
         style={{ bottom: '10%' }}
