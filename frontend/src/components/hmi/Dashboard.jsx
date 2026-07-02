@@ -240,7 +240,7 @@ export const Dashboard = ({ onOpenSettings }) => {
           {/* Tachometer (PNG background + SVG overlay) */}
           <EditableWidget {...ep('tachometer', 'Tachometer')}>
             <div style={{ width: 420, height: 420 }}>
-              <GaugePod id="tach" value={signals.rpm || 0} max={8000} ticks={[0, 1, 2, 3, 4, 5, 6, 7, 8]} unit="x1000r/min" redlineStart={7000} showDigitalValue vtecRange={{ start: 3000, end: 8000 }} />
+              <GaugePod id="tach" value={signals.rpm || 0} max={8000} ticks={[0, 1, 2, 3, 4, 5, 6, 7, 8]} unit="x1000r/min" redlineStart={7000} vtecRange={{ start: 3000, end: 8000 }} />
             </div>
           </EditableWidget>
 

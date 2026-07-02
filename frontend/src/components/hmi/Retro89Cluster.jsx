@@ -15,14 +15,15 @@ const GAUGE_BG = {
 
 function GaugePod({ value, max, ticks, unit, redlineStart, id, showDigitalValue, vtecRange }) {
   const cx = 50, cy = 50;
-  const startAngle = 135;
-  const endAngle = 405;
-  const sweep = endAngle - startAngle;
+  // Match PNG gauge face: 240° sweep from 7:30 to 1:30 position
+  const startAngle = 150;   // 7:30 position (was 135)
+  const endAngle = 390;     // 1:30 position (was 405)
+  const sweep = endAngle - startAngle; // 240° (was 270°)
 
-  const rTick = 45;       // outer edge of ticks
-  const rTickMajor = 39;  // inner edge of major ticks
-  const rTickMinor = 42;  // inner edge of minor ticks
-  const rNum = 34;        // number position radius
+  const rTick = 44;       // outer edge of ticks — aligned to PNG bezel
+  const rTickMajor = 38;  // inner edge of major ticks
+  const rTickMinor = 41;  // inner edge of minor ticks
+  const rNum = 32;        // number position radius — pushed outward to match PNG
 
   const bgSrc = GAUGE_BG[id];
 
