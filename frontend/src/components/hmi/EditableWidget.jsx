@@ -1,6 +1,18 @@
 import React, { useRef, useState, useCallback } from 'react';
 
-export default function EditableWidget({ id, editing, transform, onUpdate, children, label }) {
+// Extract coordinates from mouse or touch events
+function getXY(e) {
+  if (e.touches && e.touches.length > 0) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  if (e.changedTouches && e.changedTouches.length > 0) return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+  return { x: e.clientX, y: e.clientY };
+}
+
+function snap(val, gridSize) {
+  if (!gridSize || gridSize <= 0) return val;
+  return Math.round(val / gridSize) * gridSize;
+}
+
+export default function EditableWidget({ id, editing, transform, onUpdate, children, label, gridSize = 0 }) {
   const outerRef = useRef(null);
   const [active, setActive] = useState(false);
   const dragState = useRef({ mode: null });
@@ -13,8 +25,7 @@ export default function EditableWidget({ id, editing, transform, onUpdate, child
     e.stopPropagation();
     e.preventDefault();
 
-    const startX = e.clientX;
-    const startY = e.clientY;
+    const { x: startX, y: startY } = getXY(e);
     const origTx = t.x;
     const origTy = t.y;
     dragState.current = { mode: 'drag' };
@@ -22,9 +33,10 @@ export default function EditableWidget({ id, editing, transform, onUpdate, child
 
     const onMove = (ev) => {
       ev.preventDefault();
-      const dx = ev.clientX - startX;
-      const dy = ev.clientY - startY;
-      onUpdate(id, { x: origTx + dx, y: origTy + dy });
+      const { x: cx, y: cy } = getXY(ev);
+      const rawX = origTx + (cx - startX);
+      const rawY = origTy + (cy - startY);
+      onUpdate(id, { x: snap(rawX, gridSize), y: snap(rawY, gridSize) });
     };
 
     const onUp = () => {
@@ -40,7 +52,7 @@ export default function EditableWidget({ id, editing, transform, onUpdate, child
     window.addEventListener('mouseup', onUp, true);
     window.addEventListener('touchmove', onMove, { capture: true, passive: false });
     window.addEventListener('touchend', onUp, true);
-  }, [editing, t.x, t.y, id, onUpdate]);
+  }, [editing, t.x, t.y, id, onUpdate, gridSize]);
 
   /* ---- SCALE (corner handle) ---- */
   const startScale = useCallback((e) => {
@@ -51,15 +63,16 @@ export default function EditableWidget({ id, editing, transform, onUpdate, child
     const rect = outerRef.current?.getBoundingClientRect();
     const cx = rect ? rect.left + rect.width / 2 : 0;
     const cy = rect ? rect.top + rect.height / 2 : 0;
-    const startDist = Math.hypot(e.clientX - cx, e.clientY - cy);
+    const { x: sx, y: sy } = getXY(e);
+    const startDist = Math.hypot(sx - cx, sy - cy);
     const origScale = t.scale;
     dragState.current = { mode: 'scale' };
     setActive(true);
 
     const onMove = (ev) => {
       ev.preventDefault();
-      const pt = ev.touches ? ev.touches[0] : ev;
-      const dist = Math.hypot(pt.clientX - cx, pt.clientY - cy);
+      const { x: mx, y: my } = getXY(ev);
+      const dist = Math.hypot(mx - cx, my - cy);
       const ratio = dist / Math.max(startDist, 1);
       const newScale = Math.max(0.3, Math.min(3, origScale * ratio));
       onUpdate(id, { scale: Math.round(newScale * 100) / 100 });
@@ -106,7 +119,6 @@ export default function EditableWidget({ id, editing, transform, onUpdate, child
     >
       {children}
 
-      {/* Edit controls — only visible in edit mode */}
       {editing && (
         <>
           {/* Dashed outline */}
@@ -129,7 +141,7 @@ export default function EditableWidget({ id, editing, transform, onUpdate, child
             }}>{label || id}</span>
           </div>
 
-          {/* Scale handle — bottom-right corner */}
+          {/* Scale handle — bottom-right */}
           <div
             onMouseDown={(e) => { e.stopPropagation(); startScale(e); }}
             onTouchStart={(e) => { e.stopPropagation(); startScale(e); }}
@@ -148,10 +160,7 @@ export default function EditableWidget({ id, editing, transform, onUpdate, child
           </div>
 
           {/* Rotate buttons — top-right */}
-          <div style={{
-            position: 'absolute', top: -6, right: -6,
-            display: 'flex', gap: 2,
-          }}>
+          <div style={{ position: 'absolute', top: -6, right: -6, display: 'flex', gap: 2 }}>
             <button
               onMouseDown={e => { e.stopPropagation(); e.preventDefault(); rotate(-15); }}
               onTouchStart={e => { e.stopPropagation(); e.preventDefault(); rotate(-15); }}
@@ -159,8 +168,7 @@ export default function EditableWidget({ id, editing, transform, onUpdate, child
                 width: 14, height: 14, borderRadius: 3, border: 'none',
                 background: '#8B5CF6', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
-                touchAction: 'none',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.4)', touchAction: 'none',
               }}
             >
               <svg width="8" height="8" viewBox="0 0 8 8" fill="none" style={{ pointerEvents: 'none' }}>
@@ -174,8 +182,7 @@ export default function EditableWidget({ id, editing, transform, onUpdate, child
                 width: 14, height: 14, borderRadius: 3, border: 'none',
                 background: '#8B5CF6', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
-                touchAction: 'none',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.4)', touchAction: 'none',
               }}
             >
               <svg width="8" height="8" viewBox="0 0 8 8" fill="none" style={{ pointerEvents: 'none' }}>
