@@ -1,62 +1,46 @@
 # FRANK Dashboard - Vehicle HMI Application
 
 ## Original Problem Statement
-Build a custom vehicle HMI (Human-Machine Interface) dashboard intended to run on a Raspberry Pi 5, with animated gauges (RPM, speed, gear), a boot sequence, settings panels, and Android Auto functionality.
+Build a custom vehicle HMI dashboard for Raspberry Pi 5 with animated gauges, boot sequence, settings, and Android Auto functionality.
 
 ## Architecture
 ```
 /app
-├── backend/
-│   └── server.py       # FastAPI + WebSocket + DHU Controller + Device Prefs
-├── frontend/
-│   └── src/
-│       ├── components/hmi/
-│       │   ├── Dashboard.jsx          # Main layout - 20+ individually editable widgets
-│       │   ├── CustomGauges.jsx       # PNG-based RpmGauge + SpeedGauge (active)
-│       │   ├── Retro89Cluster.jsx     # SVG GaugePod (deprecated, not active)
-│       │   ├── EditableWidget.jsx     # Drag/Scale/Rotate wrapper (touch+mouse, grid snap)
-│       │   ├── EditModeLegend.jsx     # Grid snap toggle + Save/Reset/Cancel
-│       │   ├── DashWidgets.jsx        # ShiftLightsBar, DigitalSpeed, GearDisplay
-│       │   ├── WarningPanel.jsx       # WarningLight (bordered, visible), TurnArrow (exported)
-│       │   ├── InfoGauges.jsx         # CoolantGauge, OilPressureGauge, FuelGauge, BatteryGauge
-│       │   └── ...
-│       ├── hooks/
-│       │   └── useLayoutStore.js      # localStorage widget layout persistence
-│       └── contexts/
+├── backend/server.py              # FastAPI + WebSocket + DHU Controller
+├── frontend/src/components/hmi/
+│   ├── Dashboard.jsx              # Main layout — 20+ individually editable widgets
+│   ├── Retro89Cluster.jsx         # GaugePod: PNG background + SVG ticks/needle/VTEC overlay
+│   ├── CustomGauges.jsx           # Legacy PNG-only gauges (preserved, not active in Dashboard)
+│   ├── EditableWidget.jsx         # Drag/Scale/Rotate wrapper (touch+mouse, grid snap)
+│   ├── EditModeLegend.jsx         # Grid snap toggle + Save/Reset/Cancel
+│   ├── DashWidgets.jsx            # ShiftLightsBar, DigitalSpeed, GearDisplay
+│   ├── WarningPanel.jsx           # WarningLight (bordered visible), TurnArrow (exported)
+│   └── InfoGauges.jsx             # Coolant, Oil, Fuel, Battery gauges
+├── frontend/public/assets/gauges/ # PNG gauge backgrounds (rpm-gauge.png, spd-gauge.png, etc.)
+└── frontend/src/hooks/useLayoutStore.js  # localStorage widget layout persistence
 ```
 
 ## Completed Features
-- [x] PNG-based gauge backgrounds (tachometer + speedometer)
-- [x] VTEC engagement indicator (red text with glow, 3000-8000 RPM)
-- [x] RPM Digital Readout — separate draggable widget
-- [x] Individual turn signal arrows (left + right independently editable)
-- [x] MIL Warning Lights — 7 lights with visible borders/backgrounds
-- [x] Dashboard Edit Mode — 20+ individually draggable widgets
-- [x] Grid snap (Off/20px/40px toggle with SVG overlay)
-- [x] Touch event handling (Pi touchscreen compatible)
-- [x] Smooth needle animation (CSS transform:rotate + transition)
-- [x] Shift lights, Info gauges, Digital Speed/Gear display
-- [x] Android Auto manual launch/stop
-- [x] Boot sequence with gauge sweep test
+- [x] GaugePod: PNG backgrounds (rpm-gauge.png, spd-gauge.png) with SVG overlay (ticks, numbers, needle, VTEC, readout)
+- [x] Smooth needle: CSS transform:rotate + transition:100ms (not SVG attributes)
+- [x] VTEC indicator (red glow text, 3000-8000 RPM)
+- [x] RPM digital readout — separate draggable widget (fixed 130px width, no reflow)
+- [x] Individual turn signal arrows (left + right separately editable)
+- [x] MIL Warning Lights — 7 lights with bordered pill containers, always visible
+- [x] Dashboard Edit Mode — 20+ individually draggable/scalable/rotatable widgets
+- [x] Grid snap (Off/20px/40px toggle with SVG grid overlay)
+- [x] Touch event handling (Pi touchscreen compatible via getXY helper)
+- [x] Speedometer: 9 readable ticks (0-160 by 20s)
+- [x] All other gauges, shift lights, gear display, boot sequence, AA manual launch
 
 ## Key Changes (Jul 1, 2026 — Latest)
-- **PNG Gauge Backgrounds**: Switched from SVG horseshoe (Retro89Cluster) back to PNG-based gauges (CustomGauges.jsx) per user request
-- **RPM Readout separate**: Extracted from inside the gauge into its own EditableWidget
-- **Individual Turn Arrows**: Exported TurnArrow from WarningPanel, wrapped each as separate EditableWidget
-- **Warning Lights Visible**: Added border (rgba 0.08), background (rgba 0.04), brighter inactive color (#71717a), removed opacity approach
-
-## Individually Editable Widgets (20+)
-tachometer, speedometer, rpm-readout, digital-speed, gear-display, shift-lights, turn-left, turn-right, coolant, oil-pressure, fuel, battery, status, warn-check_engine, warn-oil_pressure_warning, warn-high_coolant, warn-low_fuel, warn-maintenance, warn-brake_warning, warn-abs_warning
+- PNG gauge backgrounds via SVG `<image>` tag — replaces SVG horseshoe band, keeps SVG overlay
+- RPM readout extracted as separate draggable widget with fixed 130px width (fixes reflow bug)
+- Turn arrows individually exported from WarningPanel and wrapped as separate EditableWidgets
 
 ## Upcoming Tasks
-- P0: Verify all changes on Raspberry Pi touchscreen
+- P0: Verify on Raspberry Pi touchscreen
 - P1: Android Auto auto-launch rebuild (on explicit request)
 - P2: Splash screen fix (1920x1080)
 - P3: OBD1/OBD2 real data integration
 - P3: Theme customization
-
-## Critical Notes
-- CustomGauges.jsx (PNG-based) is ACTIVE. Retro89Cluster.jsx (SVG) is deprecated.
-- Vehicle data is MOCKED via backend VehicleSimulator
-- DO NOT re-implement Android Auto auto-detect/udev
-- Pi build: `REACT_APP_BACKEND_URL=http://localhost:8001 yarn build` (never sudo)
