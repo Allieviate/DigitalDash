@@ -57,28 +57,37 @@ echo -e "${YELLOW}[3/5] Creating Plymouth theme files...${NC}"
 
 # Simple logo-only splash (clean black background)
 cat > "$SPLASH_DIR/frank-hmi.script" << 'PLYSCRIPT'
-# FRANK HMI Splash Script - Honda logo centered on 1920x1080
+# FRANK HMI Splash Script - Honda logo centered on 1920x1200
 
 Window.SetBackgroundTopColor(0.0, 0.0, 0.0);
 Window.SetBackgroundBottomColor(0.0, 0.0, 0.0);
 
 logo.original = Image("logo.png");
 
-# Scale logo to ~70% of original (500px -> 350px) for clean look on 1080p
+# Scale logo to ~70% of original (500px -> 350px)
 logo_w = logo.original.GetWidth() * 0.70;
 logo_h = logo.original.GetHeight() * 0.70;
 logo.image = logo.original.Scale(logo_w, logo_h);
 
 logo.sprite = Sprite(logo.image);
-logo.sprite.SetX(Window.GetWidth() / 2 - logo.image.GetWidth() / 2);
-logo.sprite.SetY(Window.GetHeight() / 2 - logo.image.GetHeight() / 2);
 logo.sprite.SetOpacity(0);
 
+# Centering must happen in refresh callback because
+# Window.GetWidth()/GetHeight() returns 0 at script init
 global.tick = 0;
+global.centered = 0;
+
 fun refresh_callback() {
     global.tick++;
 
-    # Soft fade in and hold.
+    # Center the logo once window dimensions are available
+    if (!global.centered && Window.GetWidth() > 0) {
+        logo.sprite.SetX(Window.GetWidth() / 2 - logo.image.GetWidth() / 2);
+        logo.sprite.SetY(Window.GetHeight() / 2 - logo.image.GetHeight() / 2);
+        global.centered = 1;
+    }
+
+    # Soft fade in (about 0.75s at 60fps)
     opacity = global.tick / 45.0;
     if (opacity > 1) opacity = 1;
     logo.sprite.SetOpacity(opacity);
@@ -87,6 +96,7 @@ fun refresh_callback() {
 Plymouth.SetRefreshFunction(refresh_callback);
 
 fun quit_callback() {
+    # Instant hide — React app picks up the visual seamlessly
     logo.sprite.SetOpacity(0);
 }
 
@@ -121,9 +131,9 @@ fi
 
 if [ -f "$CMDLINE_FILE" ]; then
     sed -i 's/splash//g; s/quiet//g; s/plymouth.ignore-serial-consoles//g; s/video=HDMI-A-1:[^ ]*//g' "$CMDLINE_FILE"
-    sed -i 's/$/ quiet splash plymouth.ignore-serial-consoles video=HDMI-A-1:1920x1080@60D/' "$CMDLINE_FILE"
+    sed -i 's/$/ quiet splash plymouth.ignore-serial-consoles video=HDMI-A-1:1920x1200@60D/' "$CMDLINE_FILE"
     sed -i 's/  */ /g' "$CMDLINE_FILE"
-    echo -e "${GREEN}Updated boot cmdline for splash + 1920x1080@60${NC}"
+    echo -e "${GREEN}Updated boot cmdline for splash + 1920x1200@60${NC}"
 fi
 
 CONFIG_FILE="/boot/firmware/config.txt"
@@ -135,9 +145,9 @@ if [ -f "$CONFIG_FILE" ]; then
     set_config_key "$CONFIG_FILE" "disable_splash" "1"
     set_config_key "$CONFIG_FILE" "disable_overscan" "1"
     set_config_key "$CONFIG_FILE" "framebuffer_width" "1920"
-    set_config_key "$CONFIG_FILE" "framebuffer_height" "1080"
+    set_config_key "$CONFIG_FILE" "framebuffer_height" "1200"
     set_config_key "$CONFIG_FILE" "hdmi_group" "2"
-    set_config_key "$CONFIG_FILE" "hdmi_mode" "82"
+    set_config_key "$CONFIG_FILE" "hdmi_mode" "69"
 fi
 
 echo ""
