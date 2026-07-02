@@ -210,14 +210,14 @@ export const Dashboard = ({ onOpenSettings }) => {
           {/* Tachometer */}
           <EditableWidget {...ep('tachometer')} label="Tachometer">
             <div style={{ width: 420, height: 420 }}>
-              <GaugePod id="tach" value={rpm} max={8000} ticks={[0, 1, 2, 3, 4, 5, 6, 7, 8]} unit="x1000r/min" redlineStart={7000} />
+              <GaugePod id="tach" value={rpm} max={8000} ticks={[0, 1, 2, 3, 4, 5, 6, 7, 8]} unit="x1000r/min" redlineStart={7000} showDigitalValue vtecRange={{ start: 3000, end: 8000 }} />
             </div>
           </EditableWidget>
 
           {/* Speedometer */}
           <EditableWidget {...ep('speedometer')} label="Speedometer">
             <div style={{ width: 420, height: 420 }}>
-              <GaugePod id="speedo" value={speed} max={170} ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170]} unit="mph" />
+              <GaugePod id="speedo" value={speed} max={160} ticks={[0, 20, 40, 60, 80, 100, 120, 140, 160]} unit="mph" />
             </div>
           </EditableWidget>
 

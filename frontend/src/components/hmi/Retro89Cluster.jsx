@@ -24,7 +24,7 @@ function arcBandPath(cx, cy, rOuter, rInner, startAngle, endAngle) {
   ].join(' ');
 }
 
-function GaugePod({ value, max, ticks, unit, redlineStart, id }) {
+function GaugePod({ value, max, ticks, unit, redlineStart, id, showDigitalValue, vtecRange }) {
   const cx = 50, cy = 50;
   const startAngle = 135;
   const endAngle = 405;
@@ -38,7 +38,7 @@ function GaugePod({ value, max, ticks, unit, redlineStart, id }) {
   const rTickMinor = 42;  // inner edge of minor ticks
   const rNum = 34;        // number position radius
 
-  // Needle
+  // Needle angle
   const clamped = Math.min(Math.max(value, 0), max);
   const needleAngle = startAngle + (clamped / max) * sweep;
 
@@ -55,6 +55,12 @@ function GaugePod({ value, max, ticks, unit, redlineStart, id }) {
   const minorPerMajor = 4;
   const totalMinor = (majorCount - 1) * minorPerMajor;
   const minorStep = sweep / totalMinor;
+
+  // VTEC state
+  const inVtec = vtecRange && value >= vtecRange.start && value <= vtecRange.end;
+  const vtecProgress = inVtec
+    ? Math.min(1, Math.max(0, (value - vtecRange.start) / Math.max(1, vtecRange.end - vtecRange.start)))
+    : 0;
 
   return (
     <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%' }}>
@@ -73,6 +79,19 @@ function GaugePod({ value, max, ticks, unit, redlineStart, id }) {
           <stop offset="65%" stopColor="#d0d0d0" />
           <stop offset="100%" stopColor="#777" />
         </linearGradient>
+        {/* VTEC glow filter */}
+        {vtecRange && (
+          <filter id={`vtec-glow-${id}`} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur" />
+            <feColorMatrix in="blur" type="matrix"
+              values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.8 0"
+              result="redGlow" />
+            <feMerge>
+              <feMergeNode in="redGlow" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        )}
       </defs>
 
       {/* Horseshoe gauge face — maroon band */}
@@ -81,7 +100,7 @@ function GaugePod({ value, max, ticks, unit, redlineStart, id }) {
         fill={`url(#face-${id})`}
       />
 
-      {/* Chrome outer rim — just the outer arc */}
+      {/* Chrome outer rim */}
       <path
         d={(() => {
           const r = rOuter + 0.8;
@@ -133,7 +152,6 @@ function GaugePod({ value, max, ticks, unit, redlineStart, id }) {
         const inner = polar(cx, cy, rTickMajor, angle);
         const numPos = polar(cx, cy, rNum, angle);
 
-        // Font size: smaller for 3-digit numbers
         const fontSize = String(tickVal).length >= 3 ? '5px' : '6.5px';
 
         return (
@@ -177,17 +195,66 @@ function GaugePod({ value, max, ticks, unit, redlineStart, id }) {
         {unit}
       </text>
 
-      {/* Needle — originates from center, extends to tick area */}
+      {/* VTEC indicator — inside gauge face */}
+      {inVtec && (
+        <text
+          x={cx}
+          y={cy - 8}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill="#FF0000"
+          filter={`url(#vtec-glow-${id})`}
+          style={{
+            fontSize: '5px',
+            fontFamily: "'Orbitron', sans-serif",
+            fontWeight: 700,
+            letterSpacing: '0.15em',
+            opacity: 0.6 + vtecProgress * 0.4,
+          }}
+          data-testid="vtec-indicator"
+        >
+          VTEC
+        </text>
+      )}
+
+      {/* Digital value readout — inside gauge face */}
+      {showDigitalValue && (
+        <text
+          x={cx}
+          y={cy + 14}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill="rgba(255,255,255,0.9)"
+          style={{
+            fontSize: '8px',
+            fontFamily: "'Orbitron', sans-serif",
+            fontWeight: 500,
+            letterSpacing: '1px',
+            textShadow: inVtec ? `0 0 ${3 + vtecProgress * 5}px rgba(255, 0, 0, 0.5)` : 'none',
+          }}
+          data-testid={`${id}-digital-readout`}
+        >
+          {Math.round(value)}
+        </text>
+      )}
+
+      {/* Needle — uses CSS transform: rotate() for smooth animation */}
       <line
-        x1={polar(cx, cy, 5, needleAngle + 180).x}
-        y1={polar(cx, cy, 5, needleAngle + 180).y}
-        x2={polar(cx, cy, 40, needleAngle).x}
-        y2={polar(cx, cy, 40, needleAngle).y}
+        x1={cx - 5} y1={cy}
+        x2={cx + 40} y2={cy}
         stroke="#f0f0f0"
         strokeWidth="1.3"
         strokeLinecap="round"
-        style={{ transition: 'x1 80ms ease-out, y1 80ms ease-out, x2 80ms ease-out, y2 80ms ease-out' }}
+        style={{
+          transformOrigin: `${cx}px ${cy}px`,
+          transform: `rotate(${needleAngle}deg)`,
+          transition: 'transform 100ms ease-out',
+          willChange: 'transform',
+        }}
       />
+
+      {/* Center hub cap */}
+      <circle cx={cx} cy={cy} r={3.5} fill="#333" stroke="#555" strokeWidth="0.4" />
     </svg>
   );
 }
@@ -212,6 +279,8 @@ export default function Retro89Cluster() {
           ticks={[0, 1, 2, 3, 4, 5, 6, 7, 8]}
           unit="x1000r/min"
           redlineStart={7000}
+          showDigitalValue
+          vtecRange={{ start: 3000, end: 8000 }}
         />
       </div>
 
@@ -220,8 +289,8 @@ export default function Retro89Cluster() {
         <GaugePod
           id="speedo"
           value={speed}
-          max={170}
-          ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170]}
+          max={160}
+          ticks={[0, 20, 40, 60, 80, 100, 120, 140, 160]}
           unit="mph"
         />
       </div>
