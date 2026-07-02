@@ -7,22 +7,11 @@ const polar = (cx, cy, r, angleDeg) => ({
   y: cy + r * Math.sin(angleDeg * DEG),
 });
 
-// Describes a horseshoe arc path (outer arc → connect → inner arc reversed)
-function arcBandPath(cx, cy, rOuter, rInner, startAngle, endAngle) {
-  const sweep = endAngle - startAngle;
-  const largeArc = sweep > 180 ? 1 : 0;
-  const pOuterStart = polar(cx, cy, rOuter, startAngle);
-  const pOuterEnd = polar(cx, cy, rOuter, endAngle);
-  const pInnerStart = polar(cx, cy, rInner, endAngle);
-  const pInnerEnd = polar(cx, cy, rInner, startAngle);
-  return [
-    `M${pOuterStart.x},${pOuterStart.y}`,
-    `A${rOuter},${rOuter} 0 ${largeArc} 1 ${pOuterEnd.x},${pOuterEnd.y}`,
-    `L${pInnerStart.x},${pInnerStart.y}`,
-    `A${rInner},${rInner} 0 ${largeArc} 0 ${pInnerEnd.x},${pInnerEnd.y}`,
-    'Z',
-  ].join(' ');
-}
+// Map gauge id to PNG background path
+const GAUGE_BG = {
+  tach: '/assets/gauges/rpm-gauge.png',
+  speedo: '/assets/gauges/spd-gauge.png',
+};
 
 function GaugePod({ value, max, ticks, unit, redlineStart, id, showDigitalValue, vtecRange }) {
   const cx = 50, cy = 50;
@@ -30,13 +19,12 @@ function GaugePod({ value, max, ticks, unit, redlineStart, id, showDigitalValue,
   const endAngle = 405;
   const sweep = endAngle - startAngle;
 
-  // Radii for the horseshoe band
-  const rOuter = 47;
-  const rInner = 28;
   const rTick = 45;       // outer edge of ticks
   const rTickMajor = 39;  // inner edge of major ticks
   const rTickMinor = 42;  // inner edge of minor ticks
   const rNum = 34;        // number position radius
+
+  const bgSrc = GAUGE_BG[id];
 
   // Needle angle
   const clamped = Math.min(Math.max(value, 0), max);
@@ -65,20 +53,6 @@ function GaugePod({ value, max, ticks, unit, redlineStart, id, showDigitalValue,
   return (
     <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%' }}>
       <defs>
-        {/* Dark maroon gradient for the band */}
-        <radialGradient id={`face-${id}`} cx="50%" cy="40%" r="55%">
-          <stop offset="0%" stopColor="#3d1219" />
-          <stop offset="60%" stopColor="#2d0a0f" />
-          <stop offset="100%" stopColor="#1a0508" />
-        </radialGradient>
-        {/* Chrome rim gradient */}
-        <linearGradient id={`rim-${id}`} x1="0" y1="0" x2="0.5" y2="1">
-          <stop offset="0%" stopColor="#999" />
-          <stop offset="35%" stopColor="#e0e0e0" />
-          <stop offset="50%" stopColor="#fff" />
-          <stop offset="65%" stopColor="#d0d0d0" />
-          <stop offset="100%" stopColor="#777" />
-        </linearGradient>
         {/* VTEC glow filter */}
         {vtecRange && (
           <filter id={`vtec-glow-${id}`} x="-50%" y="-50%" width="200%" height="200%">
@@ -94,37 +68,10 @@ function GaugePod({ value, max, ticks, unit, redlineStart, id, showDigitalValue,
         )}
       </defs>
 
-      {/* Horseshoe gauge face — maroon band */}
-      <path
-        d={arcBandPath(cx, cy, rOuter, rInner, startAngle, endAngle)}
-        fill={`url(#face-${id})`}
-      />
-
-      {/* Chrome outer rim */}
-      <path
-        d={(() => {
-          const r = rOuter + 0.8;
-          const p1 = polar(cx, cy, r, startAngle);
-          const p2 = polar(cx, cy, r, endAngle);
-          return `M${p1.x},${p1.y} A${r},${r} 0 1 1 ${p2.x},${p2.y}`;
-        })()}
-        fill="none"
-        stroke={`url(#rim-${id})`}
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-      {/* Thin inner rim */}
-      <path
-        d={(() => {
-          const r = rInner - 0.3;
-          const p1 = polar(cx, cy, r, startAngle);
-          const p2 = polar(cx, cy, r, endAngle);
-          return `M${p1.x},${p1.y} A${r},${r} 0 1 1 ${p2.x},${p2.y}`;
-        })()}
-        fill="none"
-        stroke="rgba(100,100,100,0.3)"
-        strokeWidth="0.3"
-      />
+      {/* PNG gauge background — the actual gauge face image */}
+      {bgSrc && (
+        <image href={bgSrc} x="0" y="0" width="100" height="100" preserveAspectRatio="xMidYMid meet" />
+      )}
 
       {/* Minor ticks */}
       {[...Array(totalMinor + 1)].map((_, i) => {

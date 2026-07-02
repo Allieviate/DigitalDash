@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useVehicleData } from '../../contexts/VehicleDataContext';
-import { RpmGauge, SpeedGauge } from './CustomGauges';
+import { GaugePod } from './Retro89Cluster';
 import { ShiftLightsBar, DigitalSpeed, GearDisplay } from './DashWidgets';
 import { WarningLight, TurnArrow, CriticalWarningBanner } from './WarningPanel';
 import { FuelGauge, CoolantGauge, BatteryGauge, OilPressureGauge } from './InfoGauges';
@@ -26,11 +26,18 @@ const RpmReadout = () => {
   const vtecProgress = inVtec ? Math.min(1, (rpm - 3000) / 5000) : 0;
 
   return (
-    <div className="flex flex-col items-center" data-testid="rpm-readout">
+    <div
+      className="flex flex-col items-center"
+      data-testid="rpm-readout"
+      style={{ width: 130, flexShrink: 0 }}
+    >
       <span
-        className="font-orbitron text-3xl font-medium text-white/90"
+        className="font-orbitron text-3xl font-medium text-white/90 text-center"
         style={{
           letterSpacing: '2px',
+          fontVariantNumeric: 'tabular-nums',
+          minWidth: 110,
+          display: 'inline-block',
           textShadow: inVtec ? `0 0 ${6 + vtecProgress * 10}px rgba(255, 0, 0, 0.55)` : 'none',
         }}
       >
@@ -230,10 +237,10 @@ export const Dashboard = ({ onOpenSettings }) => {
             </EditableWidget>
           </div>
 
-          {/* Tachometer (PNG background) */}
+          {/* Tachometer (PNG background + SVG overlay) */}
           <EditableWidget {...ep('tachometer', 'Tachometer')}>
             <div style={{ width: 420, height: 420 }}>
-              <RpmGauge size={420} />
+              <GaugePod id="tach" value={signals.rpm || 0} max={8000} ticks={[0, 1, 2, 3, 4, 5, 6, 7, 8]} unit="x1000r/min" redlineStart={7000} showDigitalValue vtecRange={{ start: 3000, end: 8000 }} />
             </div>
           </EditableWidget>
 
@@ -242,10 +249,10 @@ export const Dashboard = ({ onOpenSettings }) => {
             <RpmReadout />
           </EditableWidget>
 
-          {/* Speedometer (PNG background) */}
+          {/* Speedometer (PNG background + SVG overlay) */}
           <EditableWidget {...ep('speedometer', 'Speedometer')}>
             <div style={{ width: 420, height: 420 }}>
-              <SpeedGauge size={420} />
+              <GaugePod id="speedo" value={signals.speed_mph || 0} max={160} ticks={[0, 20, 40, 60, 80, 100, 120, 140, 160]} unit="mph" />
             </div>
           </EditableWidget>
 
