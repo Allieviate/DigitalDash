@@ -57,17 +57,21 @@ echo -e "${YELLOW}[3/5] Creating Plymouth theme files...${NC}"
 
 # Simple logo-only splash (clean black background)
 cat > "$SPLASH_DIR/frank-hmi.script" << 'PLYSCRIPT'
-# FRANK HMI Splash Script - Honda logo only
+# FRANK HMI Splash Script - Honda logo centered on 1920x1080
 
 Window.SetBackgroundTopColor(0.0, 0.0, 0.0);
 Window.SetBackgroundBottomColor(0.0, 0.0, 0.0);
 
-logo.image = Image("logo.png");
-logo.sprite = Sprite(logo.image);
+logo.original = Image("logo.png");
 
-logo_scale = 0.42;
-logo.sprite.SetX(Window.GetWidth() / 2 - logo.image.GetWidth() * logo_scale / 2);
-logo.sprite.SetY(Window.GetHeight() / 2 - logo.image.GetHeight() * logo_scale / 2);
+# Scale logo to ~70% of original (500px -> 350px) for clean look on 1080p
+logo_w = logo.original.GetWidth() * 0.70;
+logo_h = logo.original.GetHeight() * 0.70;
+logo.image = logo.original.Scale(logo_w, logo_h);
+
+logo.sprite = Sprite(logo.image);
+logo.sprite.SetX(Window.GetWidth() / 2 - logo.image.GetWidth() / 2);
+logo.sprite.SetY(Window.GetHeight() / 2 - logo.image.GetHeight() / 2);
 logo.sprite.SetOpacity(0);
 
 global.tick = 0;
@@ -117,9 +121,9 @@ fi
 
 if [ -f "$CMDLINE_FILE" ]; then
     sed -i 's/splash//g; s/quiet//g; s/plymouth.ignore-serial-consoles//g; s/video=HDMI-A-1:[^ ]*//g' "$CMDLINE_FILE"
-    sed -i 's/$/ quiet splash plymouth.ignore-serial-consoles video=HDMI-A-1:1920x1200@60D/' "$CMDLINE_FILE"
+    sed -i 's/$/ quiet splash plymouth.ignore-serial-consoles video=HDMI-A-1:1920x1080@60D/' "$CMDLINE_FILE"
     sed -i 's/  */ /g' "$CMDLINE_FILE"
-    echo -e "${GREEN}Updated boot cmdline for splash + 1920x1200@60${NC}"
+    echo -e "${GREEN}Updated boot cmdline for splash + 1920x1080@60${NC}"
 fi
 
 CONFIG_FILE="/boot/firmware/config.txt"
@@ -131,9 +135,9 @@ if [ -f "$CONFIG_FILE" ]; then
     set_config_key "$CONFIG_FILE" "disable_splash" "1"
     set_config_key "$CONFIG_FILE" "disable_overscan" "1"
     set_config_key "$CONFIG_FILE" "framebuffer_width" "1920"
-    set_config_key "$CONFIG_FILE" "framebuffer_height" "1200"
+    set_config_key "$CONFIG_FILE" "framebuffer_height" "1080"
     set_config_key "$CONFIG_FILE" "hdmi_group" "2"
-    set_config_key "$CONFIG_FILE" "hdmi_mode" "69"
+    set_config_key "$CONFIG_FILE" "hdmi_mode" "82"
 fi
 
 echo ""
