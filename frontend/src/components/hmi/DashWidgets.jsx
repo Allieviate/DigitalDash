@@ -1,32 +1,40 @@
-import React, { useState, useEffect } from 'react';
-import { useVehicleData } from '../../contexts/VehicleDataContext';
+import React, { useState, useEffect, memo } from 'react';
+import { useVehicleSignal } from '../../contexts/VehicleDataContext';
+
+// Each widget subscribes only to the signal it draws.
+//
+// These previously called useVehicleData(), which returns the whole
+// signals object. Any field changing - battery voltage, intake air
+// temp, a turn signal blink - re-rendered every widget in the tree.
+// useVehicleSignal re-renders only when that one value changes, so
+// the speed readout no longer redraws because coolant moved a tenth
+// of a degree.
 
 // Shift lights bar - 7 LEDs, ORANGISH-RED color
-export const ShiftLightsBar = ({ className = '' }) => {
-  const { signals } = useVehicleData();
-  const rpm = signals.rpm;
-  
+export const ShiftLightsBar = memo(({ className = '' }) => {
+  const rpm = useVehicleSignal('rpm');
+
   // Calculate opacity for each shift light based on RPM thresholds
   const getLightOpacity = (index) => {
     const threshold = (index + 1) * 1000;
     const opacity = Math.min(Math.max((rpm - threshold) / 1000, 0), 1);
     return opacity;
   };
-  
+
   // Flash at redline (7600+ RPM)
   const [flashState, setFlashState] = useState(1);
   const isRedline = rpm >= 7600;
-  
+
   useEffect(() => {
     if (!isRedline) {
       setFlashState(1);
       return;
     }
-    
+
     const interval = setInterval(() => {
       setFlashState(prev => prev === 1 ? 0.3 : 1);
     }, 70);
-    
+
     return () => clearInterval(interval);
   }, [isRedline]);
 
@@ -52,12 +60,13 @@ export const ShiftLightsBar = ({ className = '' }) => {
       ))}
     </div>
   );
-};
+});
+ShiftLightsBar.displayName = 'ShiftLightsBar';
 
 // Digital Speed display - Orbitron font
-export const DigitalSpeed = ({ className = '' }) => {
-  const { signals } = useVehicleData();
-  const speed = Math.round(signals.speed_mph);
+export const DigitalSpeed = memo(({ className = '' }) => {
+  const speedRaw = useVehicleSignal('speed_mph');
+  const speed = Math.round(speedRaw);
 
   return (
     <div className={`flex flex-col items-center ${className}`} data-testid="digital-speed">
@@ -72,15 +81,14 @@ export const DigitalSpeed = ({ className = '' }) => {
       </div>
     </div>
   );
-};
+});
+DigitalSpeed.displayName = 'DigitalSpeed';
 
 // Gear display - URUS LAMBORGHINI STYLE with Instant Pop, Slow Fade
-export const GearDisplay = ({ className = '' }) => {
-  const { signals } = useVehicleData();
-  const [lastGear, setLastGear] = useState(signals.gear);
+export const GearDisplay = memo(({ className = '' }) => {
+  const gear = useVehicleSignal('gear');
+  const [lastGear, setLastGear] = useState(gear);
   const [flashType, setFlashType] = useState(null);
-
-  const gear = signals.gear;
 
   const getGearText = (g) => { if (g === -1) return 'R'; if (g === 0) return 'N'; return String(g); };
   const getPrevGearText = (g) => { if (g === -1) return ' '; if (g === 0) return 'R'; if (g === 1) return 'N'; return String(g - 1); };
@@ -131,7 +139,8 @@ export const GearDisplay = ({ className = '' }) => {
       </div>
     </div>
   );
-};
+});
+GearDisplay.displayName = 'GearDisplay';
 
 // Combined for backward compat
 export const DigitalSpeedGear = ({ className = '' }) => (
