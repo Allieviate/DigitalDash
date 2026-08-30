@@ -6,11 +6,11 @@ documentation. All values are big-endian, 11-bit IDs, transmitted at
 packets on, any single channel lands roughly every 70ms.
 
 UNVERIFIED AGAINST A REAL CAR. The field order below follows the
-published spec, but signedness on the temperature fields and the gear
-encoding have not been confirmed against real traffic. Phase 5 settles
-this by capturing a candump log from the car and replaying it through
-the tests in test_hondata_can.py. Until then, treat decoded values as
-plausible rather than correct.
+published spec, but signedness on the temperature fields has not been
+confirmed against real traffic. Phase 5 settles this by capturing a
+candump log from the car and replaying it through the tests in
+test_hondata_can.py. Until then, treat decoded values as plausible
+rather than correct.
 
 This module never transmits.
 """
@@ -23,6 +23,30 @@ KPH_TO_MPH = 0.621371
 
 # Analog inputs are broadcast as voltage * 819.2
 ANALOG_SCALE = 819.2
+
+# ---- gear encoding ----
+#
+# KPro indexes forward gears from zero, so raw 0 is first gear. It does
+# not use 0 for neutral.
+#
+# Neutral and reverse are not calculated at all. A K-series gearbox
+# gives the ECU only two switch states - the neutral position switch
+# and the reverse light switch - so forward gears are derived from the
+# rpm/speed ratio, and when either switch closes the ECU overrides the
+# gear variable outright.
+#
+# One consequence worth knowing: mid-shift, with the clutch in, the
+# rpm/speed ratio is meaningless, so the calculated gear can be briefly
+# wrong. See translate_gear.
+
+GEAR_NEUTRAL_RAW = 10
+GEAR_REVERSE_RAW = 11
+MAX_FORWARD_GEARS = 6
+
+# Dash convention, matching VehicleSignals: -1 reverse, 0 neutral,
+# 1..n forward.
+DASH_NEUTRAL = 0
+DASH_REVERSE = -1
 
 # Packet IDs
 ID_ENGINE = 0x660
@@ -53,16 +77,40 @@ def _need(data: bytes, length: int, name: str) -> None:
         raise DecodeError(f"{name} needs {length} bytes, got {len(data)}")
 
 
+def translate_gear(raw: int) -> Optional[int]:
+    """Convert KPro's gear encoding to the dash convention.
+
+    Returns None for an unrecognised value so the caller can hold the
+    last known gear rather than display something invented. A gear
+    readout that freezes for a moment is better than one that shows a
+    number the transmission does not have.
+    """
+    if raw == GEAR_NEUTRAL_RAW:
+        return DASH_NEUTRAL
+    if raw == GEAR_REVERSE_RAW:
+        return DASH_REVERSE
+    if 0 <= raw < MAX_FORWARD_GEARS:
+        return raw + 1
+    return None
+
+
 def decode_engine(data: bytes) -> Dict[str, Any]:
     """0x660 - rpm, speed, gear, battery voltage."""
     _need(data, 6, "0x660")
-    rpm, speed_kph, gear, volts = struct.unpack(">HHBB", data[:6])
-    return {
+    rpm, speed_kph, gear_raw, volts = struct.unpack(">HHBB", data[:6])
+
+    out: Dict[str, Any] = {
         "rpm": float(rpm),
         "speed_mph": speed_kph * KPH_TO_MPH,
-        "gear": int(gear),
         "battery_voltage": volts / 10.0,
+        # kept for phase 5 diagnostics - not a dashboard field
+        "gear_raw": int(gear_raw),
     }
+
+    gear = translate_gear(gear_raw)
+    if gear is not None:
+        out["gear"] = gear
+    return out
 
 
 def decode_temps(data: bytes) -> Dict[str, Any]:
@@ -145,6 +193,7 @@ class HondataDecoder:
         self.frames_decoded: int = 0
         self.frames_ignored: int = 0
         self.decode_errors: int = 0
+        self.unknown_gears: int = 0
 
     def feed(self, can_id: int, data: bytes, now: Optional[float] = None) -> bool:
         """Apply one frame. Returns True if it changed anything."""
@@ -157,6 +206,9 @@ class HondataDecoder:
         if decoded is None:
             self.frames_ignored += 1
             return False
+
+        if "gear_raw" in decoded and "gear" not in decoded:
+            self.unknown_gears += 1
 
         self.values.update(decoded)
         self.last_seen[can_id] = now if now is not None else time.time()
@@ -174,5 +226,6 @@ class HondataDecoder:
             "frames_decoded": self.frames_decoded,
             "frames_ignored": self.frames_ignored,
             "decode_errors": self.decode_errors,
+            "unknown_gears": self.unknown_gears,
             "packets_seen": sorted(hex(i) for i in self.last_seen),
         }
