@@ -7,75 +7,93 @@ import logging
 import asyncio
 import math
 import time
-from enum import Enum
+from contextlib import asynccontextmanager
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone
 
+from signals import (
+    COOLANT_WARN_C,
+    LAMP_TEST_FIELDS,
+    LOW_FUEL_PCT,
+    OIL_PRESSURE_WARN_PSI,
+    SIGNAL_SOURCES,
+    VTEC_ENGAGE_RPM,
+    VehicleSignals,
+)
+from sources import (
+    SignalSnapshot,
+    SimulatorSource,
+    create_source,
+    run_source,
+)
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+
+# Configure logging early so startup messages are not swallowed
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # MongoDB connection - with safe fallbacks
 mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ.get('DB_NAME', 'frank_hmi')]
 
-# Create the main app
-app = FastAPI()
+# ============ SIGNAL SOURCE ============
+# Which source this Pi runs is a property of how it is deployed, not a
+# user preference, so it lives in backend/.env rather than in the
+# settings UI. A dash that silently reverts to simulated data because
+# someone cleared browser storage is a bad failure mode.
+#
+#   SIGNAL_SOURCE=simulation    bench
+#   SIGNAL_SOURCE=hondata_can   car (phase 3)
+
+SIGNAL_SOURCE = os.environ.get('SIGNAL_SOURCE', 'simulation')
+
+snapshot = SignalSnapshot()
+signal_source = create_source(SIGNAL_SOURCE)
+_source_task: Optional[asyncio.Task] = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global _source_task
+    _source_task = asyncio.create_task(run_source(signal_source, snapshot))
+    try:
+        yield
+    finally:
+        if _source_task is not None:
+            _source_task.cancel()
+            try:
+                await _source_task
+            except asyncio.CancelledError:
+                pass
+        client.close()
+
+
+app = FastAPI(lifespan=lifespan)
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
-# ============ WARNING THRESHOLDS ============
-# Named so the simulator and the future CAN source derive warnings from
-# the same numbers. Previously these were inline literals that the
-# simulator's own output range could never reach.
 
-LOW_FUEL_PCT = 0.12
-COOLANT_WARN_C = 110.0
-OIL_PRESSURE_WARN_PSI = 15.0
+def require_simulator():
+    """Injection only makes sense against the bench source."""
+    if not isinstance(signal_source, SimulatorSource):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Signal source is {signal_source.name!r}; injection requires SIGNAL_SOURCE=simulation"
+        )
+    return signal_source.simulator
 
-# K-series VTEC crossover. The frontend currently glows from 3000rpm,
-# which is wrong for a K20 - real engagement is around here, and once
-# CAN is wired this comes from the VTS bit in packet 0x661 anyway.
-VTEC_ENGAGE_RPM = 5800.0
-
-# How long fuel takes to go from full to empty in the bench cycle.
-FUEL_CYCLE_SECONDS = 900.0
 
 # ============ MODELS ============
-
-class VehicleSignals(BaseModel):
-    rpm: float = 900.0
-    speed_mph: float = 0.0
-    gear: int = 0  # -1=R, 0=N, 1..6 forward
-    fuel_pct: float = 1.0
-    coolant_temp_c: float = 25.0
-    oil_pressure_psi: float = 40.0
-    battery_voltage: float = 12.6
-    # Available from KPro CAN, previously absent from the backend.
-    # boost_psi and ac_on were already in the frontend's DEFAULT_SIGNALS
-    # but nothing ever sent them.
-    intake_air_temp_c: float = 25.0
-    throttle_pct: float = 0.0
-    map_kpa: float = 30.0
-    boost_psi: float = 0.0
-    vtec_active: bool = False
-    ac_on: bool = False
-    turn_left: bool = False
-    turn_right: bool = False
-    check_engine: bool = False
-    maintenance: bool = False
-    oil_pressure_warning: bool = False
-    low_fuel: bool = False
-    high_coolant: bool = False
-    abs_warning: bool = False
-    airbag_warning: bool = False
-    brake_warning: bool = False
-    headlights: bool = False
-    high_beams: bool = False
 
 class ThemeConfig(BaseModel):
     id: str
@@ -88,7 +106,6 @@ class UserSettings(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     theme_id: str = "type_r"
-    data_source: str = "simulation"  # simulation, obd1, or obd2
     performance_mode: str = "high_performance"  # high_performance or low_performance
     units: str = "imperial"  # imperial or metric
     gauge_style: str = "modern"  # modern, classic, minimal
@@ -102,7 +119,6 @@ class UserSettings(BaseModel):
 
 class UserSettingsUpdate(BaseModel):
     theme_id: Optional[str] = None
-    data_source: Optional[str] = None
     performance_mode: Optional[str] = None
     units: Optional[str] = None
     gauge_style: Optional[str] = None
@@ -112,71 +128,6 @@ class UserSettingsUpdate(BaseModel):
     brightness: Optional[int] = None
     show_diagnostics: Optional[bool] = None
     custom_gauges: Optional[Dict[str, Any]] = None
-
-# ============ SIGNAL PROVENANCE ============
-# Where each field will actually come from once the car is running.
-# The simulator produces all of them, which is exactly why a green
-# bench test was misleading: it made body-electrical and analog-sender
-# signals look as real as ECU data.
-
-class SignalOrigin(str, Enum):
-    ECU_CAN = "ecu_can"            # Hondata KPro CAN broadcast
-    KPRO_ANALOG = "kpro_analog"    # sender wired to a KPro analog input
-    BODY_GPIO = "body_gpio"        # 12V body circuit into Pi GPIO
-    DERIVED = "derived"            # computed from another signal
-    UNAVAILABLE = "unavailable"    # no source identified yet
-
-SIGNAL_SOURCES: Dict[str, Dict[str, str]] = {
-    "rpm":               {"origin": SignalOrigin.ECU_CAN, "detail": "0x660"},
-    "speed_mph":         {"origin": SignalOrigin.ECU_CAN, "detail": "0x660 (kph)"},
-    "gear":              {"origin": SignalOrigin.ECU_CAN, "detail": "0x660"},
-    "battery_voltage":   {"origin": SignalOrigin.ECU_CAN, "detail": "0x660 (volt/10)"},
-    "intake_air_temp_c": {"origin": SignalOrigin.ECU_CAN, "detail": "0x661 IAT"},
-    "coolant_temp_c":    {"origin": SignalOrigin.ECU_CAN, "detail": "0x661 ECT"},
-    "check_engine":      {"origin": SignalOrigin.ECU_CAN, "detail": "0x661 MIL"},
-    "vtec_active":       {"origin": SignalOrigin.ECU_CAN, "detail": "0x661 VTS"},
-    "throttle_pct":      {"origin": SignalOrigin.ECU_CAN, "detail": "0x662 TPS"},
-    "map_kpa":           {"origin": SignalOrigin.ECU_CAN, "detail": "0x662 MAP"},
-
-    "boost_psi":         {"origin": SignalOrigin.DERIVED, "detail": "from map_kpa"},
-    "low_fuel":          {"origin": SignalOrigin.DERIVED, "detail": "fuel_pct"},
-    "high_coolant":      {"origin": SignalOrigin.DERIVED, "detail": "coolant_temp_c"},
-    "oil_pressure_warning": {"origin": SignalOrigin.DERIVED, "detail": "oil_pressure_psi"},
-
-    # Not present anywhere in the Hondata CAN spec. These need senders
-    # wired into KPro analog inputs, broadcast on 0x667 / 0x668.
-    "fuel_pct":          {"origin": SignalOrigin.KPRO_ANALOG, "detail": "sender not yet wired"},
-    "oil_pressure_psi":  {"origin": SignalOrigin.KPRO_ANALOG, "detail": "sender not yet wired"},
-
-    # Body electrical. 12V switched circuits, needs optocouplers to GPIO.
-    "turn_left":         {"origin": SignalOrigin.BODY_GPIO, "detail": "not yet wired"},
-    "turn_right":        {"origin": SignalOrigin.BODY_GPIO, "detail": "not yet wired"},
-    "headlights":        {"origin": SignalOrigin.BODY_GPIO, "detail": "not yet wired"},
-    "high_beams":        {"origin": SignalOrigin.BODY_GPIO, "detail": "not yet wired"},
-    "brake_warning":     {"origin": SignalOrigin.BODY_GPIO, "detail": "not yet wired"},
-    "abs_warning":       {"origin": SignalOrigin.BODY_GPIO, "detail": "ABS module, not yet wired"},
-    "airbag_warning":    {"origin": SignalOrigin.BODY_GPIO, "detail": "SRS module, not yet wired"},
-    "ac_on":             {"origin": SignalOrigin.BODY_GPIO, "detail": "not yet wired"},
-
-    "maintenance":       {"origin": SignalOrigin.UNAVAILABLE, "detail": "no source identified"},
-}
-
-# Raw signals get overridden before warnings are derived, so forcing
-# coolant_temp_c to 118 makes high_coolant come true the same way the
-# real car would. Flags with no underlying signal are forced directly.
-RAW_SIGNAL_FIELDS = {
-    "rpm", "speed_mph", "gear", "fuel_pct", "coolant_temp_c",
-    "oil_pressure_psi", "battery_voltage", "intake_air_temp_c",
-    "throttle_pct", "map_kpa",
-}
-
-DERIVED_FLAG_FIELDS = {"low_fuel", "high_coolant", "oil_pressure_warning", "boost_psi", "vtec_active"}
-
-LAMP_TEST_FIELDS = [
-    "check_engine", "maintenance", "oil_pressure_warning", "low_fuel",
-    "high_coolant", "abs_warning", "airbag_warning", "brake_warning",
-    "turn_left", "turn_right", "headlights", "high_beams",
-]
 
 # ============ THEMES ============
 
@@ -204,159 +155,6 @@ THEMES = {
     )
 }
 
-# ============ VEHICLE DATA SIMULATION ============
-
-class VehicleSimulator:
-    """Bench harness. Its job is to let every gauge and every warning
-    lamp be exercised without the engine, so that when CAN is wired in
-    the wiring is the only untested variable."""
-
-    def __init__(self):
-        self.t0 = time.time()
-        self.last_update = self.t0
-        self.last_blink = 0.0
-        self.blink_state = False
-        self.signals = VehicleSignals()
-        self.overrides: Dict[str, Any] = {}
-        self.lamp_test_until: float = 0.0
-
-    def update(self) -> VehicleSignals:
-        now = time.time()
-        t = now - self.t0
-
-        # Integrate against real elapsed time. This used to be a fixed
-        # 1/60 regardless of how often update() was actually called,
-        # so coolant warmed at a rate that depended on how many
-        # clients happened to be polling.
-        dt = min(max(now - self.last_update, 0.0), 0.25)
-        self.last_update = now
-
-        # Simulate driving pattern
-        load = (math.sin(t * 0.15 - math.pi / 2) * 0.5) + 0.5
-
-        # Speed and RPM
-        self.signals.speed_mph = max(0.0, load * 120.0)
-        self.signals.rpm = max(900.0, min(8000.0, 1200.0 + self.signals.speed_mph * 55 + load * 1200))
-
-        # Gear selection based on speed
-        sp = self.signals.speed_mph
-        if sp < 3:
-            self.signals.gear = 0
-        elif sp < 30:
-            self.signals.gear = 1
-        elif sp < 50:
-            self.signals.gear = 2
-        elif sp < 70:
-            self.signals.gear = 3
-        elif sp < 95:
-            self.signals.gear = 4
-        elif sp < 120:
-            self.signals.gear = 5
-        else:
-            self.signals.gear = 6
-
-        # Fuel: sawtooth rather than a one-way drain. The old version
-        # hit zero after ~17 minutes and stayed there, so LOW FUEL was
-        # permanently lit on a kiosk that runs for hours and the lamp
-        # could never be observed switching on.
-        self.signals.fuel_pct = 1.0 - ((t / FUEL_CYCLE_SECONDS) % 1.0)
-
-        # Coolant temperature based on load. Stays in the healthy band
-        # on purpose - overheat is reachable through injection, not by
-        # a car that is running correctly.
-        coolant_target = 35.0 + load * 45.0 + (self.signals.speed_mph / 170.0) * 8.0
-        coolant_target = max(20.0, min(98.0, coolant_target))
-        self.signals.coolant_temp_c += (coolant_target - self.signals.coolant_temp_c) * 0.35 * dt
-
-        # Intake air temp trends with load
-        self.signals.intake_air_temp_c = 25.0 + load * 20.0
-
-        # Throttle and manifold pressure (naturally aspirated K-series:
-        # high vacuum at idle, approaching atmospheric at WOT)
-        self.signals.throttle_pct = min(100.0, load * 100.0)
-        self.signals.map_kpa = 30.0 + load * 71.0
-
-        # Oil pressure based on RPM
-        self.signals.oil_pressure_psi = 20 + (self.signals.rpm / 8000) * 60
-
-        # Battery voltage (simulate charging)
-        self.signals.battery_voltage = 12.6 + (self.signals.rpm / 8000) * 1.8
-
-        # Turn signal simulation
-        phase = t % 20.0
-        left_req = 5.0 <= phase < 10.0
-        right_req = 10.0 <= phase < 15.0
-        hazard_req = phase >= 18.0
-
-        if (now - self.last_blink) > 0.5:
-            self.blink_state = not self.blink_state
-            self.last_blink = now
-
-        self.signals.turn_left = (left_req or hazard_req) and self.blink_state
-        self.signals.turn_right = (right_req or hazard_req) and self.blink_state
-
-        # Lights
-        self.signals.headlights = True
-        self.signals.high_beams = sp > 60
-        self.signals.ac_on = (t % 60.0) < 30.0
-
-        self._apply_raw_overrides()
-        self._derive()
-        self._apply_flag_overrides()
-        self._apply_lamp_test(now)
-
-        return self.signals
-
-    def _apply_raw_overrides(self):
-        for key, value in self.overrides.items():
-            if key in RAW_SIGNAL_FIELDS:
-                setattr(self.signals, key, value)
-
-    def _derive(self):
-        """Everything computed from a raw signal lives here, so the
-        simulator and the future CAN source can share it."""
-        self.signals.low_fuel = self.signals.fuel_pct <= LOW_FUEL_PCT
-        self.signals.high_coolant = self.signals.coolant_temp_c >= COOLANT_WARN_C
-        self.signals.oil_pressure_warning = self.signals.oil_pressure_psi < OIL_PRESSURE_WARN_PSI
-        self.signals.vtec_active = self.signals.rpm >= VTEC_ENGAGE_RPM
-        self.signals.boost_psi = (self.signals.map_kpa - 101.3) * 0.145038
-
-    def _apply_flag_overrides(self):
-        for key, value in self.overrides.items():
-            if key not in RAW_SIGNAL_FIELDS:
-                setattr(self.signals, key, value)
-
-    def _apply_lamp_test(self, now: float):
-        if now < self.lamp_test_until:
-            for field in LAMP_TEST_FIELDS:
-                setattr(self.signals, field, True)
-
-    # ---- injection control ----
-
-    def set_overrides(self, overrides: Dict[str, Any]) -> Dict[str, Any]:
-        valid = VehicleSignals.model_fields.keys()
-        unknown = [k for k in overrides if k not in valid]
-        if unknown:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unknown signal(s): {', '.join(sorted(unknown))}"
-            )
-        self.overrides.update(overrides)
-        return self.overrides
-
-    def clear_overrides(self, fields: Optional[List[str]] = None) -> Dict[str, Any]:
-        if fields is None:
-            self.overrides.clear()
-        else:
-            for field in fields:
-                self.overrides.pop(field, None)
-        return self.overrides
-
-    def start_lamp_test(self, seconds: float):
-        self.lamp_test_until = time.time() + seconds
-
-simulator = VehicleSimulator()
-
 # ============ API ROUTES ============
 
 @api_router.get("/")
@@ -365,8 +163,18 @@ async def root():
 
 @api_router.get("/vehicle-data", response_model=VehicleSignals)
 async def get_vehicle_data():
-    """Get current vehicle signals (simulated)"""
-    return simulator.update()
+    """Latest signals from whichever source is running."""
+    return snapshot.get()
+
+@api_router.get("/source-status")
+async def get_source_status():
+    """What is feeding the dash, and whether it is still alive."""
+    return {
+        "source": signal_source.status(),
+        "fresh": snapshot.is_fresh,
+        "age_seconds": snapshot.age_seconds,
+        "sequence": snapshot.sequence,
+    }
 
 @api_router.get("/signal-sources")
 async def get_signal_sources():
@@ -404,9 +212,7 @@ async def get_settings():
         if isinstance(settings.get('updated_at'), str):
             settings['updated_at'] = datetime.fromisoformat(settings['updated_at'])
         return UserSettings(**settings)
-    # Return default settings
-    default = UserSettings()
-    return default
+    return UserSettings()
 
 @api_router.post("/settings", response_model=UserSettings)
 async def save_settings(settings_update: UserSettingsUpdate):
@@ -444,15 +250,24 @@ class LampTestRequest(BaseModel):
 
 @api_router.post("/sim/inject")
 async def inject_signals(request: InjectRequest):
-    active = simulator.set_overrides(request.overrides)
+    simulator = require_simulator()
+    try:
+        active = simulator.set_overrides(request.overrides)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     return {"status": "ok", "overrides": active}
 
 @api_router.get("/sim/overrides")
 async def get_overrides():
-    return {"overrides": simulator.overrides, "lamp_test_active": time.time() < simulator.lamp_test_until}
+    simulator = require_simulator()
+    return {
+        "overrides": simulator.overrides,
+        "lamp_test_active": time.time() < simulator.lamp_test_until,
+    }
 
 @api_router.post("/sim/clear")
 async def clear_overrides(request: ClearRequest):
+    simulator = require_simulator()
     remaining = simulator.clear_overrides(request.fields)
     return {"status": "ok", "overrides": remaining}
 
@@ -460,13 +275,14 @@ async def clear_overrides(request: ClearRequest):
 async def lamp_test(request: LampTestRequest):
     """Light every warning lamp at once so the whole panel can be
     confirmed in a single look."""
+    simulator = require_simulator()
     simulator.start_lamp_test(request.seconds)
     return {"status": "ok", "seconds": request.seconds, "fields": LAMP_TEST_FIELDS}
 
 @api_router.get("/diagnostics")
 async def get_diagnostics():
     """Get detailed diagnostics data (OBD scanner style)"""
-    signals = simulator.update()
+    signals = snapshot.get()
     return {
         "engine": {
             "rpm": round(signals.rpm, 0),
@@ -498,18 +314,27 @@ async def get_diagnostics():
             "oil_temp_c": round(80 + (signals.rpm / 8000) * 30, 1),
         },
         "dtc_codes": [] if not signals.check_engine else ["P0118 - Coolant Temp High"],
+        "source": signal_source.status(),
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
 # WebSocket for real-time data
 @api_router.websocket("/ws/vehicle-data")
 async def websocket_vehicle_data(websocket: WebSocket):
+    """Push on change rather than on a timer.
+
+    Hondata transmits at 100Hz cycling through packets, so any one
+    channel lands roughly every 70ms. Sending at a fixed 60Hz would
+    mean repeating unchanged values most of the time.
+    """
     await websocket.accept()
+    last_sequence = -1
     try:
         while True:
-            data = simulator.update()
-            await websocket.send_json(data.model_dump())
-            await asyncio.sleep(1.0 / 60.0)
+            if snapshot.sequence != last_sequence:
+                last_sequence = snapshot.sequence
+                await websocket.send_json(snapshot.get().model_dump())
+            await asyncio.sleep(0.005)
     except WebSocketDisconnect:
         pass
 
@@ -581,7 +406,6 @@ class DHUController:
         if self.is_running():
             return {"status": "running", "message": "Android Auto already running"}
 
-        # Find available implementation
         impl = self.get_available_implementation()
 
         if not impl:
@@ -591,11 +415,9 @@ class DHUController:
             }
 
         try:
-            # Set display environment
             env = os.environ.copy()
             env['DISPLAY'] = ':0'
 
-            # Launch subprocess
             self.process = subprocess.Popen(
                 [impl["bin"]],
                 stdout=subprocess.PIPE,
@@ -605,10 +427,7 @@ class DHUController:
                 preexec_fn=os.setsid
             )
 
-            # Wait for window to appear
             await asyncio.sleep(2.0)
-
-            # Find and configure OpenAuto window
             await self._configure_window(x, y, width, height, borderless)
 
             return {"status": "running", "message": "OpenAuto started successfully", "pid": self.process.pid}
@@ -731,7 +550,7 @@ class DHUController:
 # Global DHU controller instance
 dhu_controller = DHUController()
 
-# ============ DEVICE PREFERENCES (MongoDB) — kept for Saved Devices UI ============
+# ============ DEVICE PREFERENCES (MongoDB) ============
 
 class DevicePreferences(BaseModel):
     serial: str = ""
@@ -826,14 +645,3 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()
