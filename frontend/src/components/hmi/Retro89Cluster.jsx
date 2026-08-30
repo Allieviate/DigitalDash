@@ -1,5 +1,5 @@
-import React from 'react';
-import { useVehicleData } from '../../contexts/VehicleDataContext';
+import React, { useMemo } from 'react';
+import { useVehicleSignal } from '../../contexts/VehicleDataContext';
 
 const DEG = Math.PI / 180;
 const polar = (cx, cy, r, angleDeg) => ({
@@ -13,37 +13,103 @@ const GAUGE_BG = {
   speedo: '/assets/gauges/spd-gauge.png',
 };
 
+// Gauge face geometry. Matches the PNG bezel: 240 degree sweep from
+// the 7:30 position to the 1:30 position.
+const CX = 50;
+const CY = 50;
+const START_ANGLE = 150;
+const END_ANGLE = 390;
+const SWEEP = END_ANGLE - START_ANGLE;
+
+const R_TICK = 44;        // outer edge of ticks — aligned to PNG bezel
+const R_TICK_MAJOR = 38;  // inner edge of major ticks
+const R_TICK_MINOR = 41;  // inner edge of minor ticks
+const R_NUM = 32;         // number position radius — matches PNG
+
+const MINOR_PER_MAJOR = 4;
+
 function GaugePod({ value, max, ticks, unit, redlineStart, id, showDigitalValue, vtecRange }) {
-  const cx = 50, cy = 50;
-  // Match PNG gauge face: 240° sweep from 7:30 to 1:30 position
-  const startAngle = 150;   // 7:30 position (was 135)
-  const endAngle = 390;     // 1:30 position (was 405)
-  const sweep = endAngle - startAngle; // 240° (was 270°)
-
-  const rTick = 44;       // outer edge of ticks — aligned to PNG bezel
-  const rTickMajor = 38;  // inner edge of major ticks
-  const rTickMinor = 41;  // inner edge of minor ticks
-  const rNum = 32;        // number position radius — pushed outward to match PNG
-
   const bgSrc = GAUGE_BG[id];
 
   // Needle angle
   const clamped = Math.min(Math.max(value, 0), max);
-  const needleAngle = startAngle + (clamped / max) * sweep;
+  const needleAngle = START_ANGLE + (clamped / max) * SWEEP;
 
-  // Redline angle
-  const redlineAngle = redlineStart !== undefined
-    ? startAngle + (redlineStart / max) * sweep
-    : endAngle + 1;
+  // Ticks never move. They were being rebuilt on every render, which
+  // at streaming rates meant roughly 50 SVG nodes per gauge recreated
+  // and reconciled per frame, purely so the needle could rotate.
+  //
+  // ticks arrives as an inline array literal from the parent, so its
+  // identity changes every render. Keying the memo on the joined
+  // string makes it stable by content instead.
+  const ticksKey = ticks.join(',');
+  const tickValues = useMemo(() => ticksKey.split(',').map(Number), [ticksKey]);
 
-  // Major ticks
-  const majorCount = ticks.length;
-  const majorStep = sweep / (majorCount - 1);
+  const { minorTickEls, majorTickEls } = useMemo(() => {
+    const majorCount = tickValues.length;
+    const majorStep = SWEEP / (majorCount - 1);
+    const totalMinor = (majorCount - 1) * MINOR_PER_MAJOR;
+    const minorStep = SWEEP / totalMinor;
 
-  // Minor ticks (4 between each major)
-  const minorPerMajor = 4;
-  const totalMinor = (majorCount - 1) * minorPerMajor;
-  const minorStep = sweep / totalMinor;
+    const redlineAngle = redlineStart !== undefined
+      ? START_ANGLE + (redlineStart / max) * SWEEP
+      : END_ANGLE + 1;
+
+    const minors = [];
+    for (let i = 0; i <= totalMinor; i += 1) {
+      if (i % MINOR_PER_MAJOR === 0) continue;
+      const angle = START_ANGLE + i * minorStep;
+      const inRedline = angle >= redlineAngle;
+      const outer = polar(CX, CY, R_TICK, angle);
+      const inner = polar(CX, CY, R_TICK_MINOR, angle);
+      minors.push(
+        <line
+          key={`mi-${i}`}
+          x1={outer.x} y1={outer.y}
+          x2={inner.x} y2={inner.y}
+          stroke={inRedline ? '#dc2626' : 'rgba(255,255,255,0.6)'}
+          strokeWidth="0.4"
+        />
+      );
+    }
+
+    const majors = tickValues.map((tickVal, i) => {
+      const angle = START_ANGLE + i * majorStep;
+      const inRedline = angle >= redlineAngle;
+      const outer = polar(CX, CY, R_TICK, angle);
+      const inner = polar(CX, CY, R_TICK_MAJOR, angle);
+      const numPos = polar(CX, CY, R_NUM, angle);
+
+      const fontSize = String(tickVal).length >= 3 ? '5px' : '6.5px';
+
+      return (
+        <g key={`ma-${i}`}>
+          <line
+            x1={outer.x} y1={outer.y}
+            x2={inner.x} y2={inner.y}
+            stroke={inRedline ? '#dc2626' : '#f0f0f0'}
+            strokeWidth="1.1"
+          />
+          <text
+            x={numPos.x}
+            y={numPos.y}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fill={inRedline ? '#dc2626' : '#f0f0f0'}
+            style={{
+              fontSize,
+              fontFamily: "'Orbitron', sans-serif",
+              fontWeight: 500,
+            }}
+          >
+            {tickVal}
+          </text>
+        </g>
+      );
+    });
+
+    return { minorTickEls: minors, majorTickEls: majors };
+  }, [tickValues, max, redlineStart]);
 
   // VTEC state
   const inVtec = vtecRange && value >= vtecRange.start && value <= vtecRange.end;
@@ -75,63 +141,15 @@ function GaugePod({ value, max, ticks, unit, redlineStart, id, showDigitalValue,
       )}
 
       {/* Minor ticks */}
-      {[...Array(totalMinor + 1)].map((_, i) => {
-        const angle = startAngle + i * minorStep;
-        if (i % minorPerMajor === 0) return null;
-        const inRedline = angle >= redlineAngle;
-        const outer = polar(cx, cy, rTick, angle);
-        const inner = polar(cx, cy, rTickMinor, angle);
-        return (
-          <line
-            key={`mi-${i}`}
-            x1={outer.x} y1={outer.y}
-            x2={inner.x} y2={inner.y}
-            stroke={inRedline ? '#dc2626' : 'rgba(255,255,255,0.6)'}
-            strokeWidth="0.4"
-          />
-        );
-      })}
+      {minorTickEls}
 
       {/* Major ticks + numbers */}
-      {ticks.map((tickVal, i) => {
-        const angle = startAngle + i * majorStep;
-        const inRedline = angle >= redlineAngle;
-        const outer = polar(cx, cy, rTick, angle);
-        const inner = polar(cx, cy, rTickMajor, angle);
-        const numPos = polar(cx, cy, rNum, angle);
-
-        const fontSize = String(tickVal).length >= 3 ? '5px' : '6.5px';
-
-        return (
-          <g key={`ma-${i}`}>
-            <line
-              x1={outer.x} y1={outer.y}
-              x2={inner.x} y2={inner.y}
-              stroke={inRedline ? '#dc2626' : '#f0f0f0'}
-              strokeWidth="1.1"
-            />
-            <text
-              x={numPos.x}
-              y={numPos.y}
-              textAnchor="middle"
-              dominantBaseline="central"
-              fill={inRedline ? '#dc2626' : '#f0f0f0'}
-              style={{
-                fontSize,
-                fontFamily: "'Orbitron', sans-serif",
-                fontWeight: 500,
-              }}
-            >
-              {tickVal}
-            </text>
-          </g>
-        );
-      })}
+      {majorTickEls}
 
       {/* Unit label at bottom center */}
       <text
-        x={cx}
-        y={cy + 25}
+        x={CX}
+        y={CY + 25}
         textAnchor="middle"
         fill="rgba(255,255,255,0.35)"
         style={{
@@ -146,8 +164,8 @@ function GaugePod({ value, max, ticks, unit, redlineStart, id, showDigitalValue,
       {/* VTEC indicator — inside gauge face */}
       {inVtec && (
         <text
-          x={cx}
-          y={cy - 8}
+          x={CX}
+          y={CY - 8}
           textAnchor="middle"
           dominantBaseline="central"
           fill="#FF0000"
@@ -168,8 +186,8 @@ function GaugePod({ value, max, ticks, unit, redlineStart, id, showDigitalValue,
       {/* Digital value readout — inside gauge face */}
       {showDigitalValue && (
         <text
-          x={cx}
-          y={cy + 14}
+          x={CX}
+          y={CY + 14}
           textAnchor="middle"
           dominantBaseline="central"
           fill="rgba(255,255,255,0.9)"
@@ -186,15 +204,18 @@ function GaugePod({ value, max, ticks, unit, redlineStart, id, showDigitalValue,
         </text>
       )}
 
-      {/* Needle — uses CSS transform: rotate() for smooth animation */}
+      {/* Needle — uses CSS transform: rotate() for smooth animation.
+          The 100ms transition is deliberate: Hondata cycles its packets
+          at 100Hz across ten IDs, so rpm lands roughly every 70ms and
+          the transition interpolates between arrivals. */}
       <line
-        x1={cx - 5} y1={cy}
-        x2={cx + 40} y2={cy}
+        x1={CX - 5} y1={CY}
+        x2={CX + 40} y2={CY}
         stroke="#f0f0f0"
         strokeWidth="1.3"
         strokeLinecap="round"
         style={{
-          transformOrigin: `${cx}px ${cy}px`,
+          transformOrigin: `${CX}px ${CY}px`,
           transform: `rotate(${needleAngle}deg)`,
           transition: 'transform 100ms ease-out',
           willChange: 'transform',
@@ -202,15 +223,14 @@ function GaugePod({ value, max, ticks, unit, redlineStart, id, showDigitalValue,
       />
 
       {/* Center hub cap */}
-      <circle cx={cx} cy={cy} r={3.5} fill="#333" stroke="#555" strokeWidth="0.4" />
+      <circle cx={CX} cy={CY} r={3.5} fill="#333" stroke="#555" strokeWidth="0.4" />
     </svg>
   );
 }
 
 export default function Retro89Cluster() {
-  const { signals } = useVehicleData();
-  const rpm = signals.rpm || 0;
-  const speed = signals.speed_mph || 0;
+  const rpm = useVehicleSignal('rpm') || 0;
+  const speed = useVehicleSignal('speed_mph') || 0;
 
   return (
     <div
