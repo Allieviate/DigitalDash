@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -7,93 +7,49 @@ import logging
 import asyncio
 import math
 import time
-from contextlib import asynccontextmanager
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone
-
-from signals import (
-    COOLANT_WARN_C,
-    LAMP_TEST_FIELDS,
-    LOW_FUEL_PCT,
-    OIL_PRESSURE_WARN_PSI,
-    SIGNAL_SOURCES,
-    VTEC_ENGAGE_RPM,
-    VehicleSignals,
-)
-from sources import (
-    SignalSnapshot,
-    SimulatorSource,
-    create_source,
-    run_source,
-)
+import json
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
-
-# Configure logging early so startup messages are not swallowed
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 # MongoDB connection - with safe fallbacks
 mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ.get('DB_NAME', 'frank_hmi')]
 
-# ============ SIGNAL SOURCE ============
-# Which source this Pi runs is a property of how it is deployed, not a
-# user preference, so it lives in backend/.env rather than in the
-# settings UI. A dash that silently reverts to simulated data because
-# someone cleared browser storage is a bad failure mode.
-#
-#   SIGNAL_SOURCE=simulation    bench
-#   SIGNAL_SOURCE=hondata_can   car (phase 3)
-
-SIGNAL_SOURCE = os.environ.get('SIGNAL_SOURCE', 'simulation')
-
-snapshot = SignalSnapshot()
-signal_source = create_source(SIGNAL_SOURCE)
-_source_task: Optional[asyncio.Task] = None
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global _source_task
-    _source_task = asyncio.create_task(run_source(signal_source, snapshot))
-    try:
-        yield
-    finally:
-        if _source_task is not None:
-            _source_task.cancel()
-            try:
-                await _source_task
-            except asyncio.CancelledError:
-                pass
-        client.close()
-
-
-app = FastAPI(lifespan=lifespan)
+# Create the main app
+app = FastAPI()
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
-
-def require_simulator():
-    """Injection only makes sense against the bench source."""
-    if not isinstance(signal_source, SimulatorSource):
-        raise HTTPException(
-            status_code=409,
-            detail=f"Signal source is {signal_source.name!r}; injection requires SIGNAL_SOURCE=simulation"
-        )
-    return signal_source.simulator
-
-
 # ============ MODELS ============
+
+class VehicleSignals(BaseModel):
+    rpm: float = 900.0
+    speed_mph: float = 0.0
+    gear: int = 0  # -1=R, 0=N, 1..6 forward
+    fuel_pct: float = 1.0
+    coolant_temp_c: float = 25.0
+    oil_pressure_psi: float = 40.0
+    battery_voltage: float = 12.6
+    turn_left: bool = False
+    turn_right: bool = False
+    check_engine: bool = False
+    maintenance: bool = False
+    oil_pressure_warning: bool = False
+    low_fuel: bool = False
+    high_coolant: bool = False
+    abs_warning: bool = False
+    airbag_warning: bool = False
+    brake_warning: bool = False
+    headlights: bool = False
+    high_beams: bool = False
 
 class ThemeConfig(BaseModel):
     id: str
@@ -106,6 +62,7 @@ class UserSettings(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     theme_id: str = "type_r"
+    data_source: str = "simulation"  # simulation, obd1, or obd2
     performance_mode: str = "high_performance"  # high_performance or low_performance
     units: str = "imperial"  # imperial or metric
     gauge_style: str = "modern"  # modern, classic, minimal
@@ -119,6 +76,7 @@ class UserSettings(BaseModel):
 
 class UserSettingsUpdate(BaseModel):
     theme_id: Optional[str] = None
+    data_source: Optional[str] = None
     performance_mode: Optional[str] = None
     units: Optional[str] = None
     gauge_style: Optional[str] = None
@@ -155,6 +113,86 @@ THEMES = {
     )
 }
 
+# ============ VEHICLE DATA SIMULATION ============
+
+class VehicleSimulator:
+    def __init__(self):
+        self.t0 = time.time()
+        self.last_blink = 0.0
+        self.blink_state = False
+        self.signals = VehicleSignals()
+        self.tick_seconds = 1.0 / 60.0
+    
+    def update(self) -> VehicleSignals:
+        t = time.time() - self.t0
+        dt = self.tick_seconds  # ~60fps
+        
+        # Simulate driving pattern
+        load = (math.sin(t * 0.15 - math.pi / 2) * 0.5) + 0.5
+        
+        # Speed and RPM
+        self.signals.speed_mph = max(0.0, load * 120.0)
+        self.signals.rpm = max(900.0, min(8000.0, 1200.0 + self.signals.speed_mph * 55 + load * 1200))
+        
+        # Gear selection based on speed
+        sp = self.signals.speed_mph
+        if sp < 3:
+            self.signals.gear = 0
+        elif sp < 30:
+            self.signals.gear = 1
+        elif sp < 50:
+            self.signals.gear = 2
+        elif sp < 70:
+            self.signals.gear = 3
+        elif sp < 95:
+            self.signals.gear = 4
+        elif sp < 120:
+            self.signals.gear = 5
+        else:
+            self.signals.gear = 6
+        
+        # Fuel consumption
+        self.signals.fuel_pct = max(0.0, 1.0 - (t * 0.001))
+        
+        # Coolant temperature based on load
+        coolant_target = 35.0 + load * 45.0 + (self.signals.speed_mph / 170.0) * 8.0
+        coolant_target = max(20.0, min(98.0, coolant_target))
+        self.signals.coolant_temp_c += (coolant_target - self.signals.coolant_temp_c) * 0.35 * dt
+        
+        # Oil pressure based on RPM
+        self.signals.oil_pressure_psi = 20 + (self.signals.rpm / 8000) * 60
+        
+        # Battery voltage (simulate charging)
+        self.signals.battery_voltage = 12.6 + (self.signals.rpm / 8000) * 1.8
+        
+        # Warning flags
+        self.signals.low_fuel = self.signals.fuel_pct <= 0.12
+        self.signals.high_coolant = self.signals.coolant_temp_c >= 110.0
+        self.signals.oil_pressure_warning = self.signals.oil_pressure_psi < 15
+        self.signals.check_engine = False
+        self.signals.maintenance = False
+        
+        # Turn signal simulation
+        phase = t % 20.0
+        left_req = 5.0 <= phase < 10.0
+        right_req = 10.0 <= phase < 15.0
+        hazard_req = phase >= 18.0
+        
+        if (time.time() - self.last_blink) > 0.5:
+            self.blink_state = not self.blink_state
+            self.last_blink = time.time()
+        
+        self.signals.turn_left = (left_req or hazard_req) and self.blink_state
+        self.signals.turn_right = (right_req or hazard_req) and self.blink_state
+        
+        # Lights
+        self.signals.headlights = True
+        self.signals.high_beams = sp > 60
+        
+        return self.signals
+
+simulator = VehicleSimulator()
+
 # ============ API ROUTES ============
 
 @api_router.get("/")
@@ -163,34 +201,8 @@ async def root():
 
 @api_router.get("/vehicle-data", response_model=VehicleSignals)
 async def get_vehicle_data():
-    """Latest signals from whichever source is running."""
-    return snapshot.get()
-
-@api_router.get("/source-status")
-async def get_source_status():
-    """What is feeding the dash, and whether it is still alive."""
-    return {
-        "source": signal_source.status(),
-        "fresh": snapshot.is_fresh,
-        "age_seconds": snapshot.age_seconds,
-        "sequence": snapshot.sequence,
-    }
-
-@api_router.get("/signal-sources")
-async def get_signal_sources():
-    """Where each signal will really come from once the car is running.
-
-    The dash should treat anything that is not ecu_can as unproven
-    until its sender or GPIO input is physically wired."""
-    return {
-        "sources": SIGNAL_SOURCES,
-        "thresholds": {
-            "low_fuel_pct": LOW_FUEL_PCT,
-            "coolant_warn_c": COOLANT_WARN_C,
-            "oil_pressure_warn_psi": OIL_PRESSURE_WARN_PSI,
-            "vtec_engage_rpm": VTEC_ENGAGE_RPM,
-        },
-    }
+    """Get current vehicle signals (simulated)"""
+    return simulator.update()
 
 @api_router.get("/themes", response_model=List[ThemeConfig])
 async def get_themes():
@@ -212,13 +224,15 @@ async def get_settings():
         if isinstance(settings.get('updated_at'), str):
             settings['updated_at'] = datetime.fromisoformat(settings['updated_at'])
         return UserSettings(**settings)
-    return UserSettings()
+    # Return default settings
+    default = UserSettings()
+    return default
 
 @api_router.post("/settings", response_model=UserSettings)
 async def save_settings(settings_update: UserSettingsUpdate):
     """Update user settings"""
     existing = await db.settings.find_one({}, {"_id": 0})
-
+    
     if existing:
         update_data = settings_update.model_dump(exclude_unset=True)
         update_data['updated_at'] = datetime.now(timezone.utc).isoformat()
@@ -234,65 +248,18 @@ async def save_settings(settings_update: UserSettingsUpdate):
         await db.settings.insert_one(doc)
         return new_settings
 
-# ============ BENCH FAULT INJECTION ============
-
-class InjectRequest(BaseModel):
-    """Force signals or flags to a value. Raw signals are applied
-    before warnings are derived, so injecting coolant_temp_c=118
-    lights the overheat lamp the same way the real car would."""
-    overrides: Dict[str, Any]
-
-class ClearRequest(BaseModel):
-    fields: Optional[List[str]] = None
-
-class LampTestRequest(BaseModel):
-    seconds: float = 10.0
-
-@api_router.post("/sim/inject")
-async def inject_signals(request: InjectRequest):
-    simulator = require_simulator()
-    try:
-        active = simulator.set_overrides(request.overrides)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    return {"status": "ok", "overrides": active}
-
-@api_router.get("/sim/overrides")
-async def get_overrides():
-    simulator = require_simulator()
-    return {
-        "overrides": simulator.overrides,
-        "lamp_test_active": time.time() < simulator.lamp_test_until,
-    }
-
-@api_router.post("/sim/clear")
-async def clear_overrides(request: ClearRequest):
-    simulator = require_simulator()
-    remaining = simulator.clear_overrides(request.fields)
-    return {"status": "ok", "overrides": remaining}
-
-@api_router.post("/sim/lamp-test")
-async def lamp_test(request: LampTestRequest):
-    """Light every warning lamp at once so the whole panel can be
-    confirmed in a single look."""
-    simulator = require_simulator()
-    simulator.start_lamp_test(request.seconds)
-    return {"status": "ok", "seconds": request.seconds, "fields": LAMP_TEST_FIELDS}
-
 @api_router.get("/diagnostics")
 async def get_diagnostics():
     """Get detailed diagnostics data (OBD scanner style)"""
-    signals = snapshot.get()
+    signals = simulator.update()
     return {
         "engine": {
             "rpm": round(signals.rpm, 0),
             "load": round((signals.rpm / 8000) * 100, 1),
             "coolant_temp_c": round(signals.coolant_temp_c, 1),
             "coolant_temp_f": round(signals.coolant_temp_c * 9/5 + 32, 1),
-            "intake_air_temp_c": round(signals.intake_air_temp_c, 1),
-            "throttle_position": round(signals.throttle_pct, 1),
-            "map_kpa": round(signals.map_kpa, 1),
-            "vtec_active": signals.vtec_active,
+            "intake_air_temp_c": round(25 + (signals.rpm / 8000) * 20, 1),
+            "throttle_position": round((signals.speed_mph / 120) * 100, 1),
         },
         "fuel": {
             "fuel_level_pct": round(signals.fuel_pct * 100, 1),
@@ -314,27 +281,18 @@ async def get_diagnostics():
             "oil_temp_c": round(80 + (signals.rpm / 8000) * 30, 1),
         },
         "dtc_codes": [] if not signals.check_engine else ["P0118 - Coolant Temp High"],
-        "source": signal_source.status(),
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
 # WebSocket for real-time data
 @api_router.websocket("/ws/vehicle-data")
 async def websocket_vehicle_data(websocket: WebSocket):
-    """Push on change rather than on a timer.
-
-    Hondata transmits at 100Hz cycling through packets, so any one
-    channel lands roughly every 70ms. Sending at a fixed 60Hz would
-    mean repeating unchanged values most of the time.
-    """
     await websocket.accept()
-    last_sequence = -1
     try:
         while True:
-            if snapshot.sequence != last_sequence:
-                last_sequence = snapshot.sequence
-                await websocket.send_json(snapshot.get().model_dump())
-            await asyncio.sleep(0.005)
+            data = simulator.update()
+            await websocket.send_json(data.model_dump())
+            await asyncio.sleep(simulator.tick_seconds)  # ~60fps
     except WebSocketDisconnect:
         pass
 
@@ -352,7 +310,7 @@ class DHUController:
     def __init__(self):
         self.process = None
         self.window_id = None
-
+        
         # Supported Android Auto implementations (in order of preference)
         self.implementations = [
             {
@@ -380,14 +338,14 @@ class DHUController:
                 "process_name": "autoapp"
             },
         ]
-
+        
     def get_available_implementation(self):
         """Find first available Android Auto implementation"""
         for impl in self.implementations:
             if os.path.exists(impl["check"]):
                 return impl
         return None
-
+        
     def is_running(self):
         if self.process is not None and self.process.poll() is None:
             return True
@@ -400,24 +358,27 @@ class DHUController:
             except Exception:
                 pass
         return False
-
+    
     async def start(self, x=640, y=200, width=640, height=480, borderless=True):
         """Launch Android Auto and configure window"""
         if self.is_running():
             return {"status": "running", "message": "Android Auto already running"}
-
+        
+        # Find available implementation
         impl = self.get_available_implementation()
-
+        
         if not impl:
             return {
                 "status": "error", 
                 "message": "Android Auto not installed. Run: sudo bash ~/projects/DigitalDash/scripts/install_openauto.sh"
             }
-
+        
         try:
+            # Set display environment
             env = os.environ.copy()
             env['DISPLAY'] = ':0'
-
+            
+            # Launch subprocess
             self.process = subprocess.Popen(
                 [impl["bin"]],
                 stdout=subprocess.PIPE,
@@ -426,31 +387,34 @@ class DHUController:
                 shell=impl["name"] == "web-auto-electron",
                 preexec_fn=os.setsid
             )
-
+            
+            # Wait for window to appear
             await asyncio.sleep(2.0)
+            
+            # Find and configure OpenAuto window
             await self._configure_window(x, y, width, height, borderless)
-
+            
             return {"status": "running", "message": "OpenAuto started successfully", "pid": self.process.pid}
-
+            
         except Exception as e:
             logger.error(f"Failed to start OpenAuto: {e}")
             return {"status": "error", "message": str(e)}
-
+    
     async def _configure_window(self, x, y, width, height, borderless):
         """Configure OpenAuto window position and style using X11 tools"""
         try:
             await asyncio.sleep(1.0)
-
+            
             result = subprocess.run(
                 ["wmctrl", "-l"],
                 capture_output=True,
                 text=True,
                 timeout=5
             )
-
+            
             window_id = None
             search_terms = ['openauto', 'autoapp', 'android auto', 'aasdk']
-
+            
             for line in result.stdout.splitlines():
                 line_lower = line.lower()
                 for term in search_terms:
@@ -459,7 +423,7 @@ class DHUController:
                         break
                 if window_id:
                     break
-
+            
             if not window_id:
                 if self.process:
                     try:
@@ -473,13 +437,13 @@ class DHUController:
                             window_id = result.stdout.strip().split('\n')[0]
                     except Exception:
                         pass
-
+            
             if not window_id:
                 logger.warning("Could not find OpenAuto window - it may need manual positioning")
                 return
-
+            
             self.window_id = window_id
-
+            
             if borderless:
                 subprocess.run(
                     ["xdotool", "windowmove", window_id, str(x), str(y)],
@@ -498,25 +462,25 @@ class DHUController:
                     ["wmctrl", "-i", "-r", window_id, "-e", f"0,{x},{y},{width},{height}"],
                     timeout=5
                 )
-
+            
             subprocess.run(
                 ["wmctrl", "-i", "-a", window_id],
                 timeout=5
             )
-
+            
             logger.info(f"OpenAuto window configured: {window_id} at ({x},{y}) {width}x{height}")
-
+            
         except FileNotFoundError:
             logger.warning("wmctrl/xdotool not installed. Run: sudo apt install wmctrl xdotool")
         except Exception as e:
             logger.error(f"Error configuring OpenAuto window: {e}")
-
+    
     async def stop(self):
         """Stop OpenAuto subprocess cleanly"""
         try:
             subprocess.run(['pkill', '-f', 'autoapp'], timeout=5)
             await asyncio.sleep(0.5)
-
+            
             if self.process is not None:
                 try:
                     os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
@@ -527,15 +491,15 @@ class DHUController:
                         self.process.wait(timeout=2)
                     except Exception:
                         pass
-
+            
             self.process = None
             self.window_id = None
             return {"status": "stopped", "message": "OpenAuto stopped successfully"}
-
+            
         except Exception as e:
             logger.error(f"Error stopping OpenAuto: {e}")
             return {"status": "error", "message": str(e)}
-
+    
     def get_status(self):
         """Get current OpenAuto status"""
         if self.is_running():
@@ -550,7 +514,7 @@ class DHUController:
 # Global DHU controller instance
 dhu_controller = DHUController()
 
-# ============ DEVICE PREFERENCES (MongoDB) ============
+# ============ DEVICE PREFERENCES (MongoDB) — kept for Saved Devices UI ============
 
 class DevicePreferences(BaseModel):
     serial: str = ""
@@ -645,3 +609,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    client.close()
