@@ -16,13 +16,18 @@ class gets constructed, not a rewrite of the request handling.
 import asyncio
 import logging
 import math
+import os
 import time
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
+from hondata_can import HONDATA_IDS, HondataDecoder
 from signals import (
+    COOLANT_WARN_C,
     FUEL_CYCLE_SECONDS,
     LAMP_TEST_FIELDS,
+    LOW_FUEL_PCT,
+    OIL_PRESSURE_WARN_PSI,
     RAW_SIGNAL_FIELDS,
     VTEC_ENGAGE_RPM,
     VehicleSignals,
@@ -234,13 +239,156 @@ class SimulatorSource(SignalSource):
         return self.simulator.update()
 
 
+# ============ HONDATA CAN ============
+
+class HondataCanSource(SignalSource):
+    """Reads Hondata KPro frames from a SocketCAN interface.
+
+    RECEIVE ONLY. Nothing in this class transmits, and nothing should
+    be added that does. The dash is a passive listener on a bus shared
+    with the engine management.
+
+    There is one exception that is not ours to make: CAN requires a
+    node to acknowledge frames at the bit level, and the controller
+    does that in hardware. Setting the interface to listen-only would
+    suppress even that, and with the dash as the only other node the
+    KPro would go unacknowledged, error-count, and drop to bus-off. So
+    the interface runs normally and the software stays silent.
+
+    Verify after a drive:  ip -details -statistics link show can0
+    The TX packet count should still be zero.
+    """
+
+    name = "hondata_can"
+
+    # A channel silent for this long is treated as gone, not quiet.
+    STALE_AFTER = 3.0
+
+    def __init__(self, channel: str = "can0", batch_limit: int = 32):
+        self.channel = channel
+        self.batch_limit = batch_limit
+        self.bus = None
+        self.decoder = HondataDecoder()
+        self.signals = VehicleSignals()
+        self.seen_fields: Set[str] = set()
+        self.last_frame_at: Optional[float] = None
+        self._model_fields = set(VehicleSignals.model_fields)
+
+    async def start(self) -> None:
+        import can
+
+        # Hardware acceptance filters. The MCP2515 drops anything that
+        # is not Hondata before it ever reaches Python.
+        filters = [
+            {"can_id": can_id, "can_mask": 0x7FF, "extended": False}
+            for can_id in HONDATA_IDS
+        ]
+        self.bus = can.interface.Bus(
+            channel=self.channel,
+            interface="socketcan",
+            can_filters=filters,
+        )
+        logger.info("Signal source: hondata_can on %s (receive only)", self.channel)
+
+    async def stop(self) -> None:
+        if self.bus is not None:
+            try:
+                self.bus.shutdown()
+            except Exception:
+                logger.exception("Error closing %s", self.channel)
+            self.bus = None
+
+    def _read_batch(self):
+        """Blocking read, drained in one go.
+
+        Hondata cycles through its packets at 100Hz, so frames arrive
+        in bursts. Draining a burst per call keeps thread handoffs to
+        a handful per second instead of one per frame.
+        """
+        messages = []
+        first = self.bus.recv(timeout=0.25)
+        if first is None:
+            return messages
+        messages.append(first)
+        while len(messages) < self.batch_limit:
+            nxt = self.bus.recv(timeout=0.0)
+            if nxt is None:
+                break
+            messages.append(nxt)
+        return messages
+
+    async def next_update(self) -> Optional[VehicleSignals]:
+        if self.bus is None:
+            await asyncio.sleep(0.5)
+            return None
+
+        messages = await asyncio.to_thread(self._read_batch)
+        if not messages:
+            return None
+
+        changed = False
+        for message in messages:
+            if self.decoder.feed(message.arbitration_id, bytes(message.data)):
+                changed = True
+
+        if not changed:
+            return None
+
+        self.last_frame_at = time.time()
+
+        for key, value in self.decoder.values.items():
+            if key in self._model_fields:
+                setattr(self.signals, key, value)
+                self.seen_fields.add(key)
+
+        self._derive_available()
+        return self.signals.model_copy()
+
+    def _derive_available(self) -> None:
+        """Only derive a warning whose input has actually arrived.
+
+        derive_warnings() would happily compute oil_pressure_warning
+        from VehicleSignals' 40 PSI default and report healthy oil
+        pressure on a car with no sender wired. Silence is honest
+        there; a confident green light is not.
+        """
+        if "coolant_temp_c" in self.seen_fields:
+            self.signals.high_coolant = self.signals.coolant_temp_c >= COOLANT_WARN_C
+
+        if "fuel_pct" in self.seen_fields:
+            self.signals.low_fuel = self.signals.fuel_pct <= LOW_FUEL_PCT
+
+        if "oil_pressure_psi" in self.seen_fields:
+            self.signals.oil_pressure_warning = (
+                self.signals.oil_pressure_psi < OIL_PRESSURE_WARN_PSI
+            )
+
+        if "map_kpa" in self.seen_fields:
+            self.signals.boost_psi = (self.signals.map_kpa - 101.3) * 0.145038
+
+    def status(self) -> Dict[str, Any]:
+        age = None
+        if self.last_frame_at is not None:
+            age = time.time() - self.last_frame_at
+        return {
+            "name": self.name,
+            "implemented": True,
+            "channel": self.channel,
+            "bus_open": self.bus is not None,
+            "receiving": age is not None and age < self.STALE_AFTER,
+            "seconds_since_frame": age,
+            "live_fields": sorted(self.seen_fields),
+            "decoder": self.decoder.stats(),
+        }
+
+
 class NullSource(SignalSource):
     """Produces nothing, on purpose.
 
-    Used when a source is configured that does not exist yet. Falling
-    back to the simulator here would be worse: the dash would show a
-    plausible coolant temp while the real engine cooks. A dead gauge
-    is honest, a lying gauge is not.
+    Used when a source is configured but cannot run. Falling back to
+    the simulator here would be worse: the dash would show a plausible
+    coolant temp while the real engine cooks. A dead gauge is honest,
+    a lying gauge is not.
     """
 
     implemented = False
@@ -271,7 +419,16 @@ def create_source(name: str) -> SignalSource:
         return SimulatorSource()
 
     if key in ("hondata_can", "can"):
-        return NullSource("hondata_can", "CAN decoder lands in phase 3")
+        try:
+            import can  # noqa: F401
+        except ImportError:
+            # Better a dead dash than one quietly running the
+            # simulator in front of a real engine.
+            return NullSource(
+                "hondata_can",
+                "python-can is not installed; rebuild the virtualenv",
+            )
+        return HondataCanSource(channel=os.environ.get("CAN_CHANNEL", "can0"))
 
     return NullSource(key, "unrecognised source name")
 
