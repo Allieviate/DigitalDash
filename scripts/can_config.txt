@@ -1,0 +1,41 @@
+# Waveshare 2-CH CAN HAT+ on Raspberry Pi 5
+#
+# Append to /boot/firmware/config.txt, then reboot.
+# Back the file up first:
+#   sudo cp /boot/firmware/config.txt /boot/firmware/config.txt.bak
+#
+# The [all] header matters. config.txt has conditional sections
+# ([pi4], [cm4], [pi5]) and lines fall under whichever header is
+# above them. Land inside a model-specific section and the overlays
+# silently never load.
+#
+# Order matters too: spi1-3cs has to initialise SPI1 before the
+# mcp2515 overlays try to claim chip selects.
+#
+# Pin values are from Waveshare's wiki for the HAT+ specifically. The
+# non-plus 2-CH CAN HAT uses different GPIOs, and mixing them up is
+# the usual reason no interface appears.
+#
+# speed=1000000 is not in Waveshare's version. It was added because
+# "MCP251x didn't enter in conf mode after reset" (err=110) is the
+# classic symptom of an SPI clock the controller cannot keep up with.
+
+[all]
+dtparam=spi=on
+dtoverlay=i2c0
+dtoverlay=spi1-3cs
+dtoverlay=mcp2515,spi1-1,oscillator=16000000,speed=1000000,interrupt=22
+dtoverlay=mcp2515,spi1-2,oscillator=16000000,speed=1000000,interrupt=13
+
+# Verify after reboot:
+#   ip -brief link show | grep -i can      both can0 and can1 listed
+#   dmesg | grep -i mcp                    two "successfully initialized"
+#
+# err=19  (ENODEV)    nothing answered on SPI. Check the per-channel
+#                     enable jumper and the interrupt pin.
+# err=110 (ETIMEDOUT) chip answers but will not reset. SPI speed or
+#                     a wrong oscillator value.
+#
+# Each channel has its own enable jumper. Turning one off makes that
+# controller fail to probe, and the failure follows the jumper rather
+# than the chip.
