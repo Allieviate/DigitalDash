@@ -11,6 +11,8 @@ import struct
 import pytest
 
 from hondata_can import (
+    GEAR_NEUTRAL_RAW,
+    GEAR_REVERSE_RAW,
     ID_ANALOG_LOW,
     ID_ENGINE,
     ID_KNOCK,
@@ -19,32 +21,69 @@ from hondata_can import (
     DecodeError,
     HondataDecoder,
     decode_frame,
+    translate_gear,
 )
 
 
-def engine_frame(rpm, speed_kph, gear, volts):
-    return struct.pack(">HHBB", rpm, speed_kph, gear, int(volts * 10))
+def engine_frame(rpm, speed_kph, gear_raw, volts):
+    return struct.pack(">HHBB", rpm, speed_kph, gear_raw, int(volts * 10))
 
 
 def temps_frame(iat, ect, mil, vtec):
     return struct.pack(">hhBB", iat, ect, 1 if mil else 0, 1 if vtec else 0)
 
 
+class TestGearEncoding:
+    """KPro indexes forward gears from zero and flags N and R."""
+
+    def test_raw_zero_is_first_gear(self):
+        assert translate_gear(0) == 1
+
+    def test_forward_gears_are_offset_by_one(self):
+        assert translate_gear(2) == 3
+        assert translate_gear(5) == 6
+
+    def test_neutral(self):
+        assert translate_gear(GEAR_NEUTRAL_RAW) == 0
+
+    def test_reverse(self):
+        assert translate_gear(GEAR_REVERSE_RAW) == -1
+
+    def test_zero_is_not_neutral(self):
+        """The trap: 0 looks like neutral but means first."""
+        assert translate_gear(0) != 0
+
+    def test_unknown_value_returns_none(self):
+        assert translate_gear(7) is None
+        assert translate_gear(200) is None
+
+
 class TestEnginePacket:
     def test_decodes_rpm_and_gear(self):
-        out = decode_frame(ID_ENGINE, engine_frame(4500, 88, 3, 14.2))
+        out = decode_frame(ID_ENGINE, engine_frame(4500, 88, 2, 14.2))
         assert out["rpm"] == 4500.0
         assert out["gear"] == 3
         assert out["battery_voltage"] == pytest.approx(14.2)
 
     def test_converts_kph_to_mph(self):
-        out = decode_frame(ID_ENGINE, engine_frame(3000, 100, 4, 13.8))
+        out = decode_frame(ID_ENGINE, engine_frame(3000, 100, 3, 13.8))
         assert out["speed_mph"] == pytest.approx(62.1371, abs=1e-3)
 
-    def test_idle(self):
-        out = decode_frame(ID_ENGINE, engine_frame(850, 0, 0, 13.9))
+    def test_idling_in_neutral(self):
+        out = decode_frame(ID_ENGINE, engine_frame(850, 0, GEAR_NEUTRAL_RAW, 13.9))
         assert out["rpm"] == 850.0
         assert out["speed_mph"] == 0.0
+        assert out["gear"] == 0
+
+    def test_backing_up(self):
+        out = decode_frame(ID_ENGINE, engine_frame(1400, 5, GEAR_REVERSE_RAW, 14.0))
+        assert out["gear"] == -1
+
+    def test_unknown_gear_omits_field(self):
+        """Better to hold the last gear than invent one."""
+        out = decode_frame(ID_ENGINE, engine_frame(3000, 60, 99, 14.0))
+        assert "gear" not in out
+        assert out["gear_raw"] == 99
 
     def test_short_frame_rejected(self):
         with pytest.raises(DecodeError):
@@ -97,10 +136,11 @@ class TestUnconsumedPackets:
 class TestDecoderAccumulation:
     def test_merges_packets_into_one_picture(self):
         d = HondataDecoder()
-        d.feed(ID_ENGINE, engine_frame(4500, 88, 3, 14.2), now=100.0)
+        d.feed(ID_ENGINE, engine_frame(4500, 88, 2, 14.2), now=100.0)
         d.feed(ID_TEMPS, temps_frame(35, 118, True, True), now=100.01)
 
         assert d.values["rpm"] == 4500.0
+        assert d.values["gear"] == 3
         assert d.values["coolant_temp_c"] == 118.0
         assert d.values["check_engine"] is True
         assert d.frames_decoded == 2
@@ -109,12 +149,19 @@ class TestDecoderAccumulation:
         """Packets arrive one at a time; earlier fields must survive."""
         d = HondataDecoder()
         d.feed(ID_TEMPS, temps_frame(35, 88, False, False), now=100.0)
-        d.feed(ID_ENGINE, engine_frame(6200, 120, 4, 14.0), now=100.01)
+        d.feed(ID_ENGINE, engine_frame(6200, 120, 3, 14.0), now=100.01)
         assert d.values["coolant_temp_c"] == 88.0
+
+    def test_holds_gear_through_unknown_value(self):
+        d = HondataDecoder()
+        d.feed(ID_ENGINE, engine_frame(4000, 70, 2, 14.0), now=100.0)
+        d.feed(ID_ENGINE, engine_frame(4100, 71, 99, 14.0), now=100.07)
+        assert d.values["gear"] == 3
+        assert d.unknown_gears == 1
 
     def test_tracks_staleness_per_packet(self):
         d = HondataDecoder()
-        d.feed(ID_ENGINE, engine_frame(900, 0, 0, 13.9), now=100.0)
+        d.feed(ID_ENGINE, engine_frame(900, 0, GEAR_NEUTRAL_RAW, 13.9), now=100.0)
         assert d.seconds_since(ID_ENGINE, now=100.5) == pytest.approx(0.5)
         assert d.seconds_since(ID_TEMPS, now=100.5) is None
 
