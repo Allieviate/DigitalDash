@@ -42,7 +42,18 @@ const DEFAULT_SIGNALS = {
   high_beams: false,
 };
 
-const FALLBACK_POLL_MS = 250;
+// Fallback polling rate.
+//
+// This was 250ms on the assumption the socket would almost always be
+// up and polling would be a rare stopgap. When the socket could not
+// connect, that assumption made the fallback the only path and the
+// needles moved four times a second - visibly choppy.
+//
+// Back to the 60Hz the dash was built around. It is more requests than
+// the websocket needs, but a fallback that looks broken is not a
+// fallback.
+const FALLBACK_POLL_MS = 1000 / 60;
+
 const SOURCE_STATUS_POLL_MS = 2000;
 
 const RECONNECT_BASE_MS = 500;
@@ -138,7 +149,8 @@ export const VehicleDataProvider = ({ children }) => {
 
   const signalStoreRef = useRef(null);
   const wsRef = useRef(null);
-  const pollIntervalRef = useRef(null);
+  const pollTimerRef = useRef(null);
+  const pollInFlightRef = useRef(false);
   const lastDataAtRef = useRef(0);
 
   if (!signalStoreRef.current) {
@@ -152,6 +164,10 @@ export const VehicleDataProvider = ({ children }) => {
   }, []);
 
   const fetchData = useCallback(async () => {
+    // At 60Hz a slow response would otherwise stack requests on top of
+    // each other until the Pi falls over.
+    if (pollInFlightRef.current) return;
+    pollInFlightRef.current = true;
     try {
       const response = await axios.get(`${API_URL}/api/vehicle-data`);
       signalStore.setState(response.data);
@@ -159,21 +175,23 @@ export const VehicleDataProvider = ({ children }) => {
       setConnectionError(null);
     } catch (error) {
       setConnectionError(error.message);
+    } finally {
+      pollInFlightRef.current = false;
     }
   }, [markData, signalStore]);
 
   const stopPolling = useCallback(() => {
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
     }
   }, []);
 
   const startPolling = useCallback(() => {
-    if (pollIntervalRef.current) return;
+    if (pollTimerRef.current) return;
     setTransport('polling');
     fetchData();
-    pollIntervalRef.current = setInterval(fetchData, FALLBACK_POLL_MS);
+    pollTimerRef.current = setInterval(fetchData, FALLBACK_POLL_MS);
   }, [fetchData]);
 
   // ---- liveness ----
