@@ -12,7 +12,7 @@ import './App.css';
 const HMIApp = () => {
   const [isBooting, setIsBooting] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
-  const { settings, isLoading } = useSettings();
+  const { settings } = useSettings();
 
   // Handle boot completion
   const handleBootComplete = () => {
@@ -28,12 +28,6 @@ const HMIApp = () => {
       document.documentElement.style.filter = '';
     };
   }, [settings.brightness]);
-
-  // Skip boot sequence if already loaded settings
-  useEffect(() => {
-    if (!isLoading && !isBooting) return;
-    // Could add logic here to skip boot on refresh
-  }, [isLoading, isBooting]);
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-black">
@@ -68,9 +62,13 @@ const HMIApp = () => {
 };
 
 function App() {
+  // SettingsProvider must be outside ThemeProvider. The theme is a
+  // stored setting, so the provider that reads it cannot sit above the
+  // provider that holds it - which is exactly why theme choice never
+  // survived a reload before.
   return (
-    <ThemeProvider>
-      <SettingsProvider>
+    <SettingsProvider>
+      <ThemeProvider>
         <VehicleDataProvider>
           <BrowserRouter>
             <Routes>
@@ -78,8 +76,8 @@ function App() {
             </Routes>
           </BrowserRouter>
         </VehicleDataProvider>
-      </SettingsProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </SettingsProvider>
   );
 }
 
