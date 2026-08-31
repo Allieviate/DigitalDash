@@ -1,5 +1,6 @@
 import React, { useState, useEffect, memo } from 'react';
 import { useVehicleSignal } from '../../contexts/VehicleDataContext';
+import { useSettingsSelector } from '../../contexts/SettingsContext';
 
 // Each widget subscribes only to the signal it draws.
 //
@@ -10,20 +11,66 @@ import { useVehicleSignal } from '../../contexts/VehicleDataContext';
 // the speed readout no longer redraws because coolant moved a tenth
 // of a degree.
 
-// Shift lights bar - 7 LEDs, ORANGISH-RED color
+const LIGHT_COUNT = 7;
+
+// Classic bar colour, unchanged.
+const CLASSIC_GRADIENT =
+  'radial-gradient(circle at 30% 30%, #FFCC4040 -20%, #FF6B35 60%, #E83A14 100%)';
+
+// Sequential ramp stops: green through amber into red.
+const RAMP_GREEN = [34, 197, 94];
+const RAMP_AMBER = [251, 191, 36];
+const RAMP_RED = [239, 68, 68];
+
+const mix = (a, b, t) => a.map((channel, i) => Math.round(channel + (b[i] - channel) * t));
+
+/**
+ * Colour for one LED by its position along the bar.
+ *
+ * First half ramps green into amber, second half amber into red, so
+ * the bar reads as a progression toward redline rather than seven
+ * identical lamps.
+ */
+const rampColor = (position, forceRed) => {
+  if (forceRed) return RAMP_RED;
+  if (position <= 0.5) return mix(RAMP_GREEN, RAMP_AMBER, position / 0.5);
+  return mix(RAMP_AMBER, RAMP_RED, (position - 0.5) / 0.5);
+};
+
+const rgb = ([r, g, b], alpha) =>
+  alpha === undefined ? `rgb(${r}, ${g}, ${b})` : `rgba(${r}, ${g}, ${b}, ${alpha})`;
+
+// Shift lights bar
 export const ShiftLightsBar = memo(({ className = '' }) => {
   const rpm = useVehicleSignal('rpm');
 
-  // Calculate opacity for each shift light based on RPM thresholds
+  // These three sliders live in Settings > Vehicle Parameters and,
+  // until now, were saved and never read. The bar hardcoded a light
+  // every 1000rpm starting at 1000, which meant lamps lit at idle,
+  // and flashed at a hardcoded 7600 that matched no setting.
+  const style = useSettingsSelector((s) => s.shift_light_style ?? 'classic');
+  const yellowShift = useSettingsSelector((s) => Number(s.yellow_shift) || 7000);
+  const redShift = useSettingsSelector((s) => Number(s.red_shift) || 7800);
+  const redline = useSettingsSelector((s) => Number(s.redline) || 8500);
+
+  const sequential = style === 'sequential';
+
+  // Lamps span stage 1 up to the hard redline, so the first lights at
+  // yellowShift and the last at redline.
+  const span = Math.max(redline - yellowShift, 1);
+  const step = span / (LIGHT_COUNT - 1);
+
+  const thresholdFor = (index) => yellowShift + step * index;
+
   const getLightOpacity = (index) => {
-    const threshold = (index + 1) * 1000;
-    const opacity = Math.min(Math.max((rpm - threshold) / 1000, 0), 1);
-    return opacity;
+    const threshold = thresholdFor(index);
+    // Fade in over the gap between this lamp and the previous one.
+    return Math.min(Math.max((rpm - threshold) / step + 1, 0), 1);
   };
 
-  // Flash at redline (7600+ RPM)
+  const isRedline = rpm >= redline;
+
   const [flashState, setFlashState] = useState(1);
-  const isRedline = rpm >= 7600;
 
   useEffect(() => {
     if (!isRedline) {
@@ -43,21 +90,47 @@ export const ShiftLightsBar = memo(({ className = '' }) => {
       className={`flex items-center justify-center gap-3 ${className}`}
       style={{ opacity: isRedline ? flashState : 1 }}
       data-testid="shift-lights-bar"
+      data-style={style}
     >
-      {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-        <div
-          key={i}
-          className="w-[28px] h-[28px] rounded-full transition-opacity duration-75"
-          style={{
-            opacity: getLightOpacity(i),
-            // ORANGISH-RED gradient
-            background: 'radial-gradient(circle at 30% 30%, #FFCC4040 -20%, #FF6B35 60%, #E83A14 100%)',
-            boxShadow: getLightOpacity(i) > 0.5 
-              ? '0 0 16px 5px rgba(255, 107, 53, 0.6)' 
-              : 'none'
-          }}
-        />
-      ))}
+      {Array.from({ length: LIGHT_COUNT }, (_, i) => {
+        const opacity = getLightOpacity(i);
+        const position = i / (LIGHT_COUNT - 1);
+
+        if (!sequential) {
+          return (
+            <div
+              key={i}
+              className="w-[28px] h-[28px] rounded-full transition-opacity duration-75"
+              style={{
+                opacity,
+                background: CLASSIC_GRADIENT,
+                boxShadow: opacity > 0.5
+                  ? '0 0 16px 5px rgba(255, 107, 53, 0.6)'
+                  : 'none',
+              }}
+            />
+          );
+        }
+
+        // Anything at or past stage 2 is full red regardless of where
+        // it sits on the ramp, so the slider stays meaningful.
+        const color = rampColor(position, thresholdFor(i) >= redShift);
+
+        return (
+          <div
+            key={i}
+            className="w-[28px] h-[28px] rounded-full transition-opacity duration-75"
+            style={{
+              // Unlit lamps keep a dim tint of their own colour so the
+              // bar reads as a bar rather than appearing out of thin
+              // air one lamp at a time.
+              background: `radial-gradient(circle at 30% 30%, ${rgb(color, 0.25 + opacity * 0.75)} -20%, ${rgb(color, 0.15 + opacity * 0.85)} 60%, ${rgb(color, 0.1 + opacity * 0.9)} 100%)`,
+              opacity: 0.12 + opacity * 0.88,
+              boxShadow: opacity > 0.5 ? `0 0 16px 5px ${rgb(color, 0.55)}` : 'none',
+            }}
+          />
+        );
+      })}
     </div>
   );
 });
