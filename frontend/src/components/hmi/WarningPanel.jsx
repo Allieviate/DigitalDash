@@ -9,6 +9,7 @@ import {
   CircleDot
 } from 'lucide-react';
 import { useVehicleData } from '../../contexts/VehicleDataContext';
+import { useSettingsSelector } from '../../contexts/SettingsContext';
 
 const WARNING_CONFIG = {
   check_engine: {
@@ -56,11 +57,26 @@ const WARNING_CONFIG = {
 };
 
 export const WarningLight = ({ type, active, className = '' }) => {
+  // Off by default. The chip around each lamp was always drawn, lit or
+  // not, which reads as a row of empty boxes rather than as tell-tales.
+  const showChrome = useSettingsSelector((s) => Boolean(s.mil_borders));
+
   const config = WARNING_CONFIG[type];
   if (!config) return null;
   
   const Icon = config.icon;
-  
+
+  // The border stays in the box model even when hidden, just
+  // transparent. Dropping it entirely would shrink each lamp by 2px
+  // and shift every widget position saved in the layout.
+  const borderColor = showChrome
+    ? (active ? config.color + '40' : 'rgba(255,255,255,0.08)')
+    : 'transparent';
+
+  const background = showChrome
+    ? (active ? `${config.color}15` : 'rgba(255,255,255,0.04)')
+    : 'transparent';
+
   return (
     <div 
       className={`
@@ -70,8 +86,8 @@ export const WarningLight = ({ type, active, className = '' }) => {
       style={{
         padding: '8px 12px',
         borderRadius: 8,
-        background: active ? `${config.color}15` : 'rgba(255,255,255,0.04)',
-        border: `1px solid ${active ? config.color + '40' : 'rgba(255,255,255,0.08)'}`,
+        background,
+        border: `1px solid ${borderColor}`,
       }}
       data-testid={`warning-${type}`}
       data-active={active}
