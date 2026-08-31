@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo } from 'react';
+import { useSettings, useSettingsSelector } from './SettingsContext';
 
 const ThemeContext = createContext();
 
@@ -26,28 +27,47 @@ export const THEMES = {
   }
 };
 
+export const DEFAULT_THEME_ID = 'type_r';
+
+/**
+ * Theme state now lives in settings rather than in local component
+ * state.
+ *
+ * Previously this held themeId in useState initialised to 'type_r',
+ * and ThemeProvider was mounted OUTSIDE SettingsProvider in App.js -
+ * so it could not have read settings.theme_id even if it tried. Pick
+ * a theme, reload, back to Type R.
+ *
+ * App.js now nests the other way round, so this can subscribe.
+ */
 export const ThemeProvider = ({ children }) => {
-  const [themeId, setThemeId] = useState('type_r');
-  const [theme, setTheme] = useState(THEMES.type_r);
+  const themeId = useSettingsSelector((s) => s.theme_id ?? DEFAULT_THEME_ID);
+  const { updateSetting } = useSettings();
+
+  const theme = THEMES[themeId] || THEMES[DEFAULT_THEME_ID];
 
   useEffect(() => {
-    const newTheme = THEMES[themeId] || THEMES.type_r;
-    setTheme(newTheme);
-    
-    // Apply theme to document
-    document.documentElement.setAttribute('data-theme', themeId);
-    document.documentElement.style.setProperty('--hmi-accent', newTheme.accent);
-    document.documentElement.style.setProperty('--hmi-accent-glow', newTheme.glow);
-  }, [themeId]);
+    document.documentElement.setAttribute('data-theme', theme.id);
+    document.documentElement.style.setProperty('--hmi-accent', theme.accent);
+    document.documentElement.style.setProperty('--hmi-accent-glow', theme.glow);
+  }, [theme]);
 
-  const switchTheme = (newThemeId) => {
-    if (THEMES[newThemeId]) {
-      setThemeId(newThemeId);
-    }
-  };
+  const switchTheme = useCallback(
+    (newThemeId) => {
+      if (THEMES[newThemeId]) {
+        updateSetting('theme_id', newThemeId);
+      }
+    },
+    [updateSetting],
+  );
+
+  const value = useMemo(
+    () => ({ theme, themeId: theme.id, switchTheme, themes: THEMES }),
+    [switchTheme, theme],
+  );
 
   return (
-    <ThemeContext.Provider value={{ theme, themeId, switchTheme, themes: THEMES }}>
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   );
