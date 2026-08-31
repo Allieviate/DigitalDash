@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { X, Activity, LayoutGrid, Sliders, Wifi, ChevronRight } from 'lucide-react';
+import { X, Activity, Sliders, Wifi, ChevronRight } from 'lucide-react';
 import DiagnosticsTab from './DiagnosticsTab';
 import ConnectivityTab from './ConnectivityTab';
-import DashBuilderTab from './DashBuilderTab';
 import { Settings2, Smartphone } from 'lucide-react'; 
 import GeneralSettingsTab from './GeneralSettingsTab';
 import SavedDevicesTab from './SavedDevicesTab';
@@ -16,14 +15,12 @@ const VehicleParamsTab = () => {
   const yellowShift = settings.yellow_shift ?? 7000;
   const redShift = settings.red_shift ?? 7800;
   const redline = settings.redline ?? 8500;
-  const warnCoolant = settings.warn_coolant ?? true;
-  const warnOil = settings.warn_oil ?? true;
+  const milBorders = settings.mil_borders ?? false;
 
   const setYellowShift = (val) => updateSetting('yellow_shift', val);
   const setRedShift = (val) => updateSetting('red_shift', val);
   const setRedline = (val) => updateSetting('redline', val);
-  const setWarnCoolant = (val) => updateSetting('warn_coolant', val);
-  const setWarnOil = (val) => updateSetting('warn_oil', val);
+  const setMilBorders = (val) => updateSetting('mil_borders', val);
 
   // A helper component for our custom sliders
   const CustomSlider = ({ label, value, min, max, step, onChange, color }) => (
@@ -65,7 +62,13 @@ const VehicleParamsTab = () => {
         <h3 style={{ fontFamily: 'Orbitron, sans-serif', fontSize: 16, color: '#fff', marginBottom: 20, letterSpacing: '0.1em' }}>
           RPM & SHIFT LIGHTS
         </h3>
-        
+
+        {/* These three are persisted but ShiftLightsBar still hardcodes
+            its thresholds. Wiring them up is the next piece of work. */}
+        <div style={{ fontFamily: 'Helvetica Neue, sans-serif', fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 18, lineHeight: 1.5 }}>
+          Saved, but not yet driving the shift lights.
+        </div>
+
         <CustomSlider 
           label="Stage 1 (Yellow)" 
           value={yellowShift} min={3000} max={9000} step={100} 
@@ -85,24 +88,22 @@ const VehicleParamsTab = () => {
         />
       </div>
 
-      {/* ── Warning Thresholds Section ── */}
+      {/* ── Warning Lights Section ── */}
       <div style={{ background: '#18181b', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '24px' }}>
         <h3 style={{ fontFamily: 'Orbitron, sans-serif', fontSize: 16, color: '#fff', marginBottom: 20, letterSpacing: '0.1em' }}>
-          WARNING THRESHOLDS
+          WARNING LIGHTS
         </h3>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-           <span style={{ fontFamily: 'Helvetica Neue, sans-serif', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
-             Flash Screen on High Coolant Temp ({'>'} 215°F)
-           </span>
-           <input type="checkbox" checked={warnCoolant} onChange={(e) => setWarnCoolant(e.target.checked)} style={{ transform: 'scale(1.5)', accentColor: '#EF4444' }}/>
-        </div>
-
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-           <span style={{ fontFamily: 'Helvetica Neue, sans-serif', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
-             Flash Screen on Low Oil Pressure ({'<'} 15 PSI)
-           </span>
-           <input type="checkbox" checked={warnOil} onChange={(e) => setWarnOil(e.target.checked)} style={{ transform: 'scale(1.5)', accentColor: '#EF4444' }}/>
+           <div>
+             <div style={{ fontFamily: 'Helvetica Neue, sans-serif', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
+               Show borders around tell-tales
+             </div>
+             <div style={{ fontFamily: 'Helvetica Neue, sans-serif', fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>
+               Off means the icons sit directly on the background.
+             </div>
+           </div>
+           <input type="checkbox" checked={milBorders} onChange={(e) => setMilBorders(e.target.checked)} style={{ transform: 'scale(1.5)', accentColor: '#EF4444' }}/>
         </div>
 
       </div>
@@ -119,7 +120,6 @@ const NAV_ITEMS = [
   { id: 'devices',      label: 'Saved Devices',       icon: Smartphone,  component: SavedDevicesTab },
   { id: 'vehicle',      label: 'Vehicle Parameters',  icon: Sliders,     component: VehicleParamsTab },
   { id: 'connectivity', label: 'Connectivity',         icon: Wifi,        component: ConnectivityTab },
-  { id: 'dash-builder', label: 'Dash Builder',         icon: LayoutGrid,  component: DashBuilderTab },
 ];
 
 // ── Main component ────────────────────────────────────────────────────────────
