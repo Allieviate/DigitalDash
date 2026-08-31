@@ -195,6 +195,10 @@ const DEFAULT_SETTINGS = {
     rpm: true, speed: true, gear: true,
     shiftlights: true, turnsignals: true, diagnostics: false,
   },
+  // Chrome around each MIL tell-tale. Off by default: the border and
+  // fill were drawn whether or not a lamp was lit, so the bottom row
+  // read as seven empty boxes.
+  mil_borders: false,
   aa_mode: 'embedded',
   layout: DEFAULT_LAYOUT,
   featureToggles: DEFAULT_FEATURE_TOGGLES,
@@ -360,6 +364,13 @@ export const useSettings = () => {
   };
 };
 
+/**
+ * Subscribe to one derived setting.
+ *
+ * The selector MUST return a primitive. Returning a fresh object or
+ * array on each call makes useSyncExternalStore see a changed
+ * snapshot every time it checks, and React will re-render forever.
+ */
 export const useSettingsSelector = (selector) => {
   const context = useContext(SettingsContext);
   if (!context) {
