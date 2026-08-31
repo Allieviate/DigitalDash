@@ -42,24 +42,56 @@ const DEFAULT_SIGNALS = {
   high_beams: false,
 };
 
-// Fallback polling only. The websocket is the normal path now, so this
-// rate only applies while the socket is down.
 const FALLBACK_POLL_MS = 250;
-
-// The backend already tracks how old its own data is, so freshness is
-// read from /api/source-status rather than timed on the client.
 const SOURCE_STATUS_POLL_MS = 2000;
 
 const RECONNECT_BASE_MS = 500;
 const RECONNECT_MAX_MS = 10000;
 
-// Availability states a gauge can be in. Anything other than 'live'
-// means the number on screen should not be trusted as the car.
+// If the socket never opens - because nothing is proxying websockets
+// at the served origin, for instance - stop retrying aggressively and
+// settle on polling. Retrying twice a second forever is what made the
+// dash feel glitchy.
+const MAX_EAGER_ATTEMPTS = 5;
+const IDLE_RETRY_MS = 60000;
+
+// Data is considered live if something arrived recently, regardless of
+// which transport delivered it.
+const LIVE_WINDOW_MS = 2000;
+const LIVENESS_TICK_MS = 500;
+
 export const AVAILABILITY = {
   LIVE: 'live',
   SIMULATED: 'simulated',
   UNAVAILABLE: 'unavailable',
   UNKNOWN: 'unknown',
+};
+
+/**
+ * Work out where the websocket lives.
+ *
+ * This is the bug that made the dash read OFFLINE while data was
+ * arriving fine. The old fallback was window.location.host, which is
+ * the port `serve` listens on. `serve` hands out static files and does
+ * not proxy websockets, so the socket could never open there - while
+ * axios, using REACT_APP_BACKEND_URL, talked to the backend happily.
+ *
+ * Order: an explicit REACT_APP_BACKEND_WS wins; otherwise derive from
+ * the backend URL by swapping the scheme; only fall back to the page
+ * origin when the backend URL is relative, which means something is
+ * already proxying both.
+ */
+const resolveWsUrl = () => {
+  const explicit = process.env.REACT_APP_BACKEND_WS;
+  if (explicit) return `${explicit.replace(/\/$/, '')}/api/ws/vehicle-data`;
+
+  if (/^https?:\/\//i.test(API_URL)) {
+    const wsBase = API_URL.replace(/^http/i, 'ws').replace(/\/$/, '');
+    return `${wsBase}/api/ws/vehicle-data`;
+  }
+
+  const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${scheme}//${window.location.host}/api/ws/vehicle-data`;
 };
 
 const numeric = (incoming, key) =>
@@ -100,12 +132,14 @@ const createSignalStore = (initialSignals) => {
 
 export const VehicleDataProvider = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
+  const [transport, setTransport] = useState('connecting');
   const [connectionError, setConnectionError] = useState(null);
   const [sourceStatus, setSourceStatus] = useState(null);
 
   const signalStoreRef = useRef(null);
   const wsRef = useRef(null);
   const pollIntervalRef = useRef(null);
+  const lastDataAtRef = useRef(0);
 
   if (!signalStoreRef.current) {
     signalStoreRef.current = createSignalStore(DEFAULT_SIGNALS);
@@ -113,16 +147,20 @@ export const VehicleDataProvider = ({ children }) => {
 
   const signalStore = signalStoreRef.current;
 
+  const markData = useCallback(() => {
+    lastDataAtRef.current = Date.now();
+  }, []);
+
   const fetchData = useCallback(async () => {
     try {
       const response = await axios.get(`${API_URL}/api/vehicle-data`);
       signalStore.setState(response.data);
+      markData();
       setConnectionError(null);
     } catch (error) {
-      setIsConnected(false);
       setConnectionError(error.message);
     }
-  }, [signalStore]);
+  }, [markData, signalStore]);
 
   const stopPolling = useCallback(() => {
     if (pollIntervalRef.current) {
@@ -133,40 +171,49 @@ export const VehicleDataProvider = ({ children }) => {
 
   const startPolling = useCallback(() => {
     if (pollIntervalRef.current) return;
+    setTransport('polling');
     fetchData();
     pollIntervalRef.current = setInterval(fetchData, FALLBACK_POLL_MS);
   }, [fetchData]);
 
+  // ---- liveness ----
+  //
+  // isConnected used to mean "the websocket is open", which reported
+  // the dash as OFFLINE while polling was delivering data perfectly
+  // well. It now means what the label on screen claims: data is
+  // arriving.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const live = Date.now() - lastDataAtRef.current < LIVE_WINDOW_MS;
+      setIsConnected((prev) => (prev === live ? prev : live));
+    }, LIVENESS_TICK_MS);
+    return () => clearInterval(timer);
+  }, []);
+
   // ---- telemetry stream ----
-  //
-  // Previously this only opened a socket for data_source obd1/obd2 and
-  // otherwise polled at 60Hz. Two problems: the URL was missing the
-  // /api prefix so it could never have connected, and 60Hz polling
-  // asks for data far more often than it changes. Hondata cycles its
-  // packets at 100Hz across ten IDs, so any single channel lands
-  // roughly every 70ms.
-  //
-  // The socket is now the normal path and the backend pushes on
-  // change. Polling remains only as a real fallback, which is what
-  // the old error message already claimed was happening.
   useEffect(() => {
     let disposed = false;
     let attempt = 0;
     let reconnectTimer = null;
 
-    const connect = () => {
+    const scheduleReconnect = () => {
       if (disposed) return;
+      attempt += 1;
+      const delay = attempt > MAX_EAGER_ATTEMPTS
+        ? IDLE_RETRY_MS
+        : Math.min(RECONNECT_BASE_MS * 2 ** (attempt - 1), RECONNECT_MAX_MS);
+      reconnectTimer = setTimeout(connect, delay);
+    };
 
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsHost = process.env.REACT_APP_BACKEND_WS || `${wsProtocol}//${window.location.host}`;
-      const wsUrl = `${wsHost}/api/ws/vehicle-data`;
+    function connect() {
+      if (disposed) return;
 
       let socket;
       try {
-        socket = new WebSocket(wsUrl);
+        socket = new WebSocket(resolveWsUrl());
       } catch (error) {
-        setConnectionError(`Failed to open telemetry socket: ${error.message}`);
         startPolling();
+        scheduleReconnect();
         return;
       }
 
@@ -175,7 +222,7 @@ export const VehicleDataProvider = ({ children }) => {
       socket.onopen = () => {
         if (disposed) return;
         attempt = 0;
-        setIsConnected(true);
+        setTransport('websocket');
         setConnectionError(null);
         stopPolling();
       };
@@ -183,29 +230,28 @@ export const VehicleDataProvider = ({ children }) => {
       socket.onmessage = (event) => {
         try {
           signalStore.setState(JSON.parse(event.data));
+          markData();
         } catch (error) {
-          // A malformed frame should not take the stream down.
           setConnectionError(`Bad telemetry frame: ${error.message}`);
         }
       };
 
       socket.onerror = () => {
-        setConnectionError('Telemetry socket error, falling back to polling.');
+        // onclose always follows, so recovery is handled there. Doing
+        // it here as well would start polling twice.
       };
 
       socket.onclose = () => {
         wsRef.current = null;
         if (disposed) return;
-
-        setIsConnected(false);
         startPolling();
-
-        attempt += 1;
-        const delay = Math.min(RECONNECT_BASE_MS * 2 ** (attempt - 1), RECONNECT_MAX_MS);
-        reconnectTimer = setTimeout(connect, delay);
+        scheduleReconnect();
       };
-    };
+    }
 
+    // Poll immediately so the dash has data while the socket is still
+    // deciding whether it can connect at all.
+    startPolling();
     connect();
 
     return () => {
@@ -217,7 +263,7 @@ export const VehicleDataProvider = ({ children }) => {
         wsRef.current = null;
       }
     };
-  }, [signalStore, startPolling, stopPolling]);
+  }, [markData, signalStore, startPolling, stopPolling]);
 
   // ---- what is actually feeding us ----
   useEffect(() => {
@@ -259,13 +305,14 @@ export const VehicleDataProvider = ({ children }) => {
   const providerValue = useMemo(
     () => ({
       isConnected,
+      transport,
       connectionError,
       sourceStatus,
       availabilityFor,
       subscribeToSignals: signalStore.subscribe,
       getSignalsSnapshot: signalStore.getState,
     }),
-    [availabilityFor, connectionError, isConnected, signalStore, sourceStatus],
+    [availabilityFor, connectionError, isConnected, signalStore, sourceStatus, transport],
   );
 
   return <VehicleDataContext.Provider value={providerValue}>{children}</VehicleDataContext.Provider>;
@@ -309,6 +356,7 @@ export const useVehicleData = () => {
   return {
     signals,
     isConnected: context.isConnected,
+    transport: context.transport,
     connectionError: context.connectionError,
     sourceStatus: context.sourceStatus,
     criticalWarnings,
@@ -336,7 +384,6 @@ export const useVehicleSignal = (signalKey) => {
  * The selector MUST return a primitive. Returning a fresh object or
  * array on each call makes useSyncExternalStore see a changed
  * snapshot every time it checks, and React will re-render forever.
- * Use several useVehicleSignal calls instead of selecting an object.
  */
 export const useVehicleDataSelector = (selector) => {
   const context = useVehicleContext('useVehicleDataSelector');
@@ -353,8 +400,7 @@ export const useVehicleDataSelector = (selector) => {
  *
  * Returns one of AVAILABILITY. A gauge reading 40 PSI because that is
  * the model default, on a car with no oil pressure sender wired, is
- * worse than a gauge reading nothing - so widgets should dim or hide
- * anything that is not 'live' or 'simulated'.
+ * worse than a gauge reading nothing.
  */
 export const useSignalAvailability = (signalKey) => {
   const context = useVehicleContext('useSignalAvailability');
