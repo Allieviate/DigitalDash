@@ -7,23 +7,30 @@ import GeneralSettingsTab from './GeneralSettingsTab';
 import SavedDevicesTab from './SavedDevicesTab';
 import { useSettings } from '../../contexts/SettingsContext';
 
+const SHIFT_LIGHT_STYLES = [
+  { id: 'classic', label: 'Classic', hint: 'Single orange-red bar' },
+  { id: 'sequential', label: 'Sequential', hint: 'Green through amber into red' },
+];
+
 // ── Vehicle Parameters Tab with RPM & Shift Light Controls ──
 const VehicleParamsTab = () => {
   const { settings, updateSetting } = useSettings();
   
   // Read from persisted settings, fallback to defaults
+  const shiftStyle = settings.shift_light_style ?? 'classic';
   const yellowShift = settings.yellow_shift ?? 7000;
   const redShift = settings.red_shift ?? 7800;
   const redline = settings.redline ?? 8500;
   const milBorders = settings.mil_borders ?? false;
 
+  const setShiftStyle = (val) => updateSetting('shift_light_style', val);
   const setYellowShift = (val) => updateSetting('yellow_shift', val);
   const setRedShift = (val) => updateSetting('red_shift', val);
   const setRedline = (val) => updateSetting('redline', val);
   const setMilBorders = (val) => updateSetting('mil_borders', val);
 
   // A helper component for our custom sliders
-  const CustomSlider = ({ label, value, min, max, step, onChange, color }) => (
+  const CustomSlider = ({ label, value, min, max, step, onChange, color, hint }) => (
     <div style={{ marginBottom: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
         <span style={{ fontFamily: 'Helvetica Neue, sans-serif', fontSize: 10, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)' }}>
@@ -51,6 +58,11 @@ const VehicleParamsTab = () => {
         }}
         className={`slider-${color.replace('#', '')}`}
       />
+      {hint && (
+        <div style={{ fontFamily: 'Helvetica Neue, sans-serif', fontSize: 11, color: 'rgba(255,255,255,0.32)', marginTop: 6 }}>
+          {hint}
+        </div>
+      )}
     </div>
   );
 
@@ -63,28 +75,61 @@ const VehicleParamsTab = () => {
           RPM & SHIFT LIGHTS
         </h3>
 
-        {/* These three are persisted but ShiftLightsBar still hardcodes
-            its thresholds. Wiring them up is the next piece of work. */}
-        <div style={{ fontFamily: 'Helvetica Neue, sans-serif', fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 18, lineHeight: 1.5 }}>
-          Saved, but not yet driving the shift lights.
+        {/* Style picker */}
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ fontFamily: 'Helvetica Neue, sans-serif', fontSize: 10, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>
+            Style
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            {SHIFT_LIGHT_STYLES.map(option => {
+              const isActive = shiftStyle === option.id;
+              return (
+                <button
+                  key={option.id}
+                  onClick={() => setShiftStyle(option.id)}
+                  data-testid={`shift-style-${option.id}`}
+                  style={{
+                    flex: 1,
+                    textAlign: 'left',
+                    padding: '12px 14px',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    background: isActive ? 'rgba(204,0,0,0.12)' : 'rgba(255,255,255,0.03)',
+                    border: isActive ? '1px solid rgba(204,0,0,0.55)' : '1px solid rgba(255,255,255,0.08)',
+                    transition: 'all 0.18s ease',
+                  }}
+                >
+                  <div style={{ fontFamily: 'Helvetica Neue, sans-serif', fontSize: 12, color: isActive ? '#fff' : 'rgba(255,255,255,0.7)', marginBottom: 3 }}>
+                    {option.label}
+                  </div>
+                  <div style={{ fontFamily: 'Helvetica Neue, sans-serif', fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
+                    {option.hint}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <CustomSlider 
           label="Stage 1 (Yellow)" 
           value={yellowShift} min={3000} max={9000} step={100} 
           onChange={setYellowShift} color="#FBBF24"
+          hint="First lamp lights here."
         />
         
         <CustomSlider 
           label="Stage 2 (Red)" 
           value={redShift} min={3000} max={9000} step={100} 
           onChange={setRedShift} color="#EF4444"
+          hint="Lamps at or past this point go full red."
         />
         
         <CustomSlider 
           label="Hard Redline" 
           value={redline} min={5000} max={10000} step={100} 
           onChange={setRedline} color="#DC2626"
+          hint="Last lamp lights here, and the bar starts flashing."
         />
       </div>
 

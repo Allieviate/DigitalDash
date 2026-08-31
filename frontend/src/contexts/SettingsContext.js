@@ -66,6 +66,9 @@ const DEFAULT_SETTINGS = {
   chime_volume: 70,
 
   // shift lights
+  // 'classic'    - the original orange-red bar
+  // 'sequential' - green through amber into red across the seven lamps
+  shift_light_style: 'classic',
   yellow_shift: 7000,
   red_shift: 7800,
   redline: 8500,
