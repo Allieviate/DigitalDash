@@ -27,9 +27,17 @@ dtoverlay=spi1-3cs
 dtoverlay=mcp2515,spi1-1,oscillator=16000000,speed=1000000,interrupt=22
 dtoverlay=mcp2515,spi1-2,oscillator=16000000,speed=1000000,interrupt=13
 
+# These overlays CREATE the interfaces but leave them DOWN. Raising
+# and configuring them is frank-can.service, which runs
+# scripts/can_up.sh at boot (bitrate 500000, restart-ms 100).
+# setup_pi.sh and fix_boot.sh install it. To do it by hand:
+#   sudo scripts/can_up.sh can0
+#
 # Verify after reboot:
 #   ip -brief link show | grep -i can      both can0 and can1 listed
 #   dmesg | grep -i mcp                    two "successfully initialized"
+#   systemctl status frank-can             active (exited)
+#   ip -details link show can0             state UP, restart-ms 100
 #
 # err=19  (ENODEV)    nothing answered on SPI. Check the per-channel
 #                     enable jumper and the interrupt pin.
