@@ -268,7 +268,7 @@ fi
 cat > /etc/systemd/system/frank-backend.service << EOF
 [Unit]
 Description=FRANK HMI Backend
-After=network.target
+After=network.target frank-can.service
 
 [Service]
 Type=simple
@@ -329,12 +329,21 @@ RestartSec=10
 WantedBy=multi-user.target
 EOF
 
+# frank-can.service - installed from the repo file rather than a
+# heredoc, so the CAN unit reads the same however you got here.
+if [ -f "$PROJECT_DIR/scripts/frank-can.service" ]; then
+    chmod +x "$PROJECT_DIR/scripts/can_up.sh" 2>/dev/null || true
+    sed "s#__PROJECT_DIR__#$PROJECT_DIR#g" "$PROJECT_DIR/scripts/frank-can.service" \
+        > /etc/systemd/system/frank-can.service
+fi
+
 systemctl daemon-reload
+systemctl enable frank-can.service 2>/dev/null || true
 systemctl enable frank-backend.service
 systemctl enable frank-frontend.service
 systemctl enable frank-kiosk.service
 
-echo -e "  ${GREEN}Created and enabled: frank-backend, frank-frontend, frank-kiosk${NC}"
+echo -e "  ${GREEN}Created and enabled: frank-can, frank-backend, frank-frontend, frank-kiosk${NC}"
 echo ""
 
 # ─── STEP 6: Desktop image autostart (alternative to frank-display) ───

@@ -1,0 +1,44 @@
+# FRANK CAN interface bring-up.
+#
+# Installed by scripts/setup_pi.sh, which substitutes __PROJECT_DIR__
+# for the real checkout path. To install it by hand:
+#
+#   sed "s#__PROJECT_DIR__#$HOME/projects/DigitalDash#" \
+#       scripts/frank-can.service | sudo tee /etc/systemd/system/frank-can.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now frank-can
+#
+# Settings can be overridden without editing this unit by creating
+# /etc/default/frank-can with CAN_BITRATE / CAN_RESTART_MS /
+# CAN_INTERFACE / CAN_WAIT_SECONDS.
+
+[Unit]
+Description=FRANK CAN interface (Hondata KPro link)
+Documentation=file://__PROJECT_DIR__/scripts/can_config.txt
+After=network-pre.target
+Wants=network-pre.target
+
+# Ordering only, deliberately not a dependency. If the HAT is missing
+# or the overlays did not load, this unit fails and the backend still
+# starts - and reports the bus as down rather than showing defaults.
+Before=frank-backend.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+EnvironmentFile=-/etc/default/frank-can
+ExecStart=__PROJECT_DIR__/scripts/can_up.sh
+
+# Ignore failure on stop: if the interface is already gone there is
+# nothing to bring down, and that should not mark the unit failed.
+ExecStop=-/bin/sh -c 'ip link set "${CAN_INTERFACE:-can0}" down'
+
+# No Restart= here on purpose. Restart= has awkward semantics with
+# Type=oneshot, and it is not needed: can_up.sh already waits up to
+# CAN_WAIT_SECONDS for the interface to appear, which covers a slow
+# mcp2515 SPI probe. A failure after that is a real fault - a missing
+# HAT, or overlays that did not load - and should stay visible in
+# `systemctl status frank-can` rather than looping.
+
+[Install]
+WantedBy=multi-user.target
