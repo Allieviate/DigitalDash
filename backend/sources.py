@@ -264,6 +264,18 @@ class HondataCanSource(SignalSource):
     # A channel silent for this long is treated as gone, not quiet.
     STALE_AFTER = 3.0
 
+    # A bus that will not open is retried on this schedule rather than
+    # being fatal. In the car the Pi and the ECU come up together and
+    # can0 can appear a moment after the backend does, and a connector
+    # reseated mid-drive should recover without a service restart.
+    #
+    # It never gives up, because a genuinely miswired car must keep
+    # reading as dead for as long as it is dead. Nothing is written to
+    # the snapshot while the bus is down, so waiting costs honesty
+    # nothing: the dash shows no data rather than invented data.
+    REOPEN_BACKOFF_START = 1.0
+    REOPEN_BACKOFF_MAX = 10.0
+
     def __init__(self, channel: str = "can0", batch_limit: int = 32):
         self.channel = channel
         self.batch_limit = batch_limit
@@ -272,9 +284,12 @@ class HondataCanSource(SignalSource):
         self.signals = VehicleSignals()
         self.seen_fields: Set[str] = set()
         self.last_frame_at: Optional[float] = None
+        self.last_error: Optional[str] = None
+        self._reopen_delay = self.REOPEN_BACKOFF_START
         self._model_fields = set(VehicleSignals.model_fields)
 
-    async def start(self) -> None:
+    def _open(self) -> None:
+        """Open the bus. Raises if the interface is not up."""
         import can
 
         # Hardware acceptance filters. The MCP2515 drops anything that
@@ -288,7 +303,32 @@ class HondataCanSource(SignalSource):
             interface="socketcan",
             can_filters=filters,
         )
+
+    async def _try_open(self) -> bool:
+        """Attempt to open the bus. Records the failure instead of raising."""
+        try:
+            await asyncio.to_thread(self._open)
+        except Exception as exc:
+            self.bus = None
+            self.last_error = f"{type(exc).__name__}: {exc}"
+            logger.error(
+                "Signal source: cannot open %s (%s). Is the interface up? "
+                "Try: sudo ip link set %s up type can bitrate 500000 restart-ms 100",
+                self.channel,
+                self.last_error,
+                self.channel,
+            )
+            return False
+
+        self.last_error = None
+        self._reopen_delay = self.REOPEN_BACKOFF_START
         logger.info("Signal source: hondata_can on %s (receive only)", self.channel)
+        return True
+
+    async def start(self) -> None:
+        # A failure here is reported, not raised. next_update() keeps
+        # retrying, and produces nothing in the meantime.
+        await self._try_open()
 
     async def stop(self) -> None:
         if self.bus is not None:
@@ -319,10 +359,26 @@ class HondataCanSource(SignalSource):
 
     async def next_update(self) -> Optional[VehicleSignals]:
         if self.bus is None:
-            await asyncio.sleep(0.5)
+            # Down. Wait, then try again, returning nothing meanwhile so
+            # the snapshot stays unwritten and the dash stays honest.
+            await asyncio.sleep(self._reopen_delay)
+            self._reopen_delay = min(
+                self._reopen_delay * 2, self.REOPEN_BACKOFF_MAX
+            )
+            await self._try_open()
             return None
 
-        messages = await asyncio.to_thread(self._read_batch)
+        try:
+            messages = await asyncio.to_thread(self._read_batch)
+        except Exception as exc:
+            # The bus opened and has since died - the interface went
+            # down, or a connector shook loose. Drop it so the reopen
+            # path above takes over instead of failing forever.
+            self.last_error = f"{type(exc).__name__}: {exc}"
+            logger.error("Read failed on %s (%s); reopening", self.channel, self.last_error)
+            await self.stop()
+            return None
+
         if not messages:
             return None
 
@@ -351,20 +407,30 @@ class HondataCanSource(SignalSource):
         from VehicleSignals' 40 PSI default and report healthy oil
         pressure on a car with no sender wired. Silence is honest
         there; a confident green light is not.
+
+        A derived field also joins seen_fields once its input has
+        arrived, so live_fields means "you can trust this" rather than
+        "a frame carried this". Without that the dash cannot tell a
+        TEMP HIGH lamp that is genuinely being watched from one with
+        nothing behind it, and would dim a working overheat warning.
         """
         if "coolant_temp_c" in self.seen_fields:
             self.signals.high_coolant = self.signals.coolant_temp_c >= COOLANT_WARN_C
+            self.seen_fields.add("high_coolant")
 
         if "fuel_pct" in self.seen_fields:
             self.signals.low_fuel = self.signals.fuel_pct <= LOW_FUEL_PCT
+            self.seen_fields.add("low_fuel")
 
         if "oil_pressure_psi" in self.seen_fields:
             self.signals.oil_pressure_warning = (
                 self.signals.oil_pressure_psi < OIL_PRESSURE_WARN_PSI
             )
+            self.seen_fields.add("oil_pressure_warning")
 
         if "map_kpa" in self.seen_fields:
             self.signals.boost_psi = (self.signals.map_kpa - 101.3) * 0.145038
+            self.seen_fields.add("boost_psi")
 
     def status(self) -> Dict[str, Any]:
         age = None
@@ -379,6 +445,11 @@ class HondataCanSource(SignalSource):
             "seconds_since_frame": age,
             "live_fields": sorted(self.seen_fields),
             "decoder": self.decoder.stats(),
+            # Why the bus is not open, when it is not. Without this the
+            # dash can say "no data" but not "no data because can0 is
+            # down", which is the difference between a diagnosis and a
+            # shrug.
+            "error": self.last_error,
         }
 
 
@@ -434,9 +505,24 @@ def create_source(name: str) -> SignalSource:
 
 
 async def run_source(source: SignalSource, snapshot: SignalSnapshot) -> None:
-    """Background loop. Owns the source for the life of the process."""
-    await source.start()
+    """Background loop. Owns the source for the life of the process.
+
+    start() belongs inside the try. It used to sit outside it, and that
+    was the whole bug: a source that could not open - a CAN interface
+    that is down, which is the normal state at boot until something
+    brings it up - raised straight out of this coroutine. Nothing
+    awaits this task until shutdown, so the failure was invisible. The
+    reader was dead, the snapshot was never written, and
+    /api/vehicle-data went on serving VehicleSignals' defaults: rpm
+    900, coolant 25C, oil 40 PSI, fuel 100%. A healthy idling engine,
+    in front of an engine that might be cooking.
+
+    Inside the try, a start failure is logged, stop() still runs, and
+    the snapshot stays unwritten - which /api/source-status reports as
+    fresh: false with a null age.
+    """
     try:
+        await source.start()
         while True:
             try:
                 signals = await source.next_update()
@@ -449,5 +535,12 @@ async def run_source(source: SignalSource, snapshot: SignalSnapshot) -> None:
 
             if signals is not None:
                 snapshot.set(signals)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.exception(
+            "Signal source %r could not start; the dash will show no data",
+            source.name,
+        )
     finally:
         await source.stop()

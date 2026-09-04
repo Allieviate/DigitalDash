@@ -313,6 +313,21 @@ export const VehicleDataProvider = ({ children }) => {
     (signalKey) => {
       if (!sourceStatus?.source) return AVAILABILITY.UNKNOWN;
       if (!sourceStatus.source.implemented) return AVAILABILITY.UNAVAILABLE;
+
+      // Freshness gates everything below it.
+      //
+      // Two cases this catches, both of which used to read as healthy.
+      // If nothing has ever arrived - a CAN interface that is down -
+      // the signals object still holds the backend's model defaults,
+      // which are a plausible idling engine. And if frames arrived and
+      // then stopped - ignition off, connector shaken loose - the
+      // values freeze at their last reading while live_fields still
+      // lists every field that was ever seen, because it accumulates
+      // and is never cleared.
+      //
+      // In both cases what is on screen is not measurement.
+      if (!sourceStatus.fresh) return AVAILABILITY.UNAVAILABLE;
+
       if (sourceStatus.source.name === 'simulation') return AVAILABILITY.SIMULATED;
       if (!liveFields) return AVAILABILITY.UNKNOWN;
       return liveFields.has(signalKey) ? AVAILABILITY.LIVE : AVAILABILITY.UNAVAILABLE;
@@ -424,6 +439,22 @@ export const useSignalAvailability = (signalKey) => {
   const context = useVehicleContext('useSignalAvailability');
   return context.availabilityFor(signalKey);
 };
+
+/**
+ * Is there something real behind this signal right now?
+ *
+ * The boolean form, for widgets that only need to decide between
+ * drawing a value and drawing dashes. Simulated counts as available on
+ * purpose: the simulator exists to make the dash provable on the
+ * bench, and a bench full of dimmed gauges proves nothing.
+ *
+ * UNKNOWN also counts as available - it means we have not heard from
+ * /api/source-status yet, which is not evidence of a problem, and
+ * dimming on it would make the whole cluster flicker whenever that
+ * poll misses.
+ */
+export const useSignalIsAvailable = (signalKey) =>
+  useSignalAvailability(signalKey) !== AVAILABILITY.UNAVAILABLE;
 
 /** Raw source status: which source, whether it is receiving, decoder counters. */
 export const useSourceStatus = () => useVehicleContext('useSourceStatus').sourceStatus;

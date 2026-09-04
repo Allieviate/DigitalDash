@@ -12,235 +12,123 @@ const SettingsContext = createContext(null);
 
 const SETTINGS_STORAGE_KEY = 'fran.dashboard.settings.v2';
 
-const DEFAULT_LAYOUT = [
-  {
-    id: 'critical_warning_banner',
-    type: 'CriticalWarningBanner',
-    dataKey: 'check_engine',
-    x: 0,
-    y: 0,
-    width: 100,
-    height: 10,
-    visible: true,
-    zIndex: 90,
-  },
-  {
-    id: 'shift_lights',
-    type: 'ShiftLightsBar',
-    dataKey: 'rpm',
-    x: 26,
-    y: 4,
-    width: 48,
-    height: 8,
-    visible: true,
-    zIndex: 40,
-  },
-  {
-    id: 'digital_speed_gear',
-    type: 'DigitalSpeedGear',
-    dataKey: 'speed_mph',
-    x: 35,
-    y: 10,
-    width: 30,
-    height: 20,
-    visible: true,
-    zIndex: 40,
-  },
-  {
-    id: 'turn_signals',
-    type: 'TurnSignalsRow',
-    dataKey: 'turn_left',
-    x: 33,
-    y: 30,
-    width: 34,
-    height: 10,
-    visible: true,
-    zIndex: 35,
-  },
-  {
-    id: 'rpm_gauge_left',
-    type: 'RpmGauge',
-    dataKey: 'rpm',
-    x: 0,
-    y: 30,
-    width: 32,
-    height: 66,
-    visible: true,
-    zIndex: 30,
-    faceImage: '/assets/gauges/rpm-gauge.png',
-    needleImage: '/assets/gauges/rpm-needle.png',
-    tickImage: '/assets/gauges/rpm-medium-ticks.png',
-    min: 0,
-    max: 8000,
-    unit: 'rpm',
-  },
-  {
-    id: 'android_auto_panel',
-    type: 'AndroidAutoPanel',
-    dataKey: 'speed_mph',
-    x: 32,
-    y: 32,
-    width: 36,
-    height: 56,
-    visible: true,
-    zIndex: 20,
-  },
-  {
-    id: 'speed_gauge_right',
-    type: 'SpeedGauge',
-    dataKey: 'speed_mph',
-    x: 68,
-    y: 30,
-    width: 32,
-    height: 66,
-    visible: true,
-    zIndex: 30,
-    faceImage: '/assets/gauges/spd-gauge.png',
-    needleImage: '/assets/gauges/rpm-needle.png',
-    tickImage: '/assets/gauges/spd-medium-ticks.png',
-    min: 0,
-    max: 170,
-    unit: 'mph',
-  },
-  {
-    id: 'warning_panel',
-    type: 'WarningPanel',
-    dataKey: 'oil_pressure_warning',
-    x: 0,
-    y: 90,
-    width: 100,
-    height: 10,
-    visible: true,
-    zIndex: 40,
-  },
-  {
-    id: 'connection_status',
-    type: 'ConnectionStatus',
-    dataKey: 'speed_mph',
-    x: 82,
-    y: 4,
-    width: 14,
-    height: 8,
-    visible: true,
-    zIndex: 50,
-    max: 180,
-    unit: 'mph',
-  },
-  {
-    id: 'coolant_tile',
-    type: 'InfoGauge',
-    dataKey: 'coolant_temp_c',
-    x: 6,
-    y: 78,
-    width: 20,
-    height: 16,
-    visible: true,
-    zIndex: 10,
-    unit: '°C',
-  },
-  {
-    id: 'gear_indicator',
-    type: 'GearIndicator',
-    dataKey: 'gear',
-    x: 44,
-    y: 76,
-    width: 12,
-    height: 18,
-    visible: true,
-    zIndex: 30,
-  },
-  {
-    id: 'turn_indicators',
-    type: 'TurnSignals',
-    dataKey: 'turn_left',
-    x: 80,
-    y: 78,
-    width: 14,
-    height: 14,
-    visible: true,
-    zIndex: 25,
-  },
-];
-
-const DEFAULT_FEATURE_TOGGLES = {
-  enableBoostGauge: false,
-  enableACStatus: true,
-  showTurnSignals: true,
-  showDiagnostics: false,
-  showAndroidAutoPanel: true,
-};
-
+/**
+ * Every setting the dash actually has.
+ *
+ * Anything not listed here is dropped on load and on save. That
+ * matters: sanitizeSettings used to spread ...incoming wholesale, so
+ * any key ever written to localStorage survived forever and removing
+ * a setting from this file would not remove it from a Pi that had
+ * already saved it.
+ *
+ * Removed in the settings cleanup, all of them written by a control
+ * and read by nothing:
+ *   layout / DEFAULT_LAYOUT   - a second layout system. Dashboard uses
+ *                               useLayoutStore with different widget
+ *                               ids; this one was never rendered, and
+ *                               it held the stale 170 and 180 speedo
+ *                               maxima that disagreed with the real
+ *                               gauges at 160.
+ *   layout_preset             - Dash Builder tab
+ *   widget_visibility         - Dash Builder tab
+ *   gauge_scale               - Dash Builder tab, gauge size is 420px
+ *                               hardcoded in Dashboard
+ *   warn_coolant / warn_oil   - checkboxes nothing consulted
+ *   featureToggles            - never read
+ *   gauge_style               - never read
+ *   custom_gauges             - never read
+ *   aa_mode                   - never read
+ *   data_source               - moved to SIGNAL_SOURCE in backend/.env
+ *                               in phase 2; which source runs is a
+ *                               deployment property, not a preference
+ *
+ * wifi_enabled and auto_dim are kept deliberately. Nothing acts on
+ * them yet either, but they are placeholders for functionality that
+ * is wanted rather than leftovers.
+ */
 const DEFAULT_SETTINGS = {
   version: 2,
+
+  // appearance
   theme_id: 'type_r',
-  units: 'imperial',
-  data_source: 'simulation',
-  performance_mode: 'high_performance',
   brightness: 100,
-  warning_sounds: true,
-  chime_volume: 70,
-  bluetooth_enabled: true,
-  wifi_enabled: true,
-  auto_dim: false,
-  gauge_style: 'modern',
-  custom_gauges: {},
-  yellow_shift: 7000,
-  red_shift: 7800,
-  redline: 8500,
-  warn_coolant: true,
-  warn_oil: true,
-  layout_preset: 'street',
-  gauge_scale: 100,
-  widget_visibility: {
-    rpm: true, speed: true, gear: true,
-    shiftlights: true, turnsignals: true, diagnostics: false,
-  },
   // Chrome around each MIL tell-tale. Off by default: the border and
   // fill were drawn whether or not a lamp was lit, so the bottom row
   // read as seven empty boxes.
   mil_borders: false,
-  aa_mode: 'embedded',
-  layout: DEFAULT_LAYOUT,
-  featureToggles: DEFAULT_FEATURE_TOGGLES,
+
+  // units and behaviour
+  units: 'imperial',
+  performance_mode: 'high_performance',
+
+  // audio
+  warning_sounds: true,
+  chime_volume: 70,
+
+  // shift lights
+  // 'classic'    - the original orange-red bar
+  // 'sequential' - green through amber into red across the seven lamps
+  shift_light_style: 'classic',
+  yellow_shift: 7000,
+  red_shift: 7800,
+  redline: 8500,
+
+  // Which info gauges are drawn at all. This is your choice and is
+  // separate from whether the signal exists: a gauge switched off here
+  // is gone, while one left on with nothing behind it renders dimmed
+  // with dashes until data arrives.
+  //
+  // Not to be confused with the widget_visibility key removed in the
+  // settings cleanup. That one was written by the Dash Builder tab and
+  // read by nothing. These are read by InfoGauges.
+  gauge_visibility: {
+    fuel: true,
+    coolant: true,
+    battery: true,
+    oil_pressure: true,
+  },
+
+  // connectivity
+  bluetooth_enabled: true,
+  wifi_enabled: true,
+
+  // placeholder, not yet acted on
+  auto_dim: false,
 };
 
-const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
-
-const sanitizeLayoutItem = (item, index) => {
-  const base = DEFAULT_LAYOUT[index] || {};
-  return {
-    id: typeof item?.id === 'string' ? item.id : base.id || `widget_${index}`,
-    type: typeof item?.type === 'string' ? item.type : base.type || 'InfoGauge',
-    dataKey: typeof item?.dataKey === 'string' ? item.dataKey : base.dataKey || 'rpm',
-    x: Number.isFinite(Number(item?.x)) ? Number(item.x) : base.x || 0,
-    y: Number.isFinite(Number(item?.y)) ? Number(item.y) : base.y || 0,
-    width: Number.isFinite(Number(item?.width)) ? Number(item.width) : base.width || 20,
-    height: Number.isFinite(Number(item?.height)) ? Number(item.height) : base.height || 20,
-    visible: typeof item?.visible === 'boolean' ? item.visible : base.visible ?? true,
-    zIndex: Number.isFinite(Number(item?.zIndex)) ? Number(item.zIndex) : base.zIndex || 1,
-    faceImage: typeof item?.faceImage === 'string' ? item.faceImage : base.faceImage,
-    needleImage: typeof item?.needleImage === 'string' ? item.needleImage : base.needleImage,
-    tickImage: typeof item?.tickImage === 'string' ? item.tickImage : base.tickImage,
-    min: Number.isFinite(Number(item?.min)) ? Number(item.min) : base.min,
-    max: Number.isFinite(Number(item?.max)) ? Number(item.max) : base.max,
-    unit: typeof item?.unit === 'string' ? item.unit : base.unit,
-  };
-};
+const SETTING_KEYS = Object.keys(DEFAULT_SETTINGS);
 
 const sanitizeSettings = (incoming = {}) => {
-  const layout = Array.isArray(incoming.layout)
-    ? incoming.layout.map(sanitizeLayoutItem)
-    : DEFAULT_LAYOUT.map(sanitizeLayoutItem);
+  const next = { ...DEFAULT_SETTINGS };
 
-  return {
-    ...DEFAULT_SETTINGS,
-    ...incoming,
-    layout,
-    featureToggles: {
-      ...DEFAULT_FEATURE_TOGGLES,
-      ...(isObject(incoming.featureToggles) ? incoming.featureToggles : {}),
-    },
-  };
+  for (const key of SETTING_KEYS) {
+    if (incoming[key] === undefined) continue;
+
+    const fallback = DEFAULT_SETTINGS[key];
+    const value = incoming[key];
+
+    if (typeof fallback === 'number') {
+      next[key] = Number.isFinite(Number(value)) ? Number(value) : fallback;
+    } else if (typeof fallback === 'boolean') {
+      next[key] = typeof value === 'boolean' ? value : fallback;
+    } else if (typeof fallback === 'string') {
+      next[key] = typeof value === 'string' ? value : fallback;
+    } else if (fallback && typeof fallback === 'object' && !Array.isArray(fallback)) {
+      // A flat map of booleans, gauge_visibility being the only one.
+      // Same whitelist rule as the top level, one level down: unknown
+      // sub-keys are dropped and wrong types fall back, so a gauge
+      // renamed or removed later cannot linger in localStorage.
+      const merged = { ...fallback };
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        for (const subKey of Object.keys(fallback)) {
+          if (typeof value[subKey] === 'boolean') merged[subKey] = value[subKey];
+        }
+      }
+      next[key] = merged;
+    }
+  }
+
+  return next;
 };
 
 const loadInitialSettings = () => {
@@ -286,7 +174,11 @@ export const SettingsProvider = ({ children }) => {
   const settings = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
   useEffect(() => {
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    try {
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    } catch {
+      // Storage full or unavailable
+    }
   }, [settings]);
 
   const updateSettings = useCallback(
@@ -299,42 +191,17 @@ export const SettingsProvider = ({ children }) => {
 
   const updateSetting = useCallback((key, value) => updateSettings({ [key]: value }), [updateSettings]);
 
-  const updateLayout = useCallback(
-    (updater) => {
-      store.setState((current) => {
-        const nextLayout = typeof updater === 'function' ? updater(current.layout) : updater;
-        return { ...current, layout: nextLayout };
-      });
-    },
-    [store],
-  );
-
-  const updateFeatureToggle = useCallback(
-    (toggleKey, enabled) => {
-      store.setState((current) => ({
-        ...current,
-        featureToggles: {
-          ...current.featureToggles,
-          [toggleKey]: Boolean(enabled),
-        },
-      }));
-    },
-    [store],
-  );
-
   const value = useMemo(
     () => ({
       isLoading: false,
       isSaving: false,
       updateSettings,
       updateSetting,
-      updateLayout,
-      updateFeatureToggle,
       reloadSettings: () => {},
       getSettingsSnapshot: store.getState,
       subscribeToSettings: store.subscribe,
     }),
-    [store, updateFeatureToggle, updateLayout, updateSetting, updateSettings],
+    [store, updateSetting, updateSettings],
   );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
@@ -358,8 +225,6 @@ export const useSettings = () => {
     isSaving: context.isSaving,
     updateSettings: context.updateSettings,
     updateSetting: context.updateSetting,
-    updateLayout: context.updateLayout,
-    updateFeatureToggle: context.updateFeatureToggle,
     reloadSettings: context.reloadSettings,
   };
 };

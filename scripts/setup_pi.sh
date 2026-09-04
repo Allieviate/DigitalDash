@@ -68,7 +68,8 @@ sudo apt install -y \
     xinit \
     openbox \
     git \
-    curl
+    curl \
+    can-utils
 
 install_mongodb_docker_fallback() {
     echo -e "${YELLOW}Falling back to Docker-based MongoDB due apt repository signature/policy issues...${NC}"
@@ -338,9 +339,21 @@ ls -la /tmp/.X11-unix 2>/dev/null || true
 exit 1
 EOF
 chmod +x "$PROJECT_DIR/scripts/launch_kiosk.sh"
+chmod +x "$PROJECT_DIR/scripts/can_up.sh"
 
 # Create systemd services
 echo -e "${YELLOW}[6/7] Creating systemd services...${NC}"
+
+# CAN interface bring-up. Unlike the others this unit is a real file in
+# the repo rather than a heredoc, so it can be reviewed in a diff and
+# read in the garage; only the checkout path is substituted.
+#
+# Note this only raises the interface. The device-tree overlays that
+# create it still have to be added to /boot/firmware/config.txt by
+# hand - see scripts/can_config.txt - because editing that file wrong
+# can leave the Pi unbootable.
+sed "s#__PROJECT_DIR__#$PROJECT_DIR#g" "$PROJECT_DIR/scripts/frank-can.service" \
+    | sudo tee /etc/systemd/system/frank-can.service > /dev/null
 
 # Display bootstrap service for Lite images (starts Xorg + Openbox on tty1)
 sudo tee /etc/systemd/system/frank-display.service > /dev/null << EOF
@@ -373,7 +386,7 @@ EOF
 sudo tee /etc/systemd/system/frank-backend.service > /dev/null << EOF
 [Unit]
 Description=FRANK HMI Backend
-After=network.target mongodb.service
+After=network.target mongodb.service frank-can.service
 
 [Service]
 Type=simple
@@ -434,6 +447,7 @@ EOF
 
 # Enable services
 sudo systemctl daemon-reload
+sudo systemctl enable frank-can.service
 sudo systemctl enable frank-display.service
 sudo systemctl enable frank-backend.service
 sudo systemctl enable frank-frontend.service
