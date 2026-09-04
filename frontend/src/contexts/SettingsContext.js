@@ -73,6 +73,21 @@ const DEFAULT_SETTINGS = {
   red_shift: 7800,
   redline: 8500,
 
+  // Which info gauges are drawn at all. This is your choice and is
+  // separate from whether the signal exists: a gauge switched off here
+  // is gone, while one left on with nothing behind it renders dimmed
+  // with dashes until data arrives.
+  //
+  // Not to be confused with the widget_visibility key removed in the
+  // settings cleanup. That one was written by the Dash Builder tab and
+  // read by nothing. These are read by InfoGauges.
+  gauge_visibility: {
+    fuel: true,
+    coolant: true,
+    battery: true,
+    oil_pressure: true,
+  },
+
   // connectivity
   bluetooth_enabled: true,
   wifi_enabled: true,
@@ -98,6 +113,18 @@ const sanitizeSettings = (incoming = {}) => {
       next[key] = typeof value === 'boolean' ? value : fallback;
     } else if (typeof fallback === 'string') {
       next[key] = typeof value === 'string' ? value : fallback;
+    } else if (fallback && typeof fallback === 'object' && !Array.isArray(fallback)) {
+      // A flat map of booleans, gauge_visibility being the only one.
+      // Same whitelist rule as the top level, one level down: unknown
+      // sub-keys are dropped and wrong types fall back, so a gauge
+      // renamed or removed later cannot linger in localStorage.
+      const merged = { ...fallback };
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        for (const subKey of Object.keys(fallback)) {
+          if (typeof value[subKey] === 'boolean') merged[subKey] = value[subKey];
+        }
+      }
+      next[key] = merged;
     }
   }
 

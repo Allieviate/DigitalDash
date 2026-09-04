@@ -155,6 +155,47 @@ class TestCanSourceWithNoInterface:
         assert source._reopen_delay == source.REOPEN_BACKOFF_MAX
 
 
+class TestLiveFieldsCoversDerivedWarnings:
+    """live_fields has to mean "you can trust this", not "a frame carried this".
+
+    The dash dims a tell-tale whose signal is not in live_fields. The
+    overheat and low-oil lamps are derived rather than transmitted, so
+    without registering them a working overheat warning would be drawn
+    faint while the coolant feeding it was perfectly live.
+    """
+
+    def test_overheat_lamp_is_live_once_coolant_is(self):
+        source = HondataCanSource(channel=MISSING_CHANNEL)
+        source.seen_fields.add("coolant_temp_c")
+        source.signals.coolant_temp_c = 115.0
+
+        source._derive_available()
+
+        assert source.signals.high_coolant is True
+        assert "high_coolant" in source.status()["live_fields"]
+
+    def test_oil_lamp_stays_unmonitored_with_no_sender(self):
+        """The KPro analog input is not wired, so nothing is watching."""
+        source = HondataCanSource(channel=MISSING_CHANNEL)
+        source.seen_fields.add("coolant_temp_c")
+
+        source._derive_available()
+
+        live = source.status()["live_fields"]
+        assert "oil_pressure_warning" not in live
+        assert "low_fuel" not in live
+        assert source.signals.oil_pressure_warning is False
+
+    def test_boost_is_live_once_map_is(self):
+        source = HondataCanSource(channel=MISSING_CHANNEL)
+        source.seen_fields.add("map_kpa")
+        source.signals.map_kpa = 101.3
+
+        source._derive_available()
+
+        assert "boost_psi" in source.status()["live_fields"]
+
+
 class TestRunSourceWithADeadCanBus:
     def test_dash_gets_no_data_rather_than_a_healthy_engine(self):
         """End to end, the scenario that would meet the car.

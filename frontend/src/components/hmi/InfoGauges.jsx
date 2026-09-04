@@ -6,15 +6,15 @@ import {
   Droplet,
   AlertCircle,
 } from 'lucide-react';
-import { useVehicleSignal } from '../../contexts/VehicleDataContext';
-import { useSettings } from '../../contexts/SettingsContext';
+import { useSignalIsAvailable, useVehicleSignal } from '../../contexts/VehicleDataContext';
+import { useSettingsSelector } from '../../contexts/SettingsContext';
 
 /**
  * InfoGauge - Modular info tile for vertical/horizontal bar displays
  * Used for: Fuel, Coolant Temp, Battery, Oil Pressure, etc.
  */
 const InfoGauge = ({
-  visible = true,
+  available = true,
   icon: Icon,
   label,
   value = 0,
@@ -25,11 +25,22 @@ const InfoGauge = ({
   orientation = 'vertical', // 'vertical' or 'horizontal'
   className = '',
 }) => {
-  const percentage = Math.min(Math.max((value / max) * 100, 0), 100);
+  // Nothing behind this gauge: no bar, dashes instead of a number, and
+  // no warning colour. The danger band especially has to go - an oil
+  // pressure sender that is not wired yet reads as 0 PSI, and 0 PSI is
+  // exactly what a spun bearing looks like. A red lamp for a sender
+  // that does not exist teaches you to ignore the red lamp.
+  const percentage = available
+    ? Math.min(Math.max((value / max) * 100, 0), 100)
+    : 0;
 
   let barColor = '#0EA5E9'; // Default cyan
-  if (danger) barColor = '#EF4444'; // Red
+  if (!available) barColor = '#3f3f46'; // Zinc: present, but saying nothing
+  else if (danger) barColor = '#EF4444'; // Red
   else if (warning) barColor = '#F59E0B'; // Amber
+
+  const alert = available && (danger || warning);
+  const valueText = available ? Math.round(value) : '--';
 
   return (
     <div
@@ -39,12 +50,15 @@ const InfoGauge = ({
           : 'flex-row items-center gap-3'
       } ${className}`}
       data-testid={`info-gauge-${label}`}
+      data-available={available}
+      style={{ opacity: available ? 1 : 0.45 }}
+      title={available ? undefined : `${label}: no signal`}
     >
       {/* Icon */}
       <Icon
         size={16}
         style={{
-          color: danger || warning ? barColor : '#52525b',
+          color: alert ? barColor : '#52525b',
         }}
       />
 
@@ -82,11 +96,13 @@ const InfoGauge = ({
           <div className="text-center">
             <span
               className="font-orbitron text-sm font-bold"
-              style={{ color: danger || warning ? barColor : '#e4e4e7' }}
+              style={{ color: alert ? barColor : '#e4e4e7' }}
             >
-              {Math.round(value)}
+              {valueText}
             </span>
-            <span className="text-zinc-600 text-[10px] ml-0.5">{unit}</span>
+            {available && (
+              <span className="text-zinc-600 text-[10px] ml-0.5">{unit}</span>
+            )}
           </div>
 
           {/* Label */}
@@ -123,10 +139,10 @@ const InfoGauge = ({
               </span>
               <span
                 className="font-mono font-bold"
-                style={{ color: danger || warning ? barColor : '#ffffff' }}
+                style={{ color: alert ? barColor : '#ffffff' }}
               >
-                {Math.round(value)}
-                {unit}
+                {valueText}
+                {available ? unit : ''}
               </span>
             </div>
           </div>
@@ -137,22 +153,47 @@ const InfoGauge = ({
 };
 
 /**
- * FuelGauge - Fuel level indicator
+ * Should this gauge be drawn at all?
+ *
+ * Two independent questions, and it matters that they stay separate:
+ *
+ *   visibility  - your choice. A gauge switched off in settings is
+ *                 gone, whether or not its signal exists.
+ *   availability - the car's answer. A gauge left on but with nothing
+ *                 behind it renders dimmed with dashes, and comes
+ *                 alive on its own the moment data arrives.
+ *
+ * The selector returns a boolean rather than the gauge_visibility
+ * object, because useSyncExternalStore compares snapshots by identity
+ * and a fresh object each check would re-render forever.
  */
-export const FuelGauge = ({ visible = true, className = '' }) => {
-  const fuelPct = useVehicleSignal('fuel_pct') || 0;
-  const lowFuel = fuelPct < 0.2;
+const useGaugeVisible = (key, override) => {
+  const enabled = useSettingsSelector((s) => s.gauge_visibility?.[key] !== false);
+  return override ?? enabled;
+};
 
-  if (!visible) return null;
+/**
+ * FuelGauge - Fuel level indicator
+ *
+ * fuel_pct has no source until a sender is wired into a KPro analog
+ * input, so on the car as it stands this sits dimmed.
+ */
+export const FuelGauge = ({ visible, className = '' }) => {
+  const fuelPct = useVehicleSignal('fuel_pct') ?? 0;
+  const available = useSignalIsAvailable('fuel_pct');
+  const shown = useGaugeVisible('fuel', visible);
+
+  if (!shown) return null;
 
   return (
     <InfoGauge
       icon={Fuel}
       label="FUEL"
+      available={available}
       value={fuelPct * 100}
       max={100}
       unit="%"
-      danger={lowFuel}
+      danger={fuelPct < 0.2}
       warning={fuelPct < 0.3}
       orientation="vertical"
       className={className}
@@ -163,22 +204,23 @@ export const FuelGauge = ({ visible = true, className = '' }) => {
 /**
  * CoolantGauge - Engine coolant temperature
  */
-export const CoolantGauge = ({ visible = true, className = '' }) => {
-  const coolantTemp = useVehicleSignal('coolant_temp_c') || 0;
-  const danger = coolantTemp > 100;
-  const warning = coolantTemp > 90;
+export const CoolantGauge = ({ visible, className = '' }) => {
+  const coolantTemp = useVehicleSignal('coolant_temp_c') ?? 0;
+  const available = useSignalIsAvailable('coolant_temp_c');
+  const shown = useGaugeVisible('coolant', visible);
 
-  if (!visible) return null;
+  if (!shown) return null;
 
   return (
     <InfoGauge
       icon={Thermometer}
       label="COOLANT"
+      available={available}
       value={coolantTemp}
       max={120}
       unit="°C"
-      danger={danger}
-      warning={warning}
+      danger={coolantTemp > 100}
+      warning={coolantTemp > 90}
       orientation="vertical"
       className={className}
     />
@@ -188,22 +230,23 @@ export const CoolantGauge = ({ visible = true, className = '' }) => {
 /**
  * BatteryGauge - Battery voltage
  */
-export const BatteryGauge = ({ visible = true, className = '' }) => {
-  const batteryVoltage = useVehicleSignal('battery_voltage') || 0;
-  const danger = batteryVoltage < 11.5;
-  const warning = batteryVoltage < 12;
+export const BatteryGauge = ({ visible, className = '' }) => {
+  const batteryVoltage = useVehicleSignal('battery_voltage') ?? 0;
+  const available = useSignalIsAvailable('battery_voltage');
+  const shown = useGaugeVisible('battery', visible);
 
-  if (!visible) return null;
+  if (!shown) return null;
 
   return (
     <InfoGauge
       icon={Zap}
       label="BATTERY"
+      available={available}
       value={batteryVoltage}
       max={15}
       unit="V"
-      danger={danger}
-      warning={warning}
+      danger={batteryVoltage < 11.5}
+      warning={batteryVoltage < 12}
       orientation="vertical"
       className={className}
     />
@@ -212,23 +255,31 @@ export const BatteryGauge = ({ visible = true, className = '' }) => {
 
 /**
  * OilPressureGauge - Oil pressure indicator
+ *
+ * The gauge this whole change exists for. oil_pressure_psi has no
+ * source until a sender is wired into a KPro analog input, and the
+ * backend model default is 40 PSI - so before this it drew a
+ * confident, healthy 40 PSI on a car with nothing plumbed in. The
+ * `|| 0` here was worse still: it turned a missing reading into 0 PSI,
+ * sitting in the danger band, which is what a spun bearing looks like.
  */
-export const OilPressureGauge = ({ visible = true, className = '' }) => {
-  const oilPressure = useVehicleSignal('oil_pressure_psi') || 0;
-  const danger = oilPressure < 20;
-  const warning = oilPressure < 30;
+export const OilPressureGauge = ({ visible, className = '' }) => {
+  const oilPressure = useVehicleSignal('oil_pressure_psi') ?? 0;
+  const available = useSignalIsAvailable('oil_pressure_psi');
+  const shown = useGaugeVisible('oil_pressure', visible);
 
-  if (!visible) return null;
+  if (!shown) return null;
 
   return (
     <InfoGauge
       icon={Droplet}
       label="OIL PRESSURE"
+      available={available}
       value={oilPressure}
       max={80}
       unit="PSI"
-      danger={danger}
-      warning={warning}
+      danger={oilPressure < 20}
+      warning={oilPressure < 30}
       orientation="vertical"
       className={className}
     />

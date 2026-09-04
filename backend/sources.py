@@ -407,20 +407,30 @@ class HondataCanSource(SignalSource):
         from VehicleSignals' 40 PSI default and report healthy oil
         pressure on a car with no sender wired. Silence is honest
         there; a confident green light is not.
+
+        A derived field also joins seen_fields once its input has
+        arrived, so live_fields means "you can trust this" rather than
+        "a frame carried this". Without that the dash cannot tell a
+        TEMP HIGH lamp that is genuinely being watched from one with
+        nothing behind it, and would dim a working overheat warning.
         """
         if "coolant_temp_c" in self.seen_fields:
             self.signals.high_coolant = self.signals.coolant_temp_c >= COOLANT_WARN_C
+            self.seen_fields.add("high_coolant")
 
         if "fuel_pct" in self.seen_fields:
             self.signals.low_fuel = self.signals.fuel_pct <= LOW_FUEL_PCT
+            self.seen_fields.add("low_fuel")
 
         if "oil_pressure_psi" in self.seen_fields:
             self.signals.oil_pressure_warning = (
                 self.signals.oil_pressure_psi < OIL_PRESSURE_WARN_PSI
             )
+            self.seen_fields.add("oil_pressure_warning")
 
         if "map_kpa" in self.seen_fields:
             self.signals.boost_psi = (self.signals.map_kpa - 101.3) * 0.145038
+            self.seen_fields.add("boost_psi")
 
     def status(self) -> Dict[str, Any]:
         age = None

@@ -8,7 +8,7 @@ import {
   ShieldAlert,
   CircleDot
 } from 'lucide-react';
-import { useVehicleData } from '../../contexts/VehicleDataContext';
+import { useSignalIsAvailable, useVehicleData } from '../../contexts/VehicleDataContext';
 import { useSettingsSelector } from '../../contexts/SettingsContext';
 
 const WARNING_CONFIG = {
@@ -61,20 +61,28 @@ export const WarningLight = ({ type, active, className = '' }) => {
   // not, which reads as a row of empty boxes rather than as tell-tales.
   const showChrome = useSettingsSelector((s) => Boolean(s.mil_borders));
 
+  // A dark tell-tale is a claim: "checked, and fine". For BRAKE, ABS
+  // and SERVICE that claim is currently false - they are body
+  // electrical or have no source at all, so nothing is watching them.
+  // An unmonitored lamp is drawn faint so it reads as absent rather
+  // than as reassurance.
+  const monitored = useSignalIsAvailable(type);
+
   const config = WARNING_CONFIG[type];
   if (!config) return null;
-  
+
   const Icon = config.icon;
+  const lit = active && monitored;
 
   // The border stays in the box model even when hidden, just
   // transparent. Dropping it entirely would shrink each lamp by 2px
   // and shift every widget position saved in the layout.
   const borderColor = showChrome
-    ? (active ? config.color + '40' : 'rgba(255,255,255,0.08)')
+    ? (lit ? config.color + '40' : 'rgba(255,255,255,0.08)')
     : 'transparent';
 
   const background = showChrome
-    ? (active ? `${config.color}15` : 'rgba(255,255,255,0.04)')
+    ? (lit ? `${config.color}15` : 'rgba(255,255,255,0.04)')
     : 'transparent';
 
   return (
@@ -88,24 +96,27 @@ export const WarningLight = ({ type, active, className = '' }) => {
         borderRadius: 8,
         background,
         border: `1px solid ${borderColor}`,
+        opacity: monitored ? 1 : 0.35,
       }}
       data-testid={`warning-${type}`}
-      data-active={active}
+      data-active={lit}
+      data-monitored={monitored}
+      title={monitored ? undefined : `${config.label}: no source wired`}
     >
       <Icon 
         size={28} 
         className={`
           warning-light
-          ${active ? (config.critical ? 'critical' : 'active animate-pulse-glow') : ''}
+          ${lit ? (config.critical ? 'critical' : 'active animate-pulse-glow') : ''}
         `}
         style={{ 
-          color: active ? config.color : '#71717a',
-          filter: active ? `drop-shadow(0 0 10px ${config.color})` : 'none'
+          color: lit ? config.color : '#71717a',
+          filter: lit ? `drop-shadow(0 0 10px ${config.color})` : 'none'
         }}
       />
       <span 
         className="text-[10px] uppercase tracking-wider mt-1.5 font-medium font-orbitron"
-        style={{ color: active ? config.color : '#71717a' }}
+        style={{ color: lit ? config.color : '#71717a' }}
       >
         {config.label}
       </span>

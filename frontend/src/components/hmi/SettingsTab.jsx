@@ -12,22 +12,43 @@ const SHIFT_LIGHT_STYLES = [
   { id: 'sequential', label: 'Sequential', hint: 'Green through amber into red' },
 ];
 
+// The four info gauges, and which of them the car cannot feed yet.
+// Fuel and oil pressure need senders wired into KPro analog inputs;
+// nothing in the Hondata broadcast carries either.
+const GAUGE_TOGGLES = [
+  { key: 'coolant', label: 'Coolant temperature' },
+  { key: 'battery', label: 'Battery voltage' },
+  {
+    key: 'fuel',
+    label: 'Fuel level',
+    note: 'No source until a sender is wired to a KPro analog input.',
+  },
+  {
+    key: 'oil_pressure',
+    label: 'Oil pressure',
+    note: 'No source until a sender is wired to a KPro analog input.',
+  },
+];
+
 // ── Vehicle Parameters Tab with RPM & Shift Light Controls ──
 const VehicleParamsTab = () => {
   const { settings, updateSetting } = useSettings();
-  
+
   // Read from persisted settings, fallback to defaults
   const shiftStyle = settings.shift_light_style ?? 'classic';
   const yellowShift = settings.yellow_shift ?? 7000;
   const redShift = settings.red_shift ?? 7800;
   const redline = settings.redline ?? 8500;
   const milBorders = settings.mil_borders ?? false;
+  const gaugeVisibility = settings.gauge_visibility ?? {};
 
   const setShiftStyle = (val) => updateSetting('shift_light_style', val);
   const setYellowShift = (val) => updateSetting('yellow_shift', val);
   const setRedShift = (val) => updateSetting('red_shift', val);
   const setRedline = (val) => updateSetting('redline', val);
   const setMilBorders = (val) => updateSetting('mil_borders', val);
+  const setGaugeVisible = (key, val) =>
+    updateSetting('gauge_visibility', { ...gaugeVisibility, [key]: val });
 
   // A helper component for our custom sliders
   const CustomSlider = ({ label, value, min, max, step, onChange, color, hint }) => (
@@ -151,6 +172,39 @@ const VehicleParamsTab = () => {
            <input type="checkbox" checked={milBorders} onChange={(e) => setMilBorders(e.target.checked)} style={{ transform: 'scale(1.5)', accentColor: '#EF4444' }}/>
         </div>
 
+      </div>
+
+      {/* ── Gauges Section ── */}
+      <div style={{ background: '#18181b', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '24px' }}>
+        <h3 style={{ fontFamily: 'Orbitron, sans-serif', fontSize: 16, color: '#fff', marginBottom: 8, letterSpacing: '0.1em' }}>
+          GAUGES
+        </h3>
+        <div style={{ fontFamily: 'Helvetica Neue, sans-serif', fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 20, lineHeight: 1.5 }}>
+          Switch a gauge off and it is gone. Leave one on with nothing
+          feeding it and it sits dimmed showing dashes, then comes alive
+          on its own once the signal arrives.
+        </div>
+
+        {GAUGE_TOGGLES.map(({ key, label, note }) => (
+          <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div>
+              <div style={{ fontFamily: 'Helvetica Neue, sans-serif', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
+                {label}
+              </div>
+              {note && (
+                <div style={{ fontFamily: 'Helvetica Neue, sans-serif', fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>
+                  {note}
+                </div>
+              )}
+            </div>
+            <input
+              type="checkbox"
+              checked={gaugeVisibility[key] !== false}
+              onChange={(e) => setGaugeVisible(key, e.target.checked)}
+              style={{ transform: 'scale(1.5)', accentColor: '#0EA5E9' }}
+            />
+          </div>
+        ))}
       </div>
 
     </div>

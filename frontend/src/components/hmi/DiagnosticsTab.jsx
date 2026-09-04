@@ -1,6 +1,6 @@
 import React from 'react';
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { useVehicleSignal } from '../../contexts/VehicleDataContext'; // The REAL wiring harness
+import { useSignalIsAvailable, useVehicleSignal } from '../../contexts/VehicleDataContext'; // The REAL wiring harness
 
 // The Mechanic's Thresholds for a K24 Engine
 const VITALS = [
@@ -12,7 +12,9 @@ const VITALS = [
 
 function getColor(key, value) {
   const vital = VITALS.find(v => v.key === key);
-  if (!vital || value === undefined) return '#ffffff';
+  // No reading, no verdict. Colouring a missing value would put an
+  // oil pressure sender that is not wired into the danger band.
+  if (!vital || value === undefined || value === null) return '#ffffff';
   if (vital.dangerAbove  && value >= vital.dangerAbove)  return '#EF4444'; // Honda Red
   if (vital.warnAbove    && value >= vital.warnAbove)    return '#F59E0B'; // Amber Warning
   if (vital.dangerBelow  && value <= vital.dangerBelow)  return '#EF4444'; 
@@ -20,23 +22,37 @@ function getColor(key, value) {
   return '#ffffff';
 }
 
+const cToF = (c) => (c * 9) / 5 + 32;
+
 export default function DiagnosticsTab() {
   // ── Pulling directly from our Pub/Sub ECU Store ──
-  const coolantC = useVehicleSignal('coolant_temp_c') ?? 85;
-  const batteryV = useVehicleSignal('battery_voltage') ?? 14.2;
-  const oilPsi = useVehicleSignal('oil_pressure_psi') ?? 45;
-  const rpm = useVehicleSignal('rpm') ?? 900;
-  
-  // Convert Celsius to Fahrenheit for display
-  const coolant = coolantC ? (coolantC * 9/5) + 32 : 195;
-  // Intake air temp simulated from RPM load
-  const iat = Math.round(77 + (rpm / 8000) * 36);
-  const battery = batteryV ?? 14.2;
-  const oilPressure = oilPsi ?? 45;
+  //
+  // This tab used to invent what it did not have: `?? 45` for oil,
+  // `?? 14.2` for battery, `? : 195` for coolant, and intake air temp
+  // computed from RPM as `77 + (rpm / 8000) * 36`. That last one is
+  // the worst of them, because intake_air_temp_c is a real signal on
+  // 0x661 - the tab was fabricating a number it could simply have
+  // read. A diagnostics screen that makes numbers up is worse than no
+  // diagnostics screen.
+  const coolantC = useVehicleSignal('coolant_temp_c');
+  const iatC = useVehicleSignal('intake_air_temp_c');
+  const batteryV = useVehicleSignal('battery_voltage');
+  const oilPsi = useVehicleSignal('oil_pressure_psi');
+
+  const coolantLive = useSignalIsAvailable('coolant_temp_c');
+  const iatLive = useSignalIsAvailable('intake_air_temp_c');
+  const batteryLive = useSignalIsAvailable('battery_voltage');
+  const oilLive = useSignalIsAvailable('oil_pressure_psi');
+
   const faultCodes = [];
 
-  // Group them for the map loop below
-  const activeSignals = { coolant, iat, battery, oilPressure };
+  // null means "nothing behind this", and renders as dashes.
+  const activeSignals = {
+    coolant: coolantLive && coolantC != null ? cToF(coolantC) : null,
+    iat: iatLive && iatC != null ? cToF(iatC) : null,
+    battery: batteryLive ? batteryV ?? null : null,
+    oilPressure: oilLive ? oilPsi ?? null : null,
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -80,7 +96,11 @@ export default function DiagnosticsTab() {
                   transition: 'color 0.4s ease',
                 }}>
                   {/* Format Battery to 1 decimal, others to whole numbers */}
-                  {vital.key === 'battery' ? Number(value).toFixed(1) : Math.round(value)}
+                  {value === null || value === undefined
+                    ? '--'
+                    : vital.key === 'battery'
+                      ? Number(value).toFixed(1)
+                      : Math.round(value)}
                 </span>
                 <span style={{
                   fontFamily: 'Helvetica Neue, sans-serif',
