@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const BOOT_STEPS = [
@@ -18,18 +18,41 @@ const LOGO_URL = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/pub
  * - Result: user sees one continuous boot flow
  */
 
+/**
+ * Hold a callback in a ref so timers do not depend on its identity.
+ *
+ * This is the whole bug. The timer effects listed onComplete in their
+ * dependencies, and onComplete was a fresh arrow function on every
+ * parent render. VehicleDataProvider polls /api/source-status every
+ * two seconds and calls setSourceStatus with a fresh object, so the
+ * tree below it re-renders on that schedule - which cleared and
+ * rescheduled the boot timers every two seconds. The logo phase needs
+ * 3.2 uninterrupted seconds to advance, so it never advanced, and the
+ * animation restarted forever.
+ */
+const useCallbackRef = (callback) => {
+  const ref = useRef(callback);
+  useEffect(() => {
+    ref.current = callback;
+  }, [callback]);
+  return ref;
+};
+
 const HondaLogoAnimation = ({ onComplete }) => {
   const [phase, setPhase] = useState(0);
   // 0: Logo already visible (Plymouth handoff) — hold for 1s
   // 1: Glow pulse builds
   // 2: Hold + fade into next phase
+  const onCompleteRef = useCallbackRef(onComplete);
 
   useEffect(() => {
     const t1 = setTimeout(() => setPhase(1), 800);
     const t2 = setTimeout(() => setPhase(2), 2200);
-    const t3 = setTimeout(() => onComplete?.(), 3200);
+    const t3 = setTimeout(() => onCompleteRef.current?.(), 3200);
     return () => [t1, t2, t3].forEach(clearTimeout);
-  }, [onComplete]);
+    // Runs once. See useCallbackRef above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
@@ -112,7 +135,11 @@ export const BootSequence = ({ onComplete }) => {
   const [sweepAngle, setSweepAngle] = useState(-120);
   const [showK, setShowK] = useState(false);
 
-  const handleLogoComplete = () => setPhase('name');
+  const onCompleteRef = useCallbackRef(onComplete);
+
+  // Stable across renders, so HondaLogoAnimation's timer effect is not
+  // torn down every time this component re-renders.
+  const handleLogoComplete = useRef(() => setPhase('name')).current;
 
   // Name phase: "Fran" fades, "K" slams in
   useEffect(() => {
@@ -125,21 +152,33 @@ export const BootSequence = ({ onComplete }) => {
   // Text phase: system checks
   useEffect(() => {
     if (phase !== 'text') return;
-    BOOT_STEPS.forEach((step, index) => {
+
+    // Rebuild rather than append. Without this, a re-entry into the
+    // text phase would stack duplicate lines on the previous run.
+    setVisibleSteps([]);
+
+    const timers = BOOT_STEPS.map((step, index) =>
       setTimeout(() => {
         setVisibleSteps(prev => [...prev, step.text]);
         if (index === BOOT_STEPS.length - 1) {
-          setTimeout(() => setPhase('sweep'), 400);
+          timers.push(setTimeout(() => setPhase('sweep'), 400));
         }
-      }, step.delay);
-    });
+      }, step.delay)
+    );
+
+    // These were previously left running. On unmount they would still
+    // fire and call setState on a component that no longer exists.
+    return () => timers.forEach(clearTimeout);
   }, [phase]);
 
   // Sweep phase: gauge test
   useEffect(() => {
     if (phase !== 'sweep') return;
+
     const duration = 1800;
     const startTime = Date.now();
+    let frame = null;
+    let doneTimer = null;
 
     const animate = () => {
       const elapsed = Date.now() - startTime;
@@ -154,14 +193,24 @@ export const BootSequence = ({ onComplete }) => {
       }
 
       if (progress < 1) {
-        requestAnimationFrame(animate);
+        frame = requestAnimationFrame(animate);
       } else {
         setSweepAngle(-120);
-        setTimeout(() => { setPhase('complete'); onComplete?.(); }, 200);
+        doneTimer = setTimeout(() => {
+          setPhase('complete');
+          onCompleteRef.current?.();
+        }, 200);
       }
     };
-    requestAnimationFrame(animate);
-  }, [phase, onComplete]);
+    frame = requestAnimationFrame(animate);
+
+    return () => {
+      if (frame !== null) cancelAnimationFrame(frame);
+      if (doneTimer !== null) clearTimeout(doneTimer);
+    };
+    // onComplete deliberately omitted; see useCallbackRef.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   return (
     <AnimatePresence>
