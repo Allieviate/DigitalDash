@@ -1,0 +1,36 @@
+[Unit]
+Description=FRANK HMI Kiosk Display
+After=frank-frontend.service frank-display.service network-online.target
+Wants=frank-frontend.service frank-display.service network-online.target
+
+[Service]
+Type=simple
+User=fran
+Environment=HOME=/home/fran
+PAMName=login
+
+# launch_kiosk.sh does its own waiting - for the frontend to answer and
+# for a display socket to appear - and reports which one it is stuck on.
+# A blind sleep here just delays that reporting.
+ExecStart=/home/fran/projects/DigitalDash/scripts/launch_kiosk.sh
+
+# on-failure, NOT always.
+#
+# Chromium exits 0 when it hands its URL to an instance that already
+# holds the profile directory. Restart=always treats that clean exit as
+# a reason to try again, which produced 376 restarts in one session
+# while the screen never changed. on-failure lets a clean exit stay
+# exited, and the launcher now exits non-zero on the cases that really
+# are failures.
+Restart=on-failure
+RestartSec=5
+
+# Stop retrying after five failures inside a minute. Without a limit, a
+# genuine fault - no display, frontend down, a bad build - retries
+# forever and buries the cause in a repeating log. Failed and stopped
+# is easier to diagnose than failing on a loop.
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+[Install]
+WantedBy=multi-user.target
