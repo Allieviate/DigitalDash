@@ -11,6 +11,7 @@ if [ -z "$CHROMIUM_BIN" ]; then
 fi
 
 APP_URL="http://localhost:3000"
+PROFILE_DIR="$HOME/.config/chromium-kiosk"
 
 COMMON_FLAGS=(
   --kiosk
@@ -24,7 +25,7 @@ COMMON_FLAGS=(
   --disable-background-networking
   --disable-component-update
   --disable-features=OptimizationGuideModelDownloading,MediaRouter
-  --user-data-dir="$HOME/.config/chromium-kiosk"
+  --user-data-dir="$PROFILE_DIR"
   --check-for-update-interval=31536000
   --disable-translate
   --disable-sync
@@ -36,15 +37,65 @@ WAYLAND_FLAGS=(
   --enable-features=UseOzonePlatform
 )
 
+# ---------------------------------------------------------------------
+# Single instance guard
+#
+# Chromium will not run two processes against the same --user-data-dir.
+# The second one hands its URL to the first, prints "Opening in existing
+# browser session", and exits 0.
+#
+# With Restart=always in the unit, systemd read that clean exit as a
+# reason to start again ten seconds later, and did so 376 times. The
+# display never changed, because the original instance was the one
+# holding the screen the whole time.
+#
+# So: if something is already using this profile, say so and exit
+# non-zero. A failed start that names the reason beats an endless loop
+# of successful ones.
+# ---------------------------------------------------------------------
+if pgrep -f -- "--user-data-dir=$PROFILE_DIR" >/dev/null 2>&1; then
+  echo "ERROR: Chromium is already running with profile $PROFILE_DIR."
+  echo "       Refusing to start a second instance that would exit 0"
+  echo "       and be restarted forever."
+  echo
+  echo "  To take over the display:"
+  echo "    sudo systemctl stop frank-kiosk"
+  echo "    pkill -f -- '--user-data-dir=$PROFILE_DIR'"
+  echo "    sudo systemctl start frank-kiosk"
+  exit 1
+fi
+
+# A profile left behind by an unclean exit keeps its lock files. A new
+# Chromium sees them, defers to a process that no longer exists, and
+# exits 0. Nothing is running now (checked above), so these are stale
+# by definition.
+if [ -e "$PROFILE_DIR/SingletonLock" ]; then
+  echo "[launch_kiosk] Clearing stale profile locks"
+  rm -f "$PROFILE_DIR"/Singleton{Lock,Socket,Cookie}
+fi
+
 # Wait for frontend to be reachable
 echo "[launch_kiosk] Waiting for frontend at $APP_URL..."
+frontend_ready=0
 for i in $(seq 1 90); do
   if curl -fsS --max-time 2 "${APP_URL}" >/dev/null 2>&1; then
     echo "[launch_kiosk] Frontend ready after ${i}s"
+    frontend_ready=1
     break
   fi
   sleep 1
 done
+
+# Previously this loop just fell through on timeout and launched anyway,
+# so a dead frontend showed as a Chromium error page rather than
+# anything that named the problem.
+if [ "$frontend_ready" -ne 1 ]; then
+  echo "ERROR: Frontend not reachable at $APP_URL after 90s."
+  echo "       Check: systemctl status frank-frontend"
+  echo "       A failed build leaves build/ broken while serve keeps"
+  echo "       handing it out, so check that it built cleanly too."
+  exit 1
+fi
 
 # Wait for display socket
 echo "[launch_kiosk] Waiting for display..."
@@ -73,8 +124,10 @@ for i in $(seq 1 120); do
     fi
     echo "[launch_kiosk] Using X11: DISPLAY=$DISPLAY"
 
-    # Hide mouse cursor (if unclutter is available)
+    # Hide mouse cursor (if unclutter is available).
+    # Killed first so restarts do not accumulate one per launch.
     if command -v unclutter >/dev/null 2>&1; then
+      pkill -x unclutter >/dev/null 2>&1 || true
       unclutter -idle 0.1 -root &
     fi
 
