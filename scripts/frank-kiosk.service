@@ -1,7 +1,19 @@
 [Unit]
 Description=FRANK HMI Kiosk Display
-After=frank-frontend.service frank-display.service network-online.target
-Wants=frank-frontend.service frank-display.service network-online.target
+
+# network-online.target is deliberately absent.
+#
+# It used to be in both After= and Wants=, which told systemd to hold
+# the kiosk until the network was up. Parked at a grocery store there
+# is no network to come up, so that target does not fail quickly - it
+# waits out its timeout, typically 90 to 120 seconds, and the driver
+# stares at a black screen the whole time.
+#
+# Nothing here needs the internet. The frontend is served from disk on
+# localhost and the backend reads a CAN bus. The only ordering that
+# matters is that both are running and a display exists.
+After=frank-frontend.service frank-display.service
+Wants=frank-frontend.service frank-display.service
 
 [Service]
 Type=simple

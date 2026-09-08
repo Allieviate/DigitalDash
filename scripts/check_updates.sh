@@ -1,13 +1,13 @@
 #!/bin/bash
 # Report whether the checkout is behind its remote.
 #
-# Called by start.sh and status.sh. Must never block the dash coming up:
-# in a car there is usually no network, so the fetch is wrapped in a
-# timeout and every failure path exits 0.
+# Never called during startup - the dash must come up with no network.
+# Run this by hand, or via status.sh, when you are somewhere with wifi
+# and want to know whether to pull before driving.
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-FETCH_TIMEOUT=10
+FETCH_TIMEOUT=5
 
 if ! command -v git >/dev/null 2>&1; then
   echo "git is not installed. Cannot check for updates."
@@ -23,7 +23,8 @@ current_branch="$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD)"
 echo "Checking updates for branch: $current_branch"
 
 # Without the timeout this hangs on DNS resolution when parked with no
-# wifi, holding up start.sh for however long the resolver takes.
+# wifi. Every failure path exits 0 so nothing downstream treats being
+# offline as an error.
 if ! timeout "$FETCH_TIMEOUT" git -C "$REPO_DIR" fetch --quiet origin "$current_branch" 2>/dev/null; then
   echo "Could not reach origin (offline or timed out). Skipping update check."
   exit 0
