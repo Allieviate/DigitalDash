@@ -1,7 +1,6 @@
 from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect, HTTPException
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 import asyncio
@@ -9,11 +8,11 @@ import math
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
-import uuid
 from datetime import datetime, timezone
 
+from device_store import DeviceStore, default_store_path
 from signals import (
     COOLANT_WARN_C,
     LAMP_TEST_FIELDS,
@@ -40,10 +39,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# MongoDB connection - with safe fallbacks
-mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ.get('DB_NAME', 'frank_hmi')]
+# ============ LOCAL STORAGE ============
+# Saved Android Auto devices used to live in MongoDB, with a Docker
+# fallback when the apt repository signature failed. That was a server,
+# a container runtime and a boot-time dependency in service of a
+# handful of key-value records. It is a JSON file now, and the Pi has
+# one less thing that has to come up before the dash works.
+
+device_store = DeviceStore(default_store_path())
 
 # ============ SIGNAL SOURCE ============
 # Which source this Pi runs is a property of how it is deployed, not a
@@ -52,7 +55,7 @@ db = client[os.environ.get('DB_NAME', 'frank_hmi')]
 # someone cleared browser storage is a bad failure mode.
 #
 #   SIGNAL_SOURCE=simulation    bench
-#   SIGNAL_SOURCE=hondata_can   car (phase 3)
+#   SIGNAL_SOURCE=hondata_can   car
 
 SIGNAL_SOURCE = os.environ.get('SIGNAL_SOURCE', 'simulation')
 
@@ -74,7 +77,6 @@ async def lifespan(app: FastAPI):
                 await _source_task
             except asyncio.CancelledError:
                 pass
-        client.close()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -101,33 +103,6 @@ class ThemeConfig(BaseModel):
     accent: str
     glow: str
     bg_texture: str
-
-class UserSettings(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    theme_id: str = "type_r"
-    performance_mode: str = "high_performance"  # high_performance or low_performance
-    units: str = "imperial"  # imperial or metric
-    gauge_style: str = "modern"  # modern, classic, minimal
-    warning_sounds: bool = True
-    chime_volume: int = 70
-    bluetooth_enabled: bool = True
-    brightness: int = 100
-    show_diagnostics: bool = False
-    custom_gauges: Dict[str, Any] = Field(default_factory=dict)
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-class UserSettingsUpdate(BaseModel):
-    theme_id: Optional[str] = None
-    performance_mode: Optional[str] = None
-    units: Optional[str] = None
-    gauge_style: Optional[str] = None
-    warning_sounds: Optional[bool] = None
-    chime_volume: Optional[int] = None
-    bluetooth_enabled: Optional[bool] = None
-    brightness: Optional[int] = None
-    show_diagnostics: Optional[bool] = None
-    custom_gauges: Optional[Dict[str, Any]] = None
 
 # ============ THEMES ============
 
@@ -204,35 +179,9 @@ async def get_theme(theme_id: str):
         return THEMES[theme_id]
     return THEMES["type_r"]
 
-@api_router.get("/settings", response_model=UserSettings)
-async def get_settings():
-    """Get user settings"""
-    settings = await db.settings.find_one({}, {"_id": 0})
-    if settings:
-        if isinstance(settings.get('updated_at'), str):
-            settings['updated_at'] = datetime.fromisoformat(settings['updated_at'])
-        return UserSettings(**settings)
-    return UserSettings()
-
-@api_router.post("/settings", response_model=UserSettings)
-async def save_settings(settings_update: UserSettingsUpdate):
-    """Update user settings"""
-    existing = await db.settings.find_one({}, {"_id": 0})
-
-    if existing:
-        update_data = settings_update.model_dump(exclude_unset=True)
-        update_data['updated_at'] = datetime.now(timezone.utc).isoformat()
-        await db.settings.update_one({}, {"$set": update_data})
-        updated = await db.settings.find_one({}, {"_id": 0})
-        if isinstance(updated.get('updated_at'), str):
-            updated['updated_at'] = datetime.fromisoformat(updated['updated_at'])
-        return UserSettings(**updated)
-    else:
-        new_settings = UserSettings(**settings_update.model_dump(exclude_unset=True))
-        doc = new_settings.model_dump()
-        doc['updated_at'] = doc['updated_at'].isoformat()
-        await db.settings.insert_one(doc)
-        return new_settings
+# Note: /api/settings is gone. The frontend has stored its settings in
+# localStorage since the settings cleanup, and never called those
+# endpoints. They existed only to keep a MongoDB collection warm.
 
 # ============ BENCH FAULT INJECTION ============
 
@@ -550,7 +499,7 @@ class DHUController:
 # Global DHU controller instance
 dhu_controller = DHUController()
 
-# ============ DEVICE PREFERENCES (MongoDB) ============
+# ============ DEVICE PREFERENCES (local JSON) ============
 
 class DevicePreferences(BaseModel):
     serial: str = ""
@@ -559,6 +508,12 @@ class DevicePreferences(BaseModel):
     connection_type: str = "usb"
     auto_launch: bool = True
     skip_prompt: bool = False
+    # Recorded, but not used as the identity. An Android phone
+    # re-enumerates from the manufacturer's USB ID to Google's
+    # 18d1:2d00 during the accessory handshake, so these change
+    # partway through a single connection.
+    vendor_id: str = ""
+    product_id: str = ""
 
 class DHUStartRequest(BaseModel):
     x: int = 640
@@ -571,29 +526,18 @@ class DHUStartRequest(BaseModel):
 @api_router.post("/dhu/device-preferences")
 async def save_device_preferences(prefs: DevicePreferences):
     """Save per-device preferences"""
-    key = prefs.device_model or prefs.serial
-    await db.device_preferences.update_one(
-        {"device_model": key} if prefs.device_model else {"serial": key},
-        {"$set": {
-            "serial": prefs.serial,
-            "device_model": prefs.device_model or prefs.serial,
-            "name": prefs.name,
-            "connection_type": prefs.connection_type,
-            "auto_launch": prefs.auto_launch,
-            "skip_prompt": prefs.skip_prompt,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }},
-        upsert=True,
-    )
-    return {"status": "saved", "device_model": key}
+    key = device_store.save(prefs.model_dump())
+    if key is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Need at least one of serial, device_model, or vendor_id + product_id",
+        )
+    return {"status": "saved", "key": key, "device_model": prefs.device_model or prefs.serial}
 
 @api_router.get("/dhu/device-preferences/{identifier}")
 async def get_device_preferences(identifier: str):
-    """Get saved preferences by model name or serial"""
-    prefs = await db.device_preferences.find_one(
-        {"$or": [{"device_model": identifier}, {"serial": identifier}]},
-        {"_id": 0}
-    )
+    """Get saved preferences by serial, model name, or storage key"""
+    prefs = device_store.find(identifier)
     if prefs:
         return {"status": "found", "preferences": prefs}
     return {"status": "not_found"}
@@ -601,18 +545,13 @@ async def get_device_preferences(identifier: str):
 @api_router.get("/dhu/devices")
 async def list_known_devices():
     """List all devices with saved preferences"""
-    devices = []
-    async for doc in db.device_preferences.find({}, {"_id": 0}):
-        devices.append(doc)
-    return {"devices": devices}
+    return {"devices": device_store.list()}
 
 @api_router.delete("/dhu/device-preferences/{identifier}")
 async def delete_device_preferences(identifier: str):
-    """Delete saved preferences by model name or serial"""
-    result = await db.device_preferences.delete_one(
-        {"$or": [{"device_model": identifier}, {"serial": identifier}]}
-    )
-    return {"status": "deleted" if result.deleted_count > 0 else "not_found"}
+    """Delete saved preferences by serial, model name, or storage key"""
+    removed = device_store.delete(identifier)
+    return {"status": "deleted" if removed else "not_found"}
 
 @api_router.post("/dhu/start")
 async def start_dhu(config: DHUStartRequest):
