@@ -8,27 +8,71 @@ const BOOT_STEPS = [
   { text: 'DISPLAY: READY', delay: 600 },
 ];
 
-const LOGO_URL = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/user_699be97dec012b23d1ab481d/ab8fac882_honda-logo.png';
-
 /*
- * Seamless Plymouth → React handoff:
- * - Plymouth shows Honda logo on black, then hides it on quit
- * - This component starts with Honda logo ALREADY visible on black (no delay)
- * - Brief hold, then smooth crossfade into FRANK name animation
- * - Result: user sees one continuous boot flow
+ * The logo used to be fetched from a Supabase bucket belonging to
+ * whatever tool scaffolded this project, on three separate <img> tags.
+ *
+ * That is a network request on the boot path of a device that spends
+ * its life in a car. Parked without wifi it fails, on a marginal
+ * connection it stalls, and it depends on a third party's storage
+ * continuing to exist.
+ *
+ * Local file now. If it is missing the inline mark below renders
+ * instead, so a fresh checkout still boots to something rather than
+ * three broken image icons.
  */
+const LOGO_SRC = '/assets/branding/honda-logo.png';
+
+/** Simple geometric fallback. Not a brand asset, just a shape. */
+const FallbackMark = ({ size, style }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 100 100"
+    style={style}
+    aria-label="FRANK"
+  >
+    <rect
+      x="6" y="22" width="88" height="56" rx="10"
+      fill="none" stroke="#DC2626" strokeWidth="5"
+    />
+    <path
+      d="M28 36 V64 M28 50 H72 M72 36 V64"
+      stroke="#DC2626" strokeWidth="9"
+      strokeLinecap="round" strokeLinejoin="round"
+      fill="none"
+    />
+  </svg>
+);
+
+const BootLogo = ({ size = 220, style, className }) => {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return <FallbackMark size={size} style={style} />;
+  }
+
+  return (
+    <img
+      src={LOGO_SRC}
+      alt="FRANK"
+      className={className}
+      onError={() => setFailed(true)}
+      style={{ width: size, height: 'auto', objectFit: 'contain', ...style }}
+    />
+  );
+};
 
 /**
  * Hold a callback in a ref so timers do not depend on its identity.
  *
- * This is the whole bug. The timer effects listed onComplete in their
- * dependencies, and onComplete was a fresh arrow function on every
- * parent render. VehicleDataProvider polls /api/source-status every
- * two seconds and calls setSourceStatus with a fresh object, so the
- * tree below it re-renders on that schedule - which cleared and
- * rescheduled the boot timers every two seconds. The logo phase needs
- * 3.2 uninterrupted seconds to advance, so it never advanced, and the
- * animation restarted forever.
+ * The timer effects listed onComplete in their dependencies, and
+ * onComplete was a fresh arrow function on every parent render.
+ * VehicleDataProvider polls /api/source-status every two seconds and
+ * calls setSourceStatus with a fresh object, so the tree below it
+ * re-renders on that schedule - which cleared and rescheduled the boot
+ * timers every two seconds. The logo phase needs 3.2 uninterrupted
+ * seconds to advance, so it never advanced.
  */
 const useCallbackRef = (callback) => {
   const ref = useRef(callback);
@@ -40,9 +84,6 @@ const useCallbackRef = (callback) => {
 
 const HondaLogoAnimation = ({ onComplete }) => {
   const [phase, setPhase] = useState(0);
-  // 0: Logo already visible (Plymouth handoff) — hold for 1s
-  // 1: Glow pulse builds
-  // 2: Hold + fade into next phase
   const onCompleteRef = useCallbackRef(onComplete);
 
   useEffect(() => {
@@ -50,13 +91,11 @@ const HondaLogoAnimation = ({ onComplete }) => {
     const t2 = setTimeout(() => setPhase(2), 2200);
     const t3 = setTimeout(() => onCompleteRef.current?.(), 3200);
     return () => [t1, t2, t3].forEach(clearTimeout);
-    // Runs once. See useCallbackRef above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
-      {/* Scanline texture */}
       <div
         className="absolute inset-0 pointer-events-none z-10"
         style={{
@@ -65,7 +104,6 @@ const HondaLogoAnimation = ({ onComplete }) => {
         }}
       />
 
-      {/* Center glow — builds in phase 1 */}
       <motion.div
         className="absolute rounded-full pointer-events-none"
         initial={{ opacity: 0, scale: 0.3 }}
@@ -81,7 +119,6 @@ const HondaLogoAnimation = ({ onComplete }) => {
         }}
       />
 
-      {/* Persistent ambient glow */}
       <motion.div
         className="absolute rounded-full pointer-events-none"
         initial={{ opacity: 0 }}
@@ -94,17 +131,13 @@ const HondaLogoAnimation = ({ onComplete }) => {
         }}
       />
 
-      {/* Honda Logo — starts ALREADY visible (Plymouth handoff) */}
       <div className="relative z-20 flex flex-col items-center select-none">
         <motion.div
           className="relative flex items-center justify-center"
           initial={{ opacity: 1, scale: 1 }}
-          animate={{
-            scale: phase >= 1 ? 1.02 : 1,
-          }}
+          animate={{ scale: phase >= 1 ? 1.02 : 1 }}
           transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1] }}
         >
-          {/* Glow behind logo */}
           <motion.div
             className="absolute pointer-events-none rounded-full"
             initial={{ opacity: 0 }}
@@ -118,11 +151,7 @@ const HondaLogoAnimation = ({ onComplete }) => {
             }}
           />
 
-          <img
-            src={LOGO_URL}
-            alt="Honda H"
-            style={{ width: 220, height: 220, objectFit: 'contain', position: 'relative', zIndex: 1 }}
-          />
+          <BootLogo size={220} style={{ position: 'relative', zIndex: 1 }} />
         </motion.div>
       </div>
     </div>
@@ -153,8 +182,6 @@ export const BootSequence = ({ onComplete }) => {
   useEffect(() => {
     if (phase !== 'text') return;
 
-    // Rebuild rather than append. Without this, a re-entry into the
-    // text phase would stack duplicate lines on the previous run.
     setVisibleSteps([]);
 
     const timers = BOOT_STEPS.map((step, index) =>
@@ -166,8 +193,6 @@ export const BootSequence = ({ onComplete }) => {
       }, step.delay)
     );
 
-    // These were previously left running. On unmount they would still
-    // fire and call setState on a component that no longer exists.
     return () => timers.forEach(clearTimeout);
   }, [phase]);
 
@@ -208,7 +233,6 @@ export const BootSequence = ({ onComplete }) => {
       if (frame !== null) cancelAnimationFrame(frame);
       if (doneTimer !== null) clearTimeout(doneTimer);
     };
-    // onComplete deliberately omitted; see useCallbackRef.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
@@ -222,12 +246,10 @@ export const BootSequence = ({ onComplete }) => {
           transition={{ duration: 0.8, ease: 'easeInOut' }}
           data-testid="boot-sequence"
         >
-          {/* Logo phase — seamless handoff from Plymouth */}
           {phase === 'logo' && (
             <HondaLogoAnimation onComplete={handleLogoComplete} />
           )}
 
-          {/* Name phase: FRANK */}
           {phase === 'name' && (
             <motion.div
               className="flex flex-col items-center"
@@ -235,15 +257,15 @@ export const BootSequence = ({ onComplete }) => {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.5 }}
             >
-              <motion.img
-                src={LOGO_URL}
-                alt="Honda"
-                className="w-56 h-auto mb-6"
+              <motion.div
+                className="mb-6"
                 initial={{ opacity: 1, y: 0 }}
                 animate={{ opacity: 0.9, y: -10 }}
                 transition={{ duration: 0.8 }}
                 style={{ filter: 'drop-shadow(0 0 40px rgba(200, 0, 0, 0.4))' }}
-              />
+              >
+                <BootLogo size={224} />
+              </motion.div>
 
               <div className="flex items-center justify-center mb-4">
                 <motion.span
@@ -282,10 +304,11 @@ export const BootSequence = ({ onComplete }) => {
             </motion.div>
           )}
 
-          {/* Text phase: system checks */}
           {phase === 'text' && (
             <div className="flex flex-col items-center">
-              <img src={LOGO_URL} alt="Honda" className="w-32 h-auto mb-6 opacity-60" />
+              <div className="mb-6" style={{ opacity: 0.6 }}>
+                <BootLogo size={128} />
+              </div>
               <div className="font-orbitron text-sm space-y-1 text-left w-72">
                 {visibleSteps.map((text, index) => (
                   <motion.div key={index} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2">
@@ -297,7 +320,6 @@ export const BootSequence = ({ onComplete }) => {
             </div>
           )}
 
-          {/* Sweep phase: gauge test */}
           {phase === 'sweep' && (
             <div className="flex flex-col items-center gap-4">
               <div className="relative w-56 h-56">
@@ -321,7 +343,6 @@ export const BootSequence = ({ onComplete }) => {
             </div>
           )}
 
-          {/* Progress bar */}
           <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-56">
             <div className="h-1 bg-zinc-900 rounded-full overflow-hidden">
               <motion.div
