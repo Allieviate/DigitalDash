@@ -1,0 +1,4 @@
+# Runtime data written by the backend. Contents are per-Pi and should
+# not be committed, but the directory itself needs to exist.
+*
+!.gitignore
