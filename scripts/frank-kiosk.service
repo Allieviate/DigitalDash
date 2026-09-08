@@ -5,14 +5,14 @@ Wants=frank-frontend.service frank-display.service network-online.target
 
 [Service]
 Type=simple
-User=fran
-Environment=HOME=/home/fran
+User=__USER__
+Environment=HOME=__HOME__
 PAMName=login
 
 # launch_kiosk.sh does its own waiting - for the frontend to answer and
 # for a display socket to appear - and reports which one it is stuck on.
 # A blind sleep here just delays that reporting.
-ExecStart=/home/fran/projects/DigitalDash/scripts/launch_kiosk.sh
+ExecStart=__PROJECT_DIR__/scripts/launch_kiosk.sh
 
 # on-failure, NOT always.
 #

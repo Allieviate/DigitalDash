@@ -2,9 +2,23 @@
 # =============================================================================
 # FRANK Digital Instrument Cluster - Raspberry Pi 5 Setup Script
 # For 1989 Honda Accord HMI
+#
+# This script INSTALLS. It does not author.
+#
+# Anything it needs to put on the Pi lives as a real file in scripts/ and
+# is copied or sed-substituted into place. Nothing is generated inline.
+#
+# That rule exists because it was broken: this script used to write
+# scripts/launch_kiosk.sh from a heredoc, silently overwriting the
+# version in the repo with an older copy. Improvements to the launcher
+# were undone by the next setup run, and the two copies drifted until
+# they no longer matched.
+#
+# If you need setup to place a new file, add the file to scripts/ and
+# install it here. Do not paste its contents into this script.
 # =============================================================================
 
-set -e
+set -euo pipefail
 
 echo "╔═══════════════════════════════════════════════════════════════╗"
 echo "║     FRANK - Digital Instrument Cluster Setup                  ║"
@@ -22,9 +36,42 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
+# -----------------------------------------------------------------------------
+# Who are we installing for?
+#
+# Resolved once. Previously the kiosk unit used ${SUDO_USER:-...} while
+# the backend, frontend and display units used $USER, so running this
+# under sudo produced three services owned by root and one owned by the
+# real user - with the root-owned ones looking for a venv and a build in
+# the wrong home directory.
+# -----------------------------------------------------------------------------
+RUN_USER="${SUDO_USER:-$USER}"
+
+if [ "$RUN_USER" = "root" ]; then
+    echo -e "${RED}Refusing to install services owned by root.${NC}"
+    echo "Run this as your normal user (it will sudo where needed):"
+    echo "  ./scripts/setup_pi.sh"
+    exit 1
+fi
+
+RUN_HOME="$(getent passwd "$RUN_USER" | cut -d: -f6)"
+if [ -z "$RUN_HOME" ]; then
+    echo -e "${RED}Could not resolve home directory for user '$RUN_USER'.${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}Installing for user '$RUN_USER' (home: $RUN_HOME)${NC}"
+echo -e "${GREEN}Project directory: $PROJECT_DIR${NC}"
+echo ""
+
 ensure_valid_system_time() {
-    # Some fresh Pi images boot with incorrect RTC/system time.
-    # When clock is far in the future, apt signature validation can fail.
+    # A Pi has no real-time clock. Without network time it can boot with
+    # a clock far enough off that apt rejects repository signatures as
+    # not-yet-valid or expired.
+    #
+    # The bound used to be a hardcoded "year >= 2026 means the clock is
+    # ahead", which stopped being a sanity check the moment 2026 arrived
+    # and started firing on every single run. It is a range now.
     local current_year
     current_year="$(date +%Y)"
 
@@ -32,13 +79,15 @@ ensure_valid_system_time() {
         sudo timedatectl set-ntp true || true
     fi
 
-    if [ "$current_year" -ge 2026 ]; then
-        echo -e "${YELLOW}System clock appears ahead (${current_year}). Attempting HTTP time sync...${NC}"
+    if [ "$current_year" -lt 2024 ] || [ "$current_year" -gt 2100 ]; then
+        echo -e "${YELLOW}System clock looks wrong (${current_year}). Attempting HTTP time sync...${NC}"
         local http_date
-        http_date="$(curl -fsI https://deb.debian.org 2>/dev/null | awk -F': ' '/^date:/I {print $2}' | tr -d '
-')"
+        http_date="$(curl -fsI https://deb.debian.org 2>/dev/null | awk -F': ' '/^date:/I {print $2}' | tr -d '\r\n')"
         if [ -n "$http_date" ]; then
             sudo date -s "$http_date" >/dev/null 2>&1 || true
+            echo -e "${GREEN}Clock set to: $(date)${NC}"
+        else
+            echo -e "${YELLOW}Could not reach a time source. Continuing anyway.${NC}"
         fi
     fi
 }
@@ -86,7 +135,7 @@ install_mongodb_docker_fallback() {
         sudo docker start frank-mongodb >/dev/null
     else
         sudo mkdir -p /var/lib/frank-mongodb
-        sudo docker run -d             --name frank-mongodb             --restart unless-stopped             -p 27017:27017             -v /var/lib/frank-mongodb:/data/db             mongo:7 >/dev/null
+        sudo docker run -d --name frank-mongodb --restart unless-stopped -p 27017:27017 -v /var/lib/frank-mongodb:/data/db mongo:7 >/dev/null
     fi
 
     echo -e "${GREEN}MongoDB is running via Docker container 'frank-mongodb'.${NC}"
@@ -158,7 +207,7 @@ install_mongodb() {
 
     # Add MongoDB official repository for Debian
     if [ ! -f /usr/share/keyrings/mongodb-server-7.0.gpg ]; then
-        curl -fsSL https://pgp.mongodb.com/server-7.0.asc |             sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
+        curl -fsSL https://pgp.mongodb.com/server-7.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
     fi
 
     CODENAME="$(. /etc/os-release && echo ${VERSION_CODENAME})"
@@ -168,7 +217,7 @@ install_mongodb() {
     # Clean up stale/bad mongodb list files from previous attempts.
     sudo rm -f /etc/apt/sources.list.d/mongodb-org-*.list
 
-    echo "deb [ arch=${ARCH} signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/debian ${REPO_CODENAME}/mongodb-org/7.0 main" |         sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list > /dev/null
+    echo "deb [ arch=${ARCH} signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/debian ${REPO_CODENAME}/mongodb-org/7.0 main" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list > /dev/null
 
     local apt_log
     apt_log="$(mktemp)"
@@ -207,10 +256,22 @@ pip install -r requirements.txt
 
 # Create .env file if not exists
 if [ ! -f .env ]; then
-    cat > .env << EOF
+    cat > .env << 'EOF'
 MONGO_URL=mongodb://localhost:27017
 DB_NAME=frank_hmi
 CORS_ORIGINS=*
+
+# Which source feeds the gauges.
+#
+#   simulation   bench harness, invented data
+#   hondata_can  real frames from the KPro over CAN
+#
+# This is deliberately not a user setting. A dash that quietly reverts
+# to simulation in front of a running engine shows a healthy idle no
+# matter what the engine is actually doing.
+SIGNAL_SOURCE=simulation
+CAN_CHANNEL=can0
+
 DHU_PATH=/opt/android-auto/desktop-head-unit
 DHU_CONFIG=/opt/android-auto/dhu.ini
 EOF
@@ -224,16 +285,20 @@ echo -e "${YELLOW}[5/7] Setting up React frontend...${NC}"
 cd "$PROJECT_DIR/frontend"
 
 # Abort early if merge-conflict markers exist. These cause opaque JSX parse
-# errors (e.g. in BootSequence.jsx) during npm build on Pi.
-if rg -n "^<<<<<<<|^=======|^>>>>>>>" "$PROJECT_DIR/frontend/src" >/dev/null 2>&1; then
+# errors during npm build on the Pi.
+#
+# This used ripgrep, which is not installed by default and is not in the
+# apt list above. A missing binary inside an `if` just makes the branch
+# false, so the check silently never ran - the exact opposite of the
+# intent. grep is always present.
+if grep -rEn '^(<<<<<<< |=======$|>>>>>>> )' "$PROJECT_DIR/frontend/src" --include='*.js' --include='*.jsx' --include='*.css' 2>/dev/null; then
     echo -e "${RED}Merge conflict markers detected in frontend/src. Resolve conflicts before running setup.${NC}"
-    rg -n "^<<<<<<<|^=======|^>>>>>>>" "$PROJECT_DIR/frontend/src" || true
     exit 1
 fi
 
 # Create .env file if not exists (must exist before build)
 if [ ! -f .env ]; then
-    cat > .env << EOF
+    cat > .env << 'EOF'
 REACT_APP_BACKEND_URL=http://localhost:8001
 EOF
     echo -e "${GREEN}Created frontend/.env file${NC}"
@@ -261,99 +326,45 @@ if [ -z "$CHROMIUM_BIN" ]; then
     exit 1
 fi
 
-# Kiosk launcher detects Wayland sessions and applies proper Chromium flags.
-cat > "$PROJECT_DIR/scripts/launch_kiosk.sh" << 'EOF'
-#!/bin/bash
-set -euo pipefail
-
-CHROMIUM_BIN="$(command -v chromium || command -v chromium-browser || true)"
-if [ -z "$CHROMIUM_BIN" ]; then
-  echo "Chromium binary not found for kiosk startup."
-  exit 1
-fi
-
-APP_URL="http://localhost:3000"
-
-COMMON_FLAGS=(
-  --kiosk
-  --no-sandbox
-  --noerrdialogs
-  --disable-infobars
-  --disable-session-crashed-bubble
-  --disable-restore-session-state
-  --no-first-run
-  --start-fullscreen
-  --disable-background-networking
-  --disable-component-update
-  --disable-features=OptimizationGuideModelDownloading,MediaRouter
-  --user-data-dir="$HOME/.config/chromium-kiosk"
-)
-
-WAYLAND_FLAGS=(
-  --ozone-platform=wayland
-  --enable-features=UseOzonePlatform
-)
-
-# Wait briefly for frontend to be reachable so Chromium doesn't start on a dead URL.
-for _ in $(seq 1 60); do
-  if curl -fsS --max-time 2 "${APP_URL}" >/dev/null 2>&1; then
-    break
-  fi
-  sleep 1
-done
-
-# Wait up to 2 minutes for a display socket to appear after boot/login.
-for _ in $(seq 1 120); do
-  # Prefer user-specific runtime dir first.
-  if [ -z "${XDG_RUNTIME_DIR:-}" ] && [ -d "/run/user/$(id -u)" ]; then
-    export XDG_RUNTIME_DIR="/run/user/$(id -u)"
-  fi
-
-  # Detect first available Wayland socket (wayland-0, wayland-1, ...).
-  if [ -n "${XDG_RUNTIME_DIR:-}" ]; then
-    wayland_sock="$(find "$XDG_RUNTIME_DIR" -maxdepth 1 -type s -name 'wayland-*' 2>/dev/null | head -n 1 || true)"
-    if [ -n "$wayland_sock" ]; then
-      export WAYLAND_DISPLAY="$(basename "$wayland_sock")"
-      exec "$CHROMIUM_BIN" "${COMMON_FLAGS[@]}" "${WAYLAND_FLAGS[@]}" --app="$APP_URL"
-    fi
-  fi
-
-  # X11 fallback when any display socket is present.
-  x11_sock="$(find /tmp/.X11-unix -maxdepth 1 -type s -name 'X*' 2>/dev/null | head -n 1 || true)"
-  if [ -n "$x11_sock" ]; then
-    display_num="${x11_sock##*/X}"
-    export DISPLAY=":${display_num}"
-    if [ -z "${XAUTHORITY:-}" ] && [ -f "$HOME/.Xauthority" ]; then
-      export XAUTHORITY="$HOME/.Xauthority"
-    fi
-    exec "$CHROMIUM_BIN" "${COMMON_FLAGS[@]}" --app="$APP_URL"
-  fi
-
-  sleep 1
-done
-
-echo "No Wayland or X11 display socket available after waiting; kiosk launch deferred."
-ls -la /run/user 2>/dev/null || true
-ls -la "/run/user/$(id -u)" 2>/dev/null || true
-ls -la /tmp/.X11-unix 2>/dev/null || true
-exit 1
-EOF
+# -----------------------------------------------------------------------------
+# Make repo scripts executable.
+#
+# launch_kiosk.sh used to be written here from a heredoc, which meant
+# every improvement to the committed version was overwritten on the next
+# setup run. It is a repo file now and setup only marks it executable.
+# -----------------------------------------------------------------------------
 chmod +x "$PROJECT_DIR/scripts/launch_kiosk.sh"
 chmod +x "$PROJECT_DIR/scripts/can_up.sh"
+chmod +x "$PROJECT_DIR/scripts/check_updates.sh"
+chmod +x "$PROJECT_DIR/scripts/start.sh"
+chmod +x "$PROJECT_DIR/scripts/stop.sh"
+chmod +x "$PROJECT_DIR/scripts/status.sh"
 
 # Create systemd services
-echo -e "${YELLOW}[6/7] Creating systemd services...${NC}"
+echo -e "${YELLOW}[6/7] Installing systemd services...${NC}"
 
-# CAN interface bring-up. Unlike the others this unit is a real file in
-# the repo rather than a heredoc, so it can be reviewed in a diff and
-# read in the garage; only the checkout path is substituted.
+# Units that exist as real files in the repo are substituted, not
+# generated, so they can be reviewed in a diff and read in the garage.
+install_unit() {
+    local source_file="$1"
+    local unit_name="$2"
+
+    sed -e "s#__PROJECT_DIR__#$PROJECT_DIR#g" \
+        -e "s#__USER__#$RUN_USER#g" \
+        -e "s#__HOME__#$RUN_HOME#g" \
+        "$source_file" | sudo tee "/etc/systemd/system/$unit_name" > /dev/null
+}
+
+# CAN interface bring-up.
 #
 # Note this only raises the interface. The device-tree overlays that
 # create it still have to be added to /boot/firmware/config.txt by
 # hand - see scripts/can_config.txt - because editing that file wrong
 # can leave the Pi unbootable.
-sed "s#__PROJECT_DIR__#$PROJECT_DIR#g" "$PROJECT_DIR/scripts/frank-can.service" \
-    | sudo tee /etc/systemd/system/frank-can.service > /dev/null
+install_unit "$PROJECT_DIR/scripts/frank-can.service" frank-can.service
+
+# Kiosk display.
+install_unit "$PROJECT_DIR/scripts/frank-kiosk.service" frank-kiosk.service
 
 # Display bootstrap service for Lite images (starts Xorg + Openbox on tty1)
 sudo tee /etc/systemd/system/frank-display.service > /dev/null << EOF
@@ -364,8 +375,8 @@ Wants=systemd-user-sessions.service
 
 [Service]
 Type=simple
-User=$USER
-Environment=HOME=/home/$USER
+User=$RUN_USER
+Environment=HOME=$RUN_HOME
 PAMName=login
 TTYPath=/dev/tty1
 TTYReset=yes
@@ -390,7 +401,7 @@ After=network.target mongodb.service frank-can.service
 
 [Service]
 Type=simple
-User=$USER
+User=$RUN_USER
 WorkingDirectory=$PROJECT_DIR/backend
 Environment="PATH=$PROJECT_DIR/backend/venv/bin"
 EnvironmentFile=$PROJECT_DIR/backend/.env
@@ -410,36 +421,11 @@ After=network.target frank-backend.service
 
 [Service]
 Type=simple
-User=$USER
+User=$RUN_USER
 WorkingDirectory=$PROJECT_DIR/frontend
 ExecStart=$SERVE_BIN -s build -l 3000
 Restart=always
 RestartSec=3
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Kiosk service (fullscreen browser)
-# Determine the real (non-root) user for the kiosk service
-KIOSK_USER="${SUDO_USER:-$(logname 2>/dev/null || echo pi)}"
-KIOSK_HOME="/home/$KIOSK_USER"
-
-sudo tee /etc/systemd/system/frank-kiosk.service > /dev/null << EOF
-[Unit]
-Description=FRANK HMI Kiosk Display
-After=frank-frontend.service frank-display.service network-online.target
-Wants=frank-frontend.service frank-display.service network-online.target
-
-[Service]
-Type=simple
-User=$KIOSK_USER
-Environment=HOME=$KIOSK_HOME
-PAMName=login
-ExecStartPre=/bin/sleep 8
-ExecStart=$PROJECT_DIR/scripts/launch_kiosk.sh
-Restart=always
-RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
@@ -453,106 +439,36 @@ sudo systemctl enable frank-backend.service
 sudo systemctl enable frank-frontend.service
 sudo systemctl enable frank-kiosk.service
 
-echo -e "${YELLOW}[7/7] Creating helper scripts...${NC}"
+echo -e "${YELLOW}[7/7] Verifying install...${NC}"
 
-# Create git update reminder script
-cat > "$PROJECT_DIR/scripts/check_updates.sh" << 'EOF'
-#!/bin/bash
-set -euo pipefail
-
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
-if ! command -v git >/dev/null 2>&1; then
-  echo "⚠️  git is not installed. Cannot check for updates."
-  exit 0
+# Ownership check. A build run under sudo leaves root-owned files in
+# build/, and the next ordinary build fails with EACCES while serve
+# keeps handing out the stale bundle - which looks like the code is
+# broken rather than the permissions.
+if find "$PROJECT_DIR" -user root -print -quit 2>/dev/null | grep -q .; then
+    echo -e "${YELLOW}Found root-owned files in the project. Fixing ownership...${NC}"
+    sudo chown -R "$RUN_USER:$RUN_USER" "$PROJECT_DIR"
 fi
-
-if ! git -C "$REPO_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  echo "⚠️  $REPO_DIR is not a git repository."
-  exit 0
-fi
-
-current_branch="$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD)"
-echo "Checking updates for branch: $current_branch"
-
-if ! git -C "$REPO_DIR" fetch --quiet origin "$current_branch"; then
-  echo "⚠️  Could not reach origin to check updates."
-  exit 0
-fi
-
-local_rev="$(git -C "$REPO_DIR" rev-parse "$current_branch")"
-remote_rev="$(git -C "$REPO_DIR" rev-parse "origin/$current_branch")"
-
-if [ "$local_rev" != "$remote_rev" ]; then
-  echo "🔔 Update available: run 'git -C $REPO_DIR pull --ff-only origin $current_branch' before driving."
-else
-  echo "✅ Repo is up to date."
-fi
-EOF
-chmod +x "$PROJECT_DIR/scripts/check_updates.sh"
-
-# Create start script
-cat > "$PROJECT_DIR/scripts/start.sh" << 'EOF'
-#!/bin/bash
-"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check_updates.sh"
-sudo systemctl start frank-backend
-sudo systemctl start frank-frontend
-sleep 3
-sudo systemctl start frank-kiosk
-echo "FRANK HMI started!"
-EOF
-chmod +x "$PROJECT_DIR/scripts/start.sh"
-
-# Create stop script
-cat > "$PROJECT_DIR/scripts/stop.sh" << 'EOF'
-#!/bin/bash
-sudo systemctl stop frank-kiosk
-sudo systemctl stop frank-frontend
-sudo systemctl stop frank-backend
-echo "FRANK HMI stopped!"
-EOF
-chmod +x "$PROJECT_DIR/scripts/stop.sh"
-
-# Create status script
-cat > "$PROJECT_DIR/scripts/status.sh" << 'EOF'
-#!/bin/bash
-"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check_updates.sh"
-echo "=== FRANK HMI Status ==="
-echo ""
-echo "Backend:"
-sudo systemctl status frank-backend --no-pager -l | head -5
-echo ""
-echo "Frontend:"
-sudo systemctl status frank-frontend --no-pager -l | head -5
-echo ""
-echo "Kiosk:"
-sudo systemctl status frank-kiosk --no-pager -l | head -5
-EOF
-chmod +x "$PROJECT_DIR/scripts/status.sh"
 
 echo ""
 echo -e "${GREEN}╔═══════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║     FRANK HMI Installation Complete!                          ║${NC}"
 echo -e "${GREEN}╚═══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo "To start the HMI manually:"
-echo "  ./scripts/start.sh"
+echo "  ./scripts/start.sh          start the dash"
+echo "  ./scripts/stop.sh           stop it"
+echo "  ./scripts/status.sh         services, CAN interfaces, signal source"
+echo "  ./scripts/check_updates.sh  is the checkout behind origin"
 echo ""
-echo "To stop:"
-echo "  ./scripts/stop.sh"
-echo ""
-echo "To check status:"
-echo "  ./scripts/status.sh"
-
-echo "To check if you need to pull updates:"
-echo "  ./scripts/check_updates.sh"
-echo ""
-echo "Kiosk service helper:"
-echo "  ./scripts/frank-kiosk.service.sh status"
-echo ""
-echo "The HMI will auto-start on boot. To disable:"
+echo "The HMI auto-starts on boot. To disable:"
 echo "  sudo systemctl disable frank-kiosk.service"
 echo ""
-echo -e "${YELLOW}Next step: Run the boot splash setup script:${NC}"
-echo "  sudo ./scripts/setup_boot_splash.sh"
+echo -e "${YELLOW}Still to do by hand:${NC}"
+echo "  1. CAN overlays -> see scripts/can_config.txt, then reboot"
+echo "  2. Boot splash  -> sudo ./scripts/setup_boot_splash.sh"
+echo "  3. Android Auto -> sudo ./scripts/install_openauto.sh"
+echo ""
+echo -e "${YELLOW}Before the dash goes in the car:${NC}"
+echo "  set SIGNAL_SOURCE=hondata_can in backend/.env, or it will show"
+echo "  simulated data that looks like a perfectly healthy engine."
 echo ""
