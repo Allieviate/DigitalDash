@@ -1,0 +1,52 @@
+[Unit]
+Description=FRANK X11 Display Session
+After=systemd-user-sessions.service
+
+# getty@tty1 holds the console with an autologin prompt. X wants the
+# same tty, and the two fighting over it is what left the screen on a
+# blinking cursor with no dash behind it.
+Conflicts=getty@tty1.service
+After=getty@tty1.service
+
+# Five attempts in a minute, then stop. Without this the unit retried
+# without end - one session reached 61 restarts, each one logging the
+# same failure, which buries the cause rather than reporting it.
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+[Service]
+Type=simple
+
+# This unit used to be generated inline by setup_pi.sh with User=$USER.
+# Run setup under sudo and $USER is root, so the unit was installed as
+# User=root with Environment=HOME=/home/root - a directory that does
+# not exist. xinit could not write an .Xauthority there, so every start
+# failed with "Authorization required, but no authorization protocol
+# specified" and X never came up at boot.
+#
+# It is a template now, substituted at install time from the real
+# login user, the same way frank-kiosk.service is.
+User=__USER__
+Environment=HOME=__HOME__
+
+PAMName=login
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+
+# An X server killed without cleaning up leaves this behind, and every
+# later start then refuses with "Server is already active for display
+# 0". The leading dash means a failure here is ignored.
+ExecStartPre=-/bin/rm -f /tmp/.X0-lock
+
+ExecStart=/usr/bin/xinit /usr/bin/openbox-session -- :0 -nolisten tcp vt1
+
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

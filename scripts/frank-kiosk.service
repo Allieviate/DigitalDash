@@ -15,6 +15,18 @@ Description=FRANK HMI Kiosk Display
 After=frank-frontend.service frank-display.service
 Wants=frank-frontend.service frank-display.service
 
+# These two belong in [Unit], not [Service]. They were in [Service] and
+# systemd logged "Unknown key 'StartLimitIntervalSec' in section
+# [Service], ignoring" - so the limit never applied and a failing unit
+# could still retry without end.
+#
+# Stop retrying after five failures inside a minute. Without a limit, a
+# genuine fault - no display, frontend down, a bad build - retries
+# forever and buries the cause in a repeating log. Failed and stopped is
+# easier to diagnose than failing on a loop.
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
 [Service]
 Type=simple
 User=__USER__
@@ -36,13 +48,6 @@ ExecStart=__PROJECT_DIR__/scripts/launch_kiosk.sh
 # are failures.
 Restart=on-failure
 RestartSec=5
-
-# Stop retrying after five failures inside a minute. Without a limit, a
-# genuine fault - no display, frontend down, a bad build - retries
-# forever and buries the cause in a repeating log. Failed and stopped
-# is easier to diagnose than failing on a loop.
-StartLimitBurst=5
-StartLimitIntervalSec=60
 
 [Install]
 WantedBy=multi-user.target
