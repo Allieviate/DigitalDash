@@ -131,7 +131,7 @@ will fail for reasons that are not bugs.
 
 ## Moving a change to the Pi
 
-Nothing special. Commit, push, then on the Pi:
+The loop is unchanged. Commit, push, then on the Pi:
 
 ```bash
 git pull
@@ -140,6 +140,28 @@ sudo systemctl restart frank-kiosk
 ```
 
 Backend-only changes need just `sudo systemctl restart frank-backend`.
+
+**When a `.service` file changed**, there is one extra step, because
+`git pull` updates the repo but not `/etc/systemd/system`:
+
+```bash
+./scripts/install_units.sh
+```
+
+Do not `sudo cp scripts/*.service /etc/systemd/system/`. The units in
+this repo are templates carrying `__USER__`, `__HOME__`,
+`__PROJECT_DIR__` and `__SERVE_BIN__`; copied unchanged, systemd
+rejects them with "Unit frank-kiosk.service has a bad unit file
+setting". `install_units.sh` substitutes all four, refuses to install
+anything still holding a placeholder, and reloads systemd. It restarts
+nothing — you choose what to restart.
+
+`./scripts/install_units.sh --dry-run` prints what it would write
+without touching anything.
+
+`setup_pi.sh` installs the same units the same way, but it also runs a
+full `apt upgrade`, rebuilds the virtualenv and reinstalls node
+modules. Use it for a fresh Pi, not for a unit file change.
 
 A failed build leaves `build/` broken while `serve` keeps handing it
 out, so a blank dash straight after a build is almost always the build
