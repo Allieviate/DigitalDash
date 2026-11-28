@@ -352,6 +352,7 @@ install_unit() {
     sed -e "s#__PROJECT_DIR__#$PROJECT_DIR#g" \
         -e "s#__USER__#$RUN_USER#g" \
         -e "s#__HOME__#$RUN_HOME#g" \
+        -e "s#__SERVE_BIN__#$SERVE_BIN#g" \
         "$source_file" | sudo tee "/etc/systemd/system/$unit_name" > /dev/null
 }
 
@@ -366,70 +367,18 @@ install_unit "$PROJECT_DIR/scripts/frank-can.service" frank-can.service
 # Kiosk display.
 install_unit "$PROJECT_DIR/scripts/frank-kiosk.service" frank-kiosk.service
 
-# Display bootstrap service for Lite images (starts Xorg + Openbox on tty1)
-sudo tee /etc/systemd/system/frank-display.service > /dev/null << EOF
-[Unit]
-Description=FRANK X11 Display Session
-After=systemd-user-sessions.service network.target
-Wants=systemd-user-sessions.service
+# Display bootstrap for Lite images (starts Xorg + Openbox on tty1).
+#
+# This was the last unit still written inline here, and it was the one
+# that broke: generated with User=$USER, which is root when setup runs
+# under sudo, so X tried to write its .Xauthority to /home/root - a
+# directory that does not exist - and never started at boot.
+install_unit "$PROJECT_DIR/scripts/frank-display.service" frank-display.service
 
-[Service]
-Type=simple
-User=$RUN_USER
-Environment=HOME=$RUN_HOME
-PAMName=login
-TTYPath=/dev/tty1
-TTYReset=yes
-TTYVHangup=yes
-TTYVTDisallocate=yes
-StandardInput=tty
-StandardOutput=journal
-StandardError=journal
-ExecStart=/usr/bin/xinit /usr/bin/openbox-session -- :0 -nolisten tcp vt1
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Backend service
-sudo tee /etc/systemd/system/frank-backend.service > /dev/null << EOF
-[Unit]
-Description=FRANK HMI Backend
-After=network.target mongodb.service frank-can.service
-
-[Service]
-Type=simple
-User=$RUN_USER
-WorkingDirectory=$PROJECT_DIR/backend
-Environment="PATH=$PROJECT_DIR/backend/venv/bin"
-EnvironmentFile=$PROJECT_DIR/backend/.env
-ExecStart=$PROJECT_DIR/backend/venv/bin/uvicorn server:app --host 0.0.0.0 --port 8001
-Restart=always
-RestartSec=3
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Frontend service
-sudo tee /etc/systemd/system/frank-frontend.service > /dev/null << EOF
-[Unit]
-Description=FRANK HMI Frontend
-After=network.target frank-backend.service
-
-[Service]
-Type=simple
-User=$RUN_USER
-WorkingDirectory=$PROJECT_DIR/frontend
-ExecStart=$SERVE_BIN -s build -l 3000
-Restart=always
-RestartSec=3
-
-[Install]
-WantedBy=multi-user.target
-EOF
+# Backend and frontend. Both are repo files now; nothing is authored
+# inline here. See the header: this script installs, it does not author.
+install_unit "$PROJECT_DIR/scripts/frank-backend.service" frank-backend.service
+install_unit "$PROJECT_DIR/scripts/frank-frontend.service" frank-frontend.service
 
 # Enable services
 sudo systemctl daemon-reload

@@ -21,7 +21,7 @@ const BOOT_STEPS = [
  * instead, so a fresh checkout still boots to something rather than
  * three broken image icons.
  */
-const LOGO_SRC = '/assets/branding/honda-logo.png';
+const LOGO_SRC = '/assets/gauges/honda-logo.png';
 
 /** Simple geometric fallback. Not a brand asset, just a shape. */
 const FallbackMark = ({ size, style }) => (

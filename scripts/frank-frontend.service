@@ -1,0 +1,21 @@
+[Unit]
+Description=FRANK HMI Frontend
+
+# Serves the built bundle from disk on localhost. Nothing here reaches
+# the internet, so network.target is not required - waiting on it would
+# only delay the dash when parked away from wifi.
+After=frank-backend.service
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__PROJECT_DIR__/frontend
+
+# Static files only. A failed build leaves build/ broken while serve
+# keeps handing it out, so a blank dash after a build is the build.
+ExecStart=__SERVE_BIN__ -s build -l 3000
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
